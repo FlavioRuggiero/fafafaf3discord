@@ -43,8 +43,10 @@ const Index = () => {
 
   // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
   const serverMembersList: User[] = serverProfiles.map(p => {
+    // L'utente corrente è sempre online per se stesso, gli altri dipendono dalla Presence
     const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
     const name = p.first_name || "Utente";
+    // Applica lo stesso criterio per il ruolo usato nel profilo principale
     const isVerifiedUser = name.toLowerCase() === 'faf3tto';
 
     return {
@@ -52,9 +54,7 @@ const Index = () => {
       name: name,
       avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
       status: isOnline ? "online" : "offline",
-      global_role: isVerifiedUser ? "CREATOR" : "USER",
-      bio: p.bio || "",
-      digitalcardus: p.digitalcardus || 0
+      global_role: isVerifiedUser ? "CREATOR" : "USER"
     };
   });
 
@@ -62,10 +62,11 @@ const Index = () => {
   useEffect(() => {
     if (!user) return;
 
+    // Crea un canale per tracciare chi è attualmente nell'app
     const channel = supabase.channel('global_presence', {
       config: {
         presence: {
-          key: user.id,
+          key: user.id, // Usa l'ID utente come chiave univoca
         },
       },
     });
@@ -74,16 +75,19 @@ const Index = () => {
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
         const onlineIds = new Set<string>();
+        // Estrapola tutti gli ID degli utenti attualmente connessi
         Object.keys(presenceState).forEach(id => onlineIds.add(id));
         setOnlineUserIds(onlineIds);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          // Quando sei connesso al canale, trasmetti il tuo stato
           await channel.track({ online_at: new Date().toISOString() });
         }
       });
 
     return () => {
+      // Disconnessione automatica quando il componente viene smontato (es. chiudi scheda)
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -93,11 +97,14 @@ const Index = () => {
     const loadInitialData = async () => {
       if (!user) return;
       
+      // Aggiorniamo l'orario nel DB per tracciare storicamente l'ultimo accesso
       await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
+      
+      // Controllo per gli utenti verificati (attualmente solo faf3tto)
       const isVerifiedUser = userName.toLowerCase() === 'faf3tto';
 
       const loadedUser: User = {
@@ -105,9 +112,7 @@ const Index = () => {
         name: userName,
         avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
-        global_role: isVerifiedUser ? "CREATOR" : "USER",
-        bio: profile?.bio || "",
-        digitalcardus: profile?.digitalcardus || 0
+        global_role: isVerifiedUser ? "CREATOR" : "USER"
       };
       
       setCurrentUser(loadedUser);
@@ -157,6 +162,7 @@ const Index = () => {
     fetchServerMembers();
   }, [activeServerId]);
 
+  // Seleziona automaticamente il primo canale
   useEffect(() => {
     if (activeServerId !== 'home') {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
@@ -170,6 +176,7 @@ const Index = () => {
     }
   }, [activeServerId, allChannels]);
 
+  // Gestione responsive della lista membri
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
@@ -201,6 +208,7 @@ const Index = () => {
   const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
     if (!currentUser) return;
     
+    // Doppio controllo di sicurezza per la creazione
     const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
     if (!canCreate) {
       showError("Non hai i permessi per creare un server. Serve un account verificato.");
@@ -233,7 +241,7 @@ const Index = () => {
       const filePath = `${currentUser.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('icons')
+        .from('icons') // Usiamo lo stesso bucket accessibile pubblicamente
         .upload(filePath, audioFile);
 
       if (!uploadError) {
@@ -346,6 +354,7 @@ const Index = () => {
       }
     }
 
+    // Gestione aggiornamento audio (undefined = non modificato, null = eliminato, file = nuovo)
     if (audioFile !== undefined) {
       if (audioFile === null) {
         audio_url = null;

@@ -1,7 +1,6 @@
 import React from "react";
 import { User } from "@/types/discord";
 import { Crown } from "lucide-react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface MemberListProps {
   users: User[];
@@ -38,90 +37,44 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
     const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
 
     return (
-      <HoverCard openDelay={200} closeDelay={100}>
-        <HoverCardTrigger asChild>
-          <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
-            <div className="relative mr-3 mt-1.5">
-              {isCreator && (
-                <div className="absolute -top-3.5 -right-1 z-10 text-yellow-400 rotate-[15deg] drop-shadow-md">
-                  <Crown size={16} className="fill-yellow-400" />
-                </div>
-              )}
-              <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
-              
-              {/* Pallino di stato con Tooltip (nascosto quando c'è HoverCard per evitare doppioni visivi, ma lasciato per completezza) */}
-              <div className="absolute -bottom-0.5 -right-0.5 group/status">
-                <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
-              </div>
+      <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
+        <div className="relative mr-3 mt-1.5">
+          {isCreator && (
+            <div className="absolute -top-3.5 -right-1 z-10 text-yellow-400 rotate-[15deg] drop-shadow-md">
+              <Crown size={16} className="fill-yellow-400" />
             </div>
-            
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'}`}>
-                  {user.name}
-                </span>
-                {isAdmin && (
-                  <span className="text-[9px] font-bold text-white border border-[#f23f43] rounded px-1 py-[2px] leading-none tracking-wide">
-                    ADMIN
-                  </span>
-                )}
-              </div>
-              {user.customStatus && (
-                <span className="text-xs text-[#dbdee1] truncate -mt-0.5">{user.customStatus}</span>
-              )}
-            </div>
-          </div>
-        </HoverCardTrigger>
-        <HoverCardContent side="left" align="start" sideOffset={15} className="w-80 p-0 bg-[#2b2d31] border-none shadow-2xl rounded-lg overflow-hidden text-[#dbdee1] z-[100]">
-          {/* Banner */}
-          <div className="h-[60px] bg-brand" />
+          )}
+          <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
           
-          <div className="px-4 pb-4 relative">
-            {/* Avatar nel profilo */}
-            <div className="absolute -top-10 left-4 rounded-full p-[6px] bg-[#2b2d31]">
-              <div className="relative">
-                <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full bg-[#1e1f22]" />
-                <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-[4px] border-[#2b2d31] ${statusColors[user.status]}`} />
-              </div>
-            </div>
+          {/* Pallino di stato con Tooltip */}
+          <div className="absolute -bottom-0.5 -right-0.5 group/status">
+            <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
             
-            {/* Contenitore informazioni principali */}
-            <div className="mt-10 mb-4 bg-[#111214] p-3 rounded-lg border border-[#1e1f22]">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-white text-lg">{user.name}</span>
-                {isAdmin && (
-                  <span className="text-[10px] font-bold text-[#f23f43] border border-[#f23f43] rounded px-1.5 py-[2px] leading-none tracking-wide bg-[#f23f43]/10">
-                    ADMIN
-                  </span>
-                )}
-              </div>
-              {user.customStatus && <div className="text-sm">{user.customStatus}</div>}
-            </div>
-            
-            {/* Bio (se presente) */}
-            {user.bio && (
-              <div className="mb-4">
-                <h3 className="text-xs font-bold uppercase mb-1.5 text-[#f2f3f5]">Su di me</h3>
-                <p className="text-[13px] text-[#dbdee1] whitespace-pre-wrap leading-tight">{user.bio}</p>
-              </div>
-            )}
-
-            {/* Portafoglio / Digitalcardus */}
-            <div>
-              <h3 className="text-xs font-bold uppercase mb-1.5 text-[#f2f3f5]">Portafoglio</h3>
-              <div className="flex items-center bg-[#1e1f22] border border-[#1f2023] p-2 rounded-md">
-                <img 
-                  src="/digitalcardus.png" 
-                  alt="Digitalcardus" 
-                  className="w-6 h-6 mr-2 object-contain" 
-                  style={{ imageRendering: 'pixelated' }} 
-                />
-                <span className="font-semibold text-white text-sm">{user.digitalcardus || 0} Digitalcardus</span>
-              </div>
+            {/* Tooltip */}
+            <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
+              {statusText[user.status]}
+              {/* Freccina del tooltip */}
+              <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-[#111214]"></div>
             </div>
           </div>
-        </HoverCardContent>
-      </HoverCard>
+        </div>
+        
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'}`}>
+              {user.name}
+            </span>
+            {isAdmin && (
+              <span className="text-[9px] font-bold text-white border border-[#f23f43] rounded px-1 py-[2px] leading-none tracking-wide">
+                ADMIN
+              </span>
+            )}
+          </div>
+          {user.customStatus && (
+            <span className="text-xs text-[#dbdee1] truncate -mt-0.5">{user.customStatus}</span>
+          )}
+        </div>
+      </div>
     );
   };
 
