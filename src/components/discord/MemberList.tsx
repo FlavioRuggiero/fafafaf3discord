@@ -3,7 +3,7 @@ import { User } from "@/types/discord";
 
 interface MemberListProps {
   users: User[];
-  isOpen: boolean;
+  isOpen?: boolean;
 }
 
 const statusColors = {
@@ -13,8 +13,9 @@ const statusColors = {
   offline: "bg-[#80848e]",
 };
 
-export const MemberList = ({ users, isOpen }: MemberListProps) => {
-  if (!isOpen) return null;
+export const MemberList = ({ users }: MemberListProps) => {
+  // Rimuoviamo "if (!isOpen) return null;" per permettere l'animazione fluida
+  // Il genitore (Index.tsx) gestirà la larghezza (w-[240px] -> w-0) nascondendo il contenuto
 
   const onlineUsers = users.filter(u => u.status !== 'offline');
   const offlineUsers = users.filter(u => u.status === 'offline');
@@ -37,9 +38,9 @@ export const MemberList = ({ users, isOpen }: MemberListProps) => {
   );
 
   return (
-    <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 border-l border-[#1f2023]">
+    <div className="w-[240px] h-full bg-[#2b2d31] flex flex-col flex-shrink-0 border-l border-[#1f2023]">
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-end px-4 flex-shrink-0">
-        {/* Placeholder per allineamento con header chat */}
+        {/* Placeholder per allineamento con l'header della chat */}
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pr-2">
