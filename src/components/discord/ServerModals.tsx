@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Server } from "@/types/discord";
 import { X, Trash2, Upload, Mic, Square, Volume2 } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
+import { showError } from "@/utils/toast";
 
 interface DiscoverModalProps {
   isOpen: boolean;
@@ -93,6 +94,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   // Audio recording states
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [audioFile, setAudioFile] = useState<File | Blob | null>(null);
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +108,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
       setAudioFile(null);
       setAudioPreview(null);
       setIsRecording(false);
+      if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
     }
   }, [isOpen]);
 
@@ -129,8 +132,18 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setAudioFile(file);
-      setAudioPreview(URL.createObjectURL(file));
+      const tempUrl = URL.createObjectURL(file);
+      
+      const audio = new Audio(tempUrl);
+      audio.onloadedmetadata = () => {
+        if (audio.duration > 3.5) { // 3.5s limite per dare un leggero margine
+          showError("Il motto vocale può durare massimo 3 secondi.");
+          if (audioInputRef.current) audioInputRef.current.value = '';
+        } else {
+          setAudioFile(file);
+          setAudioPreview(tempUrl);
+        }
+      };
     }
   };
 
@@ -151,12 +164,22 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
       
       mediaRecorder.start();
       setIsRecording(true);
+
+      // Limita la registrazione a 3 secondi
+      recordingTimeoutRef.current = setTimeout(() => {
+        stopRecording();
+      }, 3000);
+
     } catch (err) {
       console.error("Accesso al microfono negato", err);
+      showError("Impossibile accedere al microfono.");
     }
   };
 
   const stopRecording = () => {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+    }
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
   };
@@ -235,7 +258,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
 
               <div>
                 <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-                  Motto Vocale (Opzionale)
+                  Motto Vocale (Max 3s)
                 </label>
                 <p className="text-[#949ba4] text-xs mb-2">Registra un audio per convincere le persone ad entrare nel server!</p>
                 
@@ -259,7 +282,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                     }`}
                   >
                     {isRecording ? <Square size={16} /> : <Mic size={16} />}
-                    {isRecording ? 'Ferma' : 'Registra Audio'}
+                    {isRecording ? 'Ferma (Auto tra 3s)' : 'Registra Audio'}
                   </button>
                   <input 
                     type="file" 
@@ -323,6 +346,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   // Audio recording states
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [audioFile, setAudioFile] = useState<File | Blob | null | undefined>(undefined);
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -337,6 +361,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       setAudioPreview(server.audio_url || null);
       setAudioFile(undefined);
       setIsRecording(false);
+      if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
     }
   }, [server, isOpen]);
 
@@ -353,8 +378,18 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setAudioFile(file);
-      setAudioPreview(URL.createObjectURL(file));
+      const tempUrl = URL.createObjectURL(file);
+      
+      const audio = new Audio(tempUrl);
+      audio.onloadedmetadata = () => {
+        if (audio.duration > 3.5) { // 3.5s limite per dare un leggero margine
+          showError("Il motto vocale può durare massimo 3 secondi.");
+          if (audioInputRef.current) audioInputRef.current.value = '';
+        } else {
+          setAudioFile(file);
+          setAudioPreview(tempUrl);
+        }
+      };
     }
   };
 
@@ -375,12 +410,22 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       
       mediaRecorder.start();
       setIsRecording(true);
+
+      // Limita la registrazione a 3 secondi
+      recordingTimeoutRef.current = setTimeout(() => {
+        stopRecording();
+      }, 3000);
+      
     } catch (err) {
       console.error("Accesso al microfono negato", err);
+      showError("Impossibile accedere al microfono.");
     }
   };
 
   const stopRecording = () => {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+    }
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
   };
@@ -464,7 +509,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
 
             <div>
               <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-                Motto Vocale (Opzionale)
+                Motto Vocale (Max 3s)
               </label>
               <p className="text-[#949ba4] text-xs mb-2">Modifica o elimina l'audio del tuo server.</p>
               
@@ -488,7 +533,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                   }`}
                 >
                   {isRecording ? <Square size={16} /> : <Mic size={16} />}
-                  {isRecording ? 'Ferma' : 'Registra Audio'}
+                  {isRecording ? 'Ferma (Auto tra 3s)' : 'Registra Audio'}
                 </button>
                 <input 
                   type="file" 

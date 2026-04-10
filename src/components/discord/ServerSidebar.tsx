@@ -54,8 +54,9 @@ const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElemen
   );
 };
 
-const ServerIcon = ({ image, name, active, notify, onClick, serverId }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void, serverId?: string }) => {
+const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void, serverId?: string, audioUrl?: string }) => {
   const [memberCount, setMemberCount] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Recupera il numero di membri per il server specificato
   useEffect(() => {
@@ -75,9 +76,30 @@ const ServerIcon = ({ image, name, active, notify, onClick, serverId }: { image?
     ? `${memberCount} ${memberCount === 1 ? 'membro' : 'membri'}` 
     : undefined;
 
+  const handleMouseEnter = () => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.volume = 0.5; // Dimezza il volume
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => console.log('Autoplay audio bloccato', e));
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
   return (
     <HoverTooltip text={name} subtext={subtext}>
-      <div className="relative group flex items-center justify-center cursor-pointer mb-2" onClick={onClick}>
+      <div 
+        className="relative group flex items-center justify-center cursor-pointer mb-2" 
+        onClick={onClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {audioUrl && <audio ref={audioRef} src={audioUrl} preload="none" className="hidden" />}
         <div className={`absolute left-0 w-1 bg-white rounded-r-lg transition-all duration-300 ${active ? 'h-10' : 'h-0 group-hover:h-5'} ${notify && !active ? 'h-2' : ''}`} />
         
         <div className={`w-12 h-12 flex items-center justify-center overflow-hidden transition-all duration-300 ${active ? 'rounded-2xl bg-brand' : 'rounded-[24px] group-hover:rounded-2xl bg-[#313338] group-hover:bg-brand text-[#dbdee1] group-hover:text-white'}`}>
@@ -135,6 +157,7 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
           name={server.name} 
           active={activeServerId === server.id} 
           onClick={() => onServerSelect(server.id)} 
+          audioUrl={server.audio_url}
         />
       ))}
       
