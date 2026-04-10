@@ -4,30 +4,27 @@ import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
 import { ChatArea } from "@/components/discord/ChatArea";
 import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal } from "@/components/discord/ServerModals";
-import { MOCK_CHANNELS, INITIAL_MESSAGES, MOCK_USERS, MOCK_SERVERS } from "@/data/mockData";
+import { INITIAL_MESSAGES, MOCK_USERS } from "@/data/mockData";
 import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { showSuccess, showError } from "@/utils/toast";
 
 const Index = () => {
   const { user } = useAuth();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // States per Server e Canali
-  const [servers, setServers] = useState<Server[]>([MOCK_SERVERS[0]]);
-  const [activeServerId, setActiveServerId] = useState<string>(MOCK_SERVERS[0].id);
-  const [allChannels, setAllChannels] = useState<Channel[]>(MOCK_CHANNELS);
+  // States per Server e Canali dal DB
+  const [servers, setServers] = useState<Server[]>([]);
+  const [publicServers, setPublicServers] = useState<Server[]>([]);
+  const [activeServerId, setActiveServerId] = useState<string>('home');
+  const [allChannels, setAllChannels] = useState<Channel[]>([]);
   
-  // Trova il server attivo
-  const activeServer = servers.find(s => s.id === activeServerId) || MOCK_SERVERS[0];
-  
-  // Canali del server attivo
-  const serverChannels = allChannels.filter(c => c.server_id === activeServer.id);
-  const [activeChannel, setActiveChannel] = useState<Channel | null>(serverChannels[0] || null);
+  const activeServer = servers.find(s => s.id === activeServerId);
+  const serverChannels = allChannels.filter(c => c.server_id === activeServerId);
+  const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
 
-  const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({
-    [MOCK_CHANNELS[0].id]: INITIAL_MESSAGES
-  });
+  const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({});
   
   // States per UI
   const [showMembers, setShowMembers] = useState(true);
@@ -35,23 +32,36 @@ const Index = () => {
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Caricamento dati iniziali (Profilo, Server uniti, Canali)
   useEffect(() => {
-    const fetchProfile = async () => {
+    const loadInitialData = async () => {
       if (!user) return;
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
-      const role = data?.global_role || "CREATOR"; // Default CREATOR per testare la creazione
-      
-      setCurrentUser({
+      // 1. Carica Profilo
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const loadedUser: User = {
         id: user.id,
-        name: data?.first_name || user.email?.split('@')[0] || "Utente",
-        avatar: data?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+        name: profile?.first_name || user.email?.split('@')[0] || "Utente",
+        avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
-        global_role: role as any
-      });
+        global_role: profile?.global_role || "CREATOR"
+      };
+      setCurrentUser(loadedUser);
+
+      // 2. Carica Server di cui l'utente fa parte
+      const { data: memberData } = await supabase.from('server_members').select('server_id').eq('user_id', user.id);
+      const joinedServerIds = memberData?.map(m => m.server_id) || [];
+
+      if (joinedServerIds.length > 0) {
+        const { data: serversData } = await supabase.from('servers').select('*').in('id', joinedServerIds);
+        if (serversData) setServers(serversData);
+
+        const { data: channelsData } = await supabase.from('channels').select('*').in('server_id', joinedServerIds);
+        if (channelsData) setAllChannels(channelsData);
+      }
     };
     
-    fetchProfile();
+    loadInitialData();
   }, [user]);
 
   // Seleziona automaticamente il primo canale quando si cambia server
@@ -63,9 +73,12 @@ const Index = () => {
       } else {
         setActiveChannel(null);
       }
+    } else {
+      setActiveChannel(null);
     }
   }, [activeServerId, allChannels]);
 
+  // Invio messaggio (per ora solo in memoria, step successivo sarà scriverlo su DB)
   const handleSendMessage = (content: string) => {
     if (!currentUser || !activeChannel) return;
     
@@ -82,40 +95,80 @@ const Index = () => {
     }));
   };
 
-  const handleCreateServer = (name: string) => {
+  // Creazione di un Server sul Database Reale
+  const handleCreateServer = async (name: string) => {
     if (!currentUser) return;
     
-    const newServer: Server = {
-      id: `s${Date.now()}`,
-      name,
-      created_by: currentUser.id,
-      description: "Il tuo nuovo server privato.",
-      icon_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`
-    };
-    
-    const newChannel: Channel = {
-      id: `c${Date.now()}`,
-      server_id: newServer.id,
-      name: "generale",
-      type: "text",
-      category: "Chat Generale"
-    };
+    // 1. Inserisci il server
+    const { data: newServer, error: serverError } = await supabase
+      .from('servers')
+      .insert({
+        name,
+        created_by: currentUser.id,
+        description: "Il tuo nuovo server privato.",
+        icon_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`
+      })
+      .select()
+      .single();
 
+    if (serverError || !newServer) {
+      showError("Errore durante la creazione del server");
+      return;
+    }
+
+    // 2. Aggiungi l'utente ai membri del server
+    await supabase.from('server_members').insert({ server_id: newServer.id, user_id: currentUser.id });
+
+    // 3. Crea il canale testuale di default
+    const { data: newChannel } = await supabase
+      .from('channels')
+      .insert({
+        server_id: newServer.id,
+        name: "generale",
+        type: "text",
+        category: "Chat Generale"
+      })
+      .select()
+      .single();
+
+    // Aggiorna la UI
     setServers([...servers, newServer]);
-    setAllChannels([...allChannels, newChannel]);
+    if (newChannel) setAllChannels([...allChannels, newChannel]);
     setActiveServerId(newServer.id);
+    showSuccess("Server creato con successo!");
   };
 
-  const handleJoinServer = (server: Server) => {
+  // Unisciti a un server esistente
+  const handleJoinServer = async (server: Server) => {
+    if (!currentUser) return;
+
+    const { error } = await supabase.from('server_members').insert({ server_id: server.id, user_id: currentUser.id });
+    if (error) {
+      showError("Errore durante l'unione al server");
+      return;
+    }
+
+    // Carica i canali del server a cui ci siamo appena uniti
+    const { data: newChannels } = await supabase.from('channels').select('*').eq('server_id', server.id);
+    
     setServers([...servers, server]);
+    if (newChannels) setAllChannels([...allChannels, ...newChannels]);
     setActiveServerId(server.id);
+    showSuccess(`Ti sei unito a ${server.name}!`);
+  };
+
+  // Esplora Server (Carica tutti i server pubblici dal DB)
+  const handleOpenDiscover = async () => {
+    const { data } = await supabase.from('servers').select('*');
+    if (data) setPublicServers(data);
+    setShowDiscoverModal(true);
   };
 
   if (!currentUser) {
     return <div className="h-screen w-full bg-[#313338] flex items-center justify-center text-[#dbdee1]">Caricamento profilo...</div>;
   }
 
-  const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || []) : [];
+  const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
   const currentUsersList = [...MOCK_USERS.filter(u => u.id !== 'u1'), currentUser];
 
   return (
@@ -131,11 +184,11 @@ const Index = () => {
           activeServerId={activeServerId}
           onServerSelect={(id) => { setActiveServerId(id); setShowSidebar(false); }}
           onOpenCreate={() => setShowCreateModal(true)}
-          onOpenDiscover={() => setShowDiscoverModal(true)}
+          onOpenDiscover={handleOpenDiscover}
           currentUser={currentUser}
         />
         
-        {activeServerId !== 'home' ? (
+        {activeServerId !== 'home' && activeServer ? (
           <ChannelSidebar 
             activeServer={activeServer}
             channels={allChannels}
@@ -177,7 +230,7 @@ const Index = () => {
       <DiscoverServersModal 
         isOpen={showDiscoverModal} 
         onClose={() => setShowDiscoverModal(false)} 
-        servers={MOCK_SERVERS}
+        servers={publicServers}
         joinedServerIds={servers.map(s => s.id)}
         onJoin={handleJoinServer}
       />
