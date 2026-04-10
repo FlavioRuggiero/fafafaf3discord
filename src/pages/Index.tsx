@@ -46,13 +46,20 @@ const Index = () => {
       if (!user) return;
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      
+      const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
+      
+      // Controllo per gli utenti verificati (attualmente solo faf3tto)
+      const isVerifiedUser = userName.toLowerCase() === 'faf3tto';
+
       const loadedUser: User = {
         id: user.id,
-        name: profile?.first_name || user.email?.split('@')[0] || "Utente",
+        name: userName,
         avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
-        global_role: profile?.global_role || "CREATOR"
+        global_role: isVerifiedUser ? "CREATOR" : "USER"
       };
+      
       setCurrentUser(loadedUser);
 
       const { data: memberData } = await supabase.from('server_members').select('server_id').eq('user_id', user.id);
@@ -152,6 +159,14 @@ const Index = () => {
 
   const handleCreateServer = async (name: string, imageFile: File | null) => {
     if (!currentUser) return;
+    
+    // Doppio controllo di sicurezza per la creazione
+    const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
+    if (!canCreate) {
+      showError("Non hai i permessi per creare un server. Serve un account verificato.");
+      return;
+    }
+
     setIsCreatingServer(true);
     
     let icon_url = `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`;
@@ -292,6 +307,7 @@ const Index = () => {
   }
 
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
+  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
   return (
     <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
@@ -328,7 +344,9 @@ const Index = () => {
             <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
               <h2 className="text-white font-bold text-xs mb-3 uppercase tracking-wider">Le tue attività</h2>
               <div className="text-[#949ba4] text-sm bg-[#1e1f22] p-3 rounded-lg border border-[#1f2023]">
-                Per iniziare, esplora i server pubblici o creane uno tuo usando i pulsanti nella schermata principale!
+                {canCreate 
+                  ? "Per iniziare, esplora i server pubblici o creane uno tuo usando i pulsanti nella schermata principale!"
+                  : "Per iniziare, esplora i server pubblici usando i pulsanti nella schermata principale!"}
               </div>
             </div>
             
@@ -391,9 +409,13 @@ const Index = () => {
                 <MessageSquare size={40} className="text-white" />
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
-              <p className="text-[#b5bac1] mb-8 text-lg">Inizia subito a chattare unendoti a una community o creando il tuo server personale.</p>
+              <p className="text-[#b5bac1] mb-8 text-lg">
+                {canCreate 
+                  ? "Inizia subito a chattare unendoti a una community o creando il tuo server personale."
+                  : "Inizia subito a chattare esplorando i server pubblici disponibili."}
+              </p>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
                 <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
                   <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <Compass size={24} className="text-[#23a559]" />
@@ -402,13 +424,15 @@ const Index = () => {
                   <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
                 </button>
                 
-                <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                  <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Plus size={24} className="text-brand" />
-                  </div>
-                  <h3 className="font-bold text-white mb-1">Crea un Server</h3>
-                  <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
-                </button>
+                {canCreate && (
+                  <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                    <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Plus size={24} className="text-brand" />
+                    </div>
+                    <h3 className="font-bold text-white mb-1">Crea un Server</h3>
+                    <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
+                  </button>
+                )}
               </div>
             </div>
           </div>
