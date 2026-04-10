@@ -40,57 +40,19 @@ const Index = () => {
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
-  // Heartbeat: aggiorna lo stato online dell'utente corrente ogni minuto
-  useEffect(() => {
-    if (!user) return;
-    
-    const updatePresence = async () => {
-      await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
-    };
-
-    // Aggiorna subito all'avvio
-    updatePresence();
-
-    const intervalId = setInterval(updatePresence, 60000); // 1 minuto
-    return () => clearInterval(intervalId);
-  }, [user]);
-
-  // Ricalcola lo stato offline ogni 30 secondi per gli utenti che chiudono la tab senza fare logout
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setServerMembersList(prev => {
-        let changed = false;
-        const now = new Date().getTime();
-        
-        const newList = prev.map(u => {
-          if (!u.updated_at) return u;
-          const lastSeen = new Date(u.updated_at).getTime();
-          const isOnline = (now - lastSeen) < 5 * 60 * 1000;
-          const newStatus = isOnline ? "online" : "offline";
-          
-          if (u.status !== newStatus) {
-            changed = true;
-            return { ...u, status: newStatus };
-          }
-          return u;
-        });
-        
-        return changed ? newList : prev;
-      });
-    }, 30000); // 30 secondi
-    
-    return () => clearInterval(intervalId);
-  }, []);
-
   // Caricamento dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
+      // Aggiorniamo l'orario di attività per indicare che l'utente è "Online"
+      await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
+      
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
       
+      // Controllo per gli utenti verificati (attualmente solo faf3tto)
       const isVerifiedUser = userName.toLowerCase() === 'faf3tto';
 
       const loadedUser: User = {
@@ -98,8 +60,7 @@ const Index = () => {
         name: userName,
         avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
-        global_role: isVerifiedUser ? "CREATOR" : "USER",
-        updated_at: profile?.updated_at
+        global_role: isVerifiedUser ? "CREATOR" : "USER"
       };
       
       setCurrentUser(loadedUser);
@@ -119,10 +80,8 @@ const Index = () => {
     loadInitialData();
   }, [user]);
 
-  // Caricamento membri quando si cambia server (con Realtime Subscription)
+  // Caricamento membri quando si cambia server
   useEffect(() => {
-    let subscription: any;
-
     const fetchServerMembers = async () => {
       if (!activeServerId || activeServerId === 'home') {
         setServerMembersList([]);
@@ -146,6 +105,7 @@ const Index = () => {
           const now = new Date().getTime();
           
           const formattedMembers: User[] = profilesData.map(p => {
+            // Se l'utente è stato attivo negli ultimi 5 minuti consideralo online
             const lastSeen = new Date(p.updated_at || 0).getTime();
             const isOnline = (now - lastSeen) < 5 * 60 * 1000;
             
@@ -154,54 +114,15 @@ const Index = () => {
               name: p.first_name || "Utente",
               avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
               status: isOnline ? "online" : "offline",
-              global_role: "USER",
-              updated_at: p.updated_at
+              global_role: "USER"
             };
           });
           setServerMembersList(formattedMembers);
         }
       }
-
-      // Iscrizione Realtime per ricevere modifiche dalla tabella profiles (ad es. cambio di stato)
-      subscription = supabase
-        .channel(`server_${activeServerId}_profiles`)
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'profiles' },
-          (payload) => {
-            const updatedProfile = payload.new;
-            setServerMembersList(prev => {
-              // Controlliamo se l'utente aggiornato si trova in questo server
-              if (!prev.find(u => u.id === updatedProfile.id)) return prev;
-
-              return prev.map(u => {
-                if (u.id === updatedProfile.id) {
-                  const now = new Date().getTime();
-                  const lastSeen = new Date(updatedProfile.updated_at || 0).getTime();
-                  const isOnline = (now - lastSeen) < 5 * 60 * 1000;
-                  return {
-                    ...u,
-                    name: updatedProfile.first_name || u.name,
-                    avatar: updatedProfile.avatar_url || u.avatar,
-                    status: isOnline ? "online" : "offline",
-                    updated_at: updatedProfile.updated_at
-                  };
-                }
-                return u;
-              });
-            });
-          }
-        )
-        .subscribe();
     };
 
     fetchServerMembers();
-
-    return () => {
-      if (subscription) {
-        supabase.removeChannel(subscription);
-      }
-    };
   }, [activeServerId]);
 
   // Seleziona automaticamente il primo canale
@@ -250,6 +171,7 @@ const Index = () => {
   const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
     if (!currentUser) return;
     
+    // Doppio controllo di sicurezza per la creazione
     const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
     if (!canCreate) {
       showError("Non hai i permessi per creare un server. Serve un account verificato.");
@@ -282,7 +204,7 @@ const Index = () => {
       const filePath = `${currentUser.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('icons') 
+        .from('icons') // Usiamo lo stesso bucket accessibile pubblicamente
         .upload(filePath, audioFile);
 
       if (!uploadError) {
@@ -395,6 +317,7 @@ const Index = () => {
       }
     }
 
+    // Gestione aggiornamento audio (undefined = non modificato, null = eliminato, file = nuovo)
     if (audioFile !== undefined) {
       if (audioFile === null) {
         audio_url = null;
@@ -440,11 +363,6 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
-    if (currentUser) {
-      // Imposta updated_at molto nel passato così che agli altri utenti
-      // appaia istantaneamente come 'offline' grazie al Realtime
-      await supabase.from('profiles').update({ updated_at: new Date(0).toISOString() }).eq('id', currentUser.id);
-    }
     await supabase.auth.signOut();
   };
 
