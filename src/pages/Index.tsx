@@ -31,7 +31,7 @@ const Index = () => {
   const [serverMembersList, setServerMembersList] = useState<User[]>([]);
 
   // States per UI
-  const [showMembers, setShowMembers] = useState(true);
+  const [showMembers, setShowMembers] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -120,6 +120,19 @@ const Index = () => {
       setActiveChannel(null);
     }
   }, [activeServerId, allChannels]);
+
+  // Gestione responsive della lista membri
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setShowMembers(false);
+      } else {
+        setShowMembers(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleSendMessage = (content: string) => {
     if (!currentUser || !activeChannel) return;
@@ -325,6 +338,10 @@ const Index = () => {
             onToggleSidebar={() => setShowSidebar(true)}
             showMembers={showMembers}
           />
+          {/* Overlay scuro su mobile/tablet per chiudere la lista membri cliccando fuori */}
+          {showMembers && (
+            <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
+          )}
           {/* Wrapper per l'elenco membri aggiornato per funzionare su tutti gli schermi tramite pannello laterale scorrevole/espandibile */}
           <div className={`
             absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
