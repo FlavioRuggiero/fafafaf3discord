@@ -28,7 +28,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           {isOwner && onOpenSettings && (
             <button 
               onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
-              className="p-1 text-[#dbdee1] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
               title="Impostazioni Server"
             >
               <Settings size={16} />
