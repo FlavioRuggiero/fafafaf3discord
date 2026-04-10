@@ -9,6 +9,7 @@ import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
@@ -32,12 +33,11 @@ const Index = () => {
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Caricamento dati iniziali (Profilo, Server uniti, Canali)
+  // Caricamento dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
-      // 1. Carica Profilo
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       const loadedUser: User = {
         id: user.id,
@@ -48,7 +48,6 @@ const Index = () => {
       };
       setCurrentUser(loadedUser);
 
-      // 2. Carica Server di cui l'utente fa parte
       const { data: memberData } = await supabase.from('server_members').select('server_id').eq('user_id', user.id);
       const joinedServerIds = memberData?.map(m => m.server_id) || [];
 
@@ -64,7 +63,7 @@ const Index = () => {
     loadInitialData();
   }, [user]);
 
-  // Seleziona automaticamente il primo canale quando si cambia server
+  // Seleziona automaticamente il primo canale
   useEffect(() => {
     if (activeServerId !== 'home') {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
@@ -78,7 +77,6 @@ const Index = () => {
     }
   }, [activeServerId, allChannels]);
 
-  // Invio messaggio (per ora solo in memoria, step successivo sarà scriverlo su DB)
   const handleSendMessage = (content: string) => {
     if (!currentUser || !activeChannel) return;
     
@@ -95,11 +93,9 @@ const Index = () => {
     }));
   };
 
-  // Creazione di un Server sul Database Reale
   const handleCreateServer = async (name: string) => {
     if (!currentUser) return;
     
-    // 1. Inserisci il server
     const { data: newServer, error: serverError } = await supabase
       .from('servers')
       .insert({
@@ -116,10 +112,8 @@ const Index = () => {
       return;
     }
 
-    // 2. Aggiungi l'utente ai membri del server
     await supabase.from('server_members').insert({ server_id: newServer.id, user_id: currentUser.id });
 
-    // 3. Crea il canale testuale di default
     const { data: newChannel } = await supabase
       .from('channels')
       .insert({
@@ -131,14 +125,12 @@ const Index = () => {
       .select()
       .single();
 
-    // Aggiorna la UI
     setServers([...servers, newServer]);
     if (newChannel) setAllChannels([...allChannels, newChannel]);
     setActiveServerId(newServer.id);
     showSuccess("Server creato con successo!");
   };
 
-  // Unisciti a un server esistente
   const handleJoinServer = async (server: Server) => {
     if (!currentUser) return;
 
@@ -148,7 +140,6 @@ const Index = () => {
       return;
     }
 
-    // Carica i canali del server a cui ci siamo appena uniti
     const { data: newChannels } = await supabase.from('channels').select('*').eq('server_id', server.id);
     
     setServers([...servers, server]);
@@ -157,11 +148,14 @@ const Index = () => {
     showSuccess(`Ti sei unito a ${server.name}!`);
   };
 
-  // Esplora Server (Carica tutti i server pubblici dal DB)
   const handleOpenDiscover = async () => {
     const { data } = await supabase.from('servers').select('*');
     if (data) setPublicServers(data);
     setShowDiscoverModal(true);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   if (!currentUser) {
@@ -197,9 +191,36 @@ const Index = () => {
             currentUser={currentUser}
           />
         ) : (
-          <div className="w-[240px] bg-[#2b2d31] flex flex-col p-4 z-10 border-r border-[#1e1f22]">
-            <h2 className="text-white font-bold text-lg mb-4">Amici</h2>
-            <div className="text-[#949ba4] text-sm">Presto potrai gestire i tuoi amici qui! Per ora, unisciti a un Server dalla lista a sinistra o esplora la bussola.</div>
+          <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">
+            <div className="h-12 flex items-center px-4 border-b border-[#1f2023] shadow-sm">
+              <h1 className="font-semibold text-white">Dashboard</h1>
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+              <h2 className="text-white font-bold text-xs mb-3 uppercase tracking-wider">Le tue attività</h2>
+              <div className="text-[#949ba4] text-sm bg-[#1e1f22] p-3 rounded-lg border border-[#1f2023]">
+                Per iniziare, esplora i server pubblici o creane uno tuo usando i pulsanti nella schermata principale!
+              </div>
+            </div>
+            
+            {/* User Profile Block per la Home */}
+            <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
+              <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
+                <div className="relative">
+                  <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
+                </div>
+                <div className="ml-2 flex flex-col min-w-0">
+                  <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser.name}</span>
+                  <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center text-[#dbdee1]">
+                <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
+                <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
+                <button onClick={handleLogout} title="Disconnetti" className="p-1.5 hover:bg-[#3f4147] rounded transition-colors text-[#f23f43] hover:text-white hover:bg-[#f23f43]"><LogOut size={18} /></button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -218,9 +239,44 @@ const Index = () => {
           </div>
         </>
       ) : activeServerId === 'home' ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-[#313338] p-8 text-center">
-          <img src="https://api.dicebear.com/7.x/shapes/svg?seed=wumpus" className="w-64 h-64 opacity-50 mb-8" alt="Wumpus" />
-          <h2 className="text-[#949ba4] text-xl font-medium">Nessuno in linea per ora...</h2>
+        <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
+          {/* Header per la Home (Essenziale per Mobile) */}
+          <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
+            <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
+              <Menu size={24} />
+            </button>
+            <Home size={20} className="text-[#80848e] mr-2" />
+            <h2 className="font-semibold text-white">Home</h2>
+          </div>
+          
+          {/* Contenuto di Benvenuto */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-xl w-full text-center">
+              <div className="w-20 h-20 bg-brand rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
+                <MessageSquare size={40} className="text-white" />
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
+              <p className="text-[#b5bac1] mb-8 text-lg">Inizia subito a chattare unendoti a una community o creando il tuo server personale.</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                  <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Compass size={24} className="text-[#23a559]" />
+                  </div>
+                  <h3 className="font-bold text-white mb-1">Esplora Server</h3>
+                  <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
+                </button>
+                
+                <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                  <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Plus size={24} className="text-brand" />
+                  </div>
+                  <h3 className="font-bold text-white mb-1">Crea un Server</h3>
+                  <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
