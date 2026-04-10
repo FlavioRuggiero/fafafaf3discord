@@ -168,7 +168,7 @@ const Index = () => {
     }));
   };
 
-  const handleCreateServer = async (name: string, imageFile: File | null) => {
+  const handleCreateServer = async (name: string, description: string, imageFile: File | null) => {
     if (!currentUser) return;
     
     // Doppio controllo di sicurezza per la creazione
@@ -204,7 +204,7 @@ const Index = () => {
       .insert({
         name,
         created_by: currentUser.id,
-        description: "Il tuo nuovo server privato.",
+        description: description || "Il tuo nuovo server privato.",
         icon_url
       })
       .select()
@@ -280,7 +280,7 @@ const Index = () => {
     setShowDiscoverModal(true);
   };
 
-  const handleUpdateServer = async (id: string, name: string, imageFile: File | null) => {
+  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null) => {
     if (!currentUser) return;
     setIsUpdatingServer(true);
     
@@ -303,14 +303,14 @@ const Index = () => {
       }
     }
 
-    const { error } = await supabase.from('servers').update({ name, icon_url }).eq('id', id);
+    const { error } = await supabase.from('servers').update({ name, description, icon_url }).eq('id', id);
     if (error) {
       showError("Impossibile aggiornare il server");
       setIsUpdatingServer(false);
       return;
     }
     
-    setServers(servers.map(s => s.id === id ? { ...s, name, icon_url: icon_url || s.icon_url } : s));
+    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url } : s));
     setShowSettingsModal(false);
     showSuccess("Impostazioni salvate con successo!");
     setIsUpdatingServer(false);

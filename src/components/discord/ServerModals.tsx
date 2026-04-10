@@ -45,7 +45,7 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
                     </div>
                     <div className="mt-4">
                       <h3 className="font-bold text-white text-lg mb-1">{server.name}</h3>
-                      <p className="text-[#b5bac1] text-sm line-clamp-2 mb-4">{server.description}</p>
+                      <p className="text-[#b5bac1] text-sm line-clamp-2 mb-4">{server.description || "Nessuna descrizione."}</p>
                       <button 
                         onClick={() => { onJoin(server); onClose(); }}
                         className="w-full bg-[#35373c] hover:bg-[#23a559] hover:text-white text-[#dbdee1] font-medium py-2 rounded transition-colors text-sm"
@@ -67,12 +67,13 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, imageFile: File | null) => void;
+  onCreate: (name: string, description: string, imageFile: File | null) => void;
   isCreating: boolean;
 }
 
 export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: CreateModalProps) => {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,6 +81,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   useEffect(() => {
     if (isOpen) {
       setName("");
+      setDescription("");
       setImageFile(null);
       setPreviewUrl(null);
     }
@@ -90,7 +92,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && !isCreating) {
-      onCreate(name.trim(), imageFile);
+      onCreate(name.trim(), description.trim(), imageFile);
     }
   };
 
@@ -111,11 +113,11 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
         <div className="p-6 text-center relative">
           <button onClick={onClose} disabled={isCreating} className="absolute top-4 right-4 text-[#b5bac1] hover:text-white p-1 disabled:opacity-50"><X size={20} /></button>
           <h2 className="text-2xl font-bold text-white mb-2">Personalizza il tuo server</h2>
-          <p className="text-[#b5bac1] text-sm">Dai al tuo nuovo server una personalità con un nome e un'icona unici.</p>
+          <p className="text-[#b5bac1] text-sm">Dai al tuo nuovo server una personalità con un nome, un'icona e una descrizione unici.</p>
         </div>
         
         <form onSubmit={handleSubmit}>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 space-y-4">
             <div className="flex justify-center mb-6 relative">
               <div 
                 onClick={() => !isCreating && fileInputRef.current?.click()}
@@ -144,18 +146,34 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
               />
             </div>
             
-            <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-              Nome del server <span className="text-[#f23f43]">*</span>
-            </label>
-            <input 
-              type="text" 
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Il server di DyadUser"
-              required
-              disabled={isCreating}
-              className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
-            />
+            <div>
+              <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                Nome del server <span className="text-[#f23f43]">*</span>
+              </label>
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Il server di DyadUser"
+                required
+                disabled={isCreating}
+                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                Descrizione
+              </label>
+              <textarea 
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Di cosa tratta questo server?"
+                disabled={isCreating}
+                rows={3}
+                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] p-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50 resize-none custom-scrollbar"
+              />
+            </div>
           </div>
           
           <div className="p-4 bg-[#2b2d31] rounded-b-lg flex justify-between items-center">
@@ -176,13 +194,14 @@ interface ServerSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   server: Server | null;
-  onUpdate: (id: string, name: string, imageFile: File | null) => void;
+  onUpdate: (id: string, name: string, description: string, imageFile: File | null) => void;
   onDelete: (id: string) => void;
   isUpdating?: boolean;
 }
 
 export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete, isUpdating = false }: ServerSettingsModalProps) => {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -191,6 +210,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   useEffect(() => {
     if (server && isOpen) {
       setName(server.name);
+      setDescription(server.description || "");
       setPreviewUrl(server.icon_url || null);
       setImageFile(null);
       setConfirmDelete(false);
@@ -210,7 +230,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && !isUpdating) {
-      onUpdate(server.id, name.trim(), imageFile);
+      onUpdate(server.id, name.trim(), description.trim(), imageFile);
     }
   };
 
@@ -267,6 +287,20 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                 required
                 disabled={isUpdating}
                 className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                Descrizione
+              </label>
+              <textarea 
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Di cosa tratta questo server?"
+                disabled={isUpdating}
+                rows={3}
+                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] p-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50 resize-none custom-scrollbar"
               />
             </div>
           </form>
