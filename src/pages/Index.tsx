@@ -255,6 +255,25 @@ const Index = () => {
     showSuccess(`Ti sei unito a ${server.name}!`);
   };
 
+  const handleLeaveServer = async (serverId: string) => {
+    if (!currentUser) return;
+
+    const { error } = await supabase
+      .from('server_members')
+      .delete()
+      .eq('server_id', serverId)
+      .eq('user_id', currentUser.id);
+
+    if (error) {
+      showError("Impossibile uscire dal server. Controlla i permessi.");
+      return;
+    }
+
+    setServers(servers.filter(s => s.id !== serverId));
+    setActiveServerId('home');
+    showSuccess("Sei uscito dal server.");
+  };
+
   const handleOpenDiscover = async () => {
     const { data } = await supabase.from('servers').select('*');
     if (data) setPublicServers(data);
@@ -346,6 +365,7 @@ const Index = () => {
             onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
             currentUser={currentUser}
             onOpenSettings={() => setShowSettingsModal(true)}
+            onLeaveServer={() => handleLeaveServer(activeServer.id)}
           />
         ) : (
           <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">

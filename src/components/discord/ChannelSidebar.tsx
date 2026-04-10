@@ -1,5 +1,5 @@
 import React from "react";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 
 interface ChannelSidebarProps {
@@ -9,9 +9,10 @@ interface ChannelSidebarProps {
   onChannelSelect: (channel: Channel) => void;
   currentUser: User;
   onOpenSettings?: () => void;
+  onLeaveServer?: () => void;
 }
 
-export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer }: ChannelSidebarProps) => {
   const serverChannels = channels.filter(c => c.server_id === activeServer.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   
@@ -25,14 +26,26 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       >
         <h1 className="font-semibold text-white truncate pr-2">{activeServer.name}</h1>
         <div className="flex items-center flex-shrink-0">
-          {isOwner && onOpenSettings && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
-              className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
-              title="Impostazioni Server"
-            >
-              <Settings size={16} />
-            </button>
+          {isOwner ? (
+            onOpenSettings && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+                className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
+                title="Impostazioni Server"
+              >
+                <Settings size={16} />
+              </button>
+            )
+          ) : (
+            onLeaveServer && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onLeaveServer(); }}
+                className="p-1 text-[#dbdee1] hover:text-[#f23f43] transition-colors"
+                title="Esci dal Server"
+              >
+                <LogOut size={16} />
+              </button>
+            )
           )}
           <ChevronDown size={18} className="text-[#dbdee1] ml-1" />
         </div>
