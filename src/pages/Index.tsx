@@ -27,8 +27,9 @@ const Index = () => {
 
   const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({});
   
-  // State per i membri reali del server
-  const [serverMembersList, setServerMembersList] = useState<User[]>([]);
+  // State per gestire la Presence in tempo reale e i profili
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [serverProfiles, setServerProfiles] = useState<any[]>([]);
 
   // States per UI
   const [showMembers, setShowMembers] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -40,12 +41,59 @@ const Index = () => {
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
+  // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
+  const serverMembersList: User[] = serverProfiles.map(p => {
+    // L'utente corrente è sempre online per se stesso, gli altri dipendono dalla Presence
+    const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
+    return {
+      id: p.id,
+      name: p.first_name || "Utente",
+      avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+      status: isOnline ? "online" : "offline",
+      global_role: "USER"
+    };
+  });
+
+  // Gestione Supabase Presence
+  useEffect(() => {
+    if (!user) return;
+
+    // Crea un canale per tracciare chi è attualmente nell'app
+    const channel = supabase.channel('global_presence', {
+      config: {
+        presence: {
+          key: user.id, // Usa l'ID utente come chiave univoca
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const presenceState = channel.presenceState();
+        const onlineIds = new Set<string>();
+        // Estrapola tutti gli ID degli utenti attualmente connessi
+        Object.keys(presenceState).forEach(id => onlineIds.add(id));
+        setOnlineUserIds(onlineIds);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Quando sei connesso al canale, trasmetti il tuo stato
+          await channel.track({ online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      // Disconnessione automatica quando il componente viene smontato (es. chiudi scheda)
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Caricamento dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
-      // Aggiorniamo l'orario di attività per indicare che l'utente è "Online"
+      // Aggiorniamo l'orario nel DB per tracciare storicamente l'ultimo accesso
       await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
@@ -80,11 +128,11 @@ const Index = () => {
     loadInitialData();
   }, [user]);
 
-  // Caricamento membri quando si cambia server
+  // Caricamento profili membri del server corrente
   useEffect(() => {
     const fetchServerMembers = async () => {
       if (!activeServerId || activeServerId === 'home') {
-        setServerMembersList([]);
+        setServerProfiles([]);
         return;
       }
       
@@ -102,22 +150,7 @@ const Index = () => {
           .in('id', userIds);
           
         if (profilesData) {
-          const now = new Date().getTime();
-          
-          const formattedMembers: User[] = profilesData.map(p => {
-            // Se l'utente è stato attivo negli ultimi 5 minuti consideralo online
-            const lastSeen = new Date(p.updated_at || 0).getTime();
-            const isOnline = (now - lastSeen) < 5 * 60 * 1000;
-            
-            return {
-              id: p.id,
-              name: p.first_name || "Utente",
-              avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
-              status: isOnline ? "online" : "offline",
-              global_role: "USER"
-            };
-          });
-          setServerMembersList(formattedMembers);
+          setServerProfiles(profilesData);
         }
       }
     };
