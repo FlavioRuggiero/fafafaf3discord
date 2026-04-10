@@ -1,36 +1,35 @@
-import { User, Message, Channel } from "../types/discord";
+import { User, Message, Channel, Server } from "../types/discord";
 
 export const CURRENT_USER: User = {
   id: "u1",
   name: "DyadUser",
   avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dyad",
   status: "online",
+  global_role: "CREATOR" // Default to CREATOR to allow testing server creation
 };
 
 export const MOCK_USERS: User[] = [
   CURRENT_USER,
   { id: "u2", name: "Mario", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mario", status: "online", customStatus: "Sto programmando..." },
   { id: "u3", name: "Luigi", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Luigi", status: "idle" },
-  { id: "u4", name: "Peach", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Peach", status: "dnd", customStatus: "Non disturbare" },
-  { id: "u5", name: "Toad", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Toad", status: "offline" },
 ];
 
-export const MOCK_CHANNELS: { category: string; channels: Channel[] }[] = [
-  {
-    category: "Informazioni",
-    channels: [
-      { id: "c1", name: "benvenuto", type: "text" },
-      { id: "c2", name: "annunci", type: "text", unread: true },
-    ],
-  },
-  {
-    category: "Chat Generale",
-    channels: [
-      { id: "c3", name: "generale", type: "text" },
-      { id: "c4", name: "off-topic", type: "text" },
-      { id: "c5", name: "Lounge", type: "voice" },
-    ],
-  },
+export const MOCK_SERVERS: Server[] = [
+  { id: "s1", name: "Dyad Community", created_by: "u1", icon_url: "https://api.dicebear.com/7.x/shapes/svg?seed=home", description: "Il server ufficiale di Dyad." },
+  { id: "s2", name: "Gaming Hub", created_by: "u2", icon_url: "https://api.dicebear.com/7.x/identicon/svg?seed=gaming", description: "Per tutti i videogiocatori!" },
+  { id: "s3", name: "Designers", created_by: "u3", icon_url: "https://api.dicebear.com/7.x/bottts/svg?seed=design", description: "UI/UX e Grafica." },
+];
+
+export const MOCK_CHANNELS: Channel[] = [
+  { id: "c1", server_id: "s1", name: "benvenuto", type: "text", category: "Informazioni" },
+  { id: "c2", server_id: "s1", name: "annunci", type: "text", category: "Informazioni", unread: true },
+  { id: "c3", server_id: "s1", name: "generale", type: "text", category: "Chat Generale" },
+  { id: "c4", server_id: "s1", name: "Lounge", type: "voice", category: "Chat Generale" },
+  
+  { id: "c5", server_id: "s2", name: "general-gaming", type: "text", category: "Generale" },
+  { id: "c6", server_id: "s2", name: "Fortnite", type: "voice", category: "Vocali" },
+  
+  { id: "c7", server_id: "s3", name: "ispirazione", type: "text", category: "Design" },
 ];
 
 export const INITIAL_MESSAGES: Message[] = [

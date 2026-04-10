@@ -4,6 +4,24 @@ export type User = {
   avatar: string;
   status: "online" | "idle" | "dnd" | "offline";
   customStatus?: string;
+  global_role?: "USER" | "CREATOR" | "ADMIN";
+};
+
+export type Server = {
+  id: string;
+  name: string;
+  icon_url?: string;
+  created_by: string;
+  description?: string;
+};
+
+export type Channel = {
+  id: string;
+  server_id: string;
+  name: string;
+  type: "text" | "voice";
+  category: string;
+  unread?: boolean;
 };
 
 export type Message = {
@@ -11,11 +29,4 @@ export type Message = {
   user: User;
   content: string;
   timestamp: string;
-};
-
-export type Channel = {
-  id: string;
-  name: string;
-  type: "text" | "voice";
-  unread?: boolean;
 };
