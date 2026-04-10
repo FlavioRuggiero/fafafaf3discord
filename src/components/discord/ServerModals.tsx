@@ -16,7 +16,10 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
   const availableServers = servers.filter(s => !joinedServerIds.includes(s.id));
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="bg-[#313338] w-full max-w-3xl rounded-lg shadow-2xl flex flex-col max-h-[80vh]">
         <div className="p-6 border-b border-[#1f2023] flex justify-between items-center flex-shrink-0">
           <div>
@@ -100,7 +103,10 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4"
+      onClick={(e) => !isCreating && e.target === e.currentTarget && onClose()}
+    >
       <div className="bg-[#313338] w-full max-w-md rounded-lg shadow-2xl flex flex-col">
         <div className="p-6 text-center relative">
           <button onClick={onClose} disabled={isCreating} className="absolute top-4 right-4 text-[#b5bac1] hover:text-white p-1 disabled:opacity-50"><X size={20} /></button>
@@ -209,7 +215,10 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4"
+      onClick={(e) => !isUpdating && e.target === e.currentTarget && onClose()}
+    >
       <div className="bg-[#313338] w-full max-w-md rounded-lg shadow-2xl flex flex-col">
         <div className="p-6 relative border-b border-[#1f2023]">
           <button onClick={onClose} disabled={isUpdating} className="absolute top-6 right-6 text-[#b5bac1] hover:text-white p-1 disabled:opacity-50"><X size={20} /></button>
@@ -298,7 +307,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
           </div>
         </div>
         
-        <div className="p-4 bg-[#2b2d31] rounded-b-lg flex justify-end gap-3">
+        <div className="p-4 bg-[#2b2d31] rounded-b-lg flex justify-between items-center">
           <button type="button" onClick={onClose} disabled={isUpdating} className="text-sm font-medium text-white hover:underline px-4 disabled:opacity-50">
             Annulla
           </button>
