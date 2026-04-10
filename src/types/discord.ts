@@ -5,6 +5,8 @@ export type User = {
   status: "online" | "idle" | "dnd" | "offline";
   customStatus?: string;
   global_role?: "USER" | "CREATOR" | "ADMIN";
+  bio?: string;
+  digitalcardus?: number;
 };
 
 export type Server = {
