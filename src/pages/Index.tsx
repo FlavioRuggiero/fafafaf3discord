@@ -33,6 +33,7 @@ const Index = () => {
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [isCreatingServer, setIsCreatingServer] = useState(false);
 
   // Caricamento dati iniziali
   useEffect(() => {
@@ -94,8 +95,29 @@ const Index = () => {
     }));
   };
 
-  const handleCreateServer = async (name: string) => {
+  const handleCreateServer = async (name: string, imageFile: File | null) => {
     if (!currentUser) return;
+    setIsCreatingServer(true);
+    
+    let icon_url = `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`;
+
+    // Se l'utente ha selezionato un file, lo carichiamo nello Storage
+    if (imageFile) {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${currentUser.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('icons')
+        .upload(filePath, imageFile);
+
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        icon_url = data.publicUrl;
+      } else {
+        showError("Errore durante il caricamento dell'immagine, verrà usata quella di default.");
+      }
+    }
     
     const { data: newServer, error: serverError } = await supabase
       .from('servers')
@@ -103,13 +125,14 @@ const Index = () => {
         name,
         created_by: currentUser.id,
         description: "Il tuo nuovo server privato.",
-        icon_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`
+        icon_url
       })
       .select()
       .single();
 
     if (serverError || !newServer) {
       showError("Errore durante la creazione del server");
+      setIsCreatingServer(false);
       return;
     }
 
@@ -129,7 +152,10 @@ const Index = () => {
     setServers([...servers, newServer]);
     if (newChannel) setAllChannels([...allChannels, newChannel]);
     setActiveServerId(newServer.id);
+    
     showSuccess("Server creato con successo!");
+    setShowCreateModal(false);
+    setIsCreatingServer(false);
   };
 
   const handleJoinServer = async (server: Server) => {
@@ -227,7 +253,6 @@ const Index = () => {
               </div>
             </div>
             
-            {/* User Profile Block per la Home */}
             <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
               <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
                 <div className="relative">
@@ -305,7 +330,6 @@ const Index = () => {
         <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
       )}
 
-      {/* Modals */}
       <DiscoverServersModal 
         isOpen={showDiscoverModal} 
         onClose={() => setShowDiscoverModal(false)} 
@@ -318,6 +342,7 @@ const Index = () => {
         isOpen={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
         onCreate={handleCreateServer}
+        isCreating={isCreatingServer}
       />
 
       <ServerSettingsModal

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Server } from "@/types/discord";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Upload } from "lucide-react";
 
 interface DiscoverModalProps {
   isOpen: boolean;
@@ -64,20 +64,38 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, imageFile: File | null) => void;
+  isCreating: boolean;
 }
 
-export const CreateServerModal = ({ isOpen, onClose, onCreate }: CreateModalProps) => {
+export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: CreateModalProps) => {
   const [name, setName] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName("");
+      setImageFile(null);
+      setPreviewUrl(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onCreate(name.trim());
-      setName("");
-      onClose();
+    if (name.trim() && !isCreating) {
+      onCreate(name.trim(), imageFile);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
     }
   };
 
@@ -85,17 +103,39 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate }: CreateModalProp
     <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
       <div className="bg-[#313338] w-full max-w-md rounded-lg shadow-2xl flex flex-col">
         <div className="p-6 text-center relative">
-          <button onClick={onClose} className="absolute top-4 right-4 text-[#b5bac1] hover:text-white p-1"><X size={20} /></button>
+          <button onClick={onClose} disabled={isCreating} className="absolute top-4 right-4 text-[#b5bac1] hover:text-white p-1 disabled:opacity-50"><X size={20} /></button>
           <h2 className="text-2xl font-bold text-white mb-2">Personalizza il tuo server</h2>
-          <p className="text-[#b5bac1] text-sm">Dai al tuo nuovo server una personalità con un nome unico. Potrai sempre cambiarlo più tardi.</p>
+          <p className="text-[#b5bac1] text-sm">Dai al tuo nuovo server una personalità con un nome e un'icona unici.</p>
         </div>
         
         <form onSubmit={handleSubmit}>
           <div className="px-6 pb-6">
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 border-2 border-dashed border-[#b5bac1] rounded-full flex flex-col items-center justify-center text-[#b5bac1] cursor-pointer hover:border-white hover:text-white transition-colors">
-                <div className="font-bold text-xs uppercase mt-1">Upload</div>
+            <div className="flex justify-center mb-6 relative">
+              <div 
+                onClick={() => !isCreating && fileInputRef.current?.click()}
+                className={`w-24 h-24 border-2 border-dashed border-[#b5bac1] rounded-full flex flex-col items-center justify-center text-[#b5bac1] cursor-pointer hover:border-white hover:text-white transition-all overflow-hidden relative group ${isCreating ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                {previewUrl ? (
+                  <>
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Upload size={24} className="text-white" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={24} className="mb-1" />
+                    <div className="font-bold text-[10px] uppercase">Upload</div>
+                  </>
+                )}
               </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/png, image/jpeg, image/gif, image/webp" 
+                onChange={handleFileChange} 
+              />
             </div>
             
             <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
@@ -107,17 +147,17 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate }: CreateModalProp
               onChange={(e) => setName(e.target.value)}
               placeholder="Il server di DyadUser"
               required
-              className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+              disabled={isCreating}
+              className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
             />
-            <p className="text-[#b5bac1] text-[11px] mt-2">Creando un server accetti le Linee guida della community.</p>
           </div>
           
           <div className="p-4 bg-[#2b2d31] rounded-b-lg flex justify-between items-center">
-            <button type="button" onClick={onClose} className="text-sm font-medium text-white hover:underline px-4">
+            <button type="button" onClick={onClose} disabled={isCreating} className="text-sm font-medium text-white hover:underline px-4 disabled:opacity-50">
               Indietro
             </button>
-            <button type="submit" className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors">
-              Crea
+            <button type="submit" disabled={isCreating} className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {isCreating ? 'Creazione...' : 'Crea'}
             </button>
           </div>
         </form>
