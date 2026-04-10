@@ -1,7 +1,6 @@
 import React from "react";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, LogOut, Settings } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
-import { supabase } from "@/integrations/supabase/client";
 
 interface ChannelSidebarProps {
   activeServer: Server;
@@ -13,10 +12,6 @@ interface ChannelSidebarProps {
 }
 
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings }: ChannelSidebarProps) => {
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
-
   const serverChannels = channels.filter(c => c.server_id === activeServer.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   
@@ -101,7 +96,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         <div className="flex items-center text-[#dbdee1]">
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
-          <button onClick={handleLogout} title="Disconnetti" className="p-1.5 hover:bg-[#3f4147] rounded transition-colors text-[#f23f43] hover:text-white hover:bg-[#f23f43]"><LogOut size={18} /></button>
         </div>
       </div>
     </div>

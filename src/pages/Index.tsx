@@ -9,7 +9,7 @@ import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut } from "lucide-react";
+import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
@@ -101,7 +101,6 @@ const Index = () => {
     
     let icon_url = `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`;
 
-    // Se l'utente ha selezionato un file, lo carichiamo nello Storage
     if (imageFile) {
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
@@ -230,6 +229,7 @@ const Index = () => {
           onOpenCreate={() => setShowCreateModal(true)}
           onOpenDiscover={handleOpenDiscover}
           currentUser={currentUser}
+          onLogout={handleLogout}
         />
         
         {activeServerId !== 'home' && activeServer ? (
@@ -268,7 +268,6 @@ const Index = () => {
               <div className="flex items-center text-[#dbdee1]">
                 <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
                 <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
-                <button onClick={handleLogout} title="Disconnetti" className="p-1.5 hover:bg-[#3f4147] rounded transition-colors text-[#f23f43] hover:text-white hover:bg-[#f23f43]"><LogOut size={18} /></button>
               </div>
             </div>
           </div>

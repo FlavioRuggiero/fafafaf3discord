@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Compass, Download } from "lucide-react";
+import { Plus, Compass, LogOut } from "lucide-react";
 import { Server, User } from "@/types/discord";
 
 const ServerIcon = ({ image, name, active, notify, onClick }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void }) => (
@@ -31,9 +31,10 @@ interface ServerSidebarProps {
   onOpenCreate: () => void;
   onOpenDiscover: () => void;
   currentUser: User;
+  onLogout: () => void;
 }
 
-export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser }: ServerSidebarProps) => {
+export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout }: ServerSidebarProps) => {
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
   return (
@@ -60,7 +61,11 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
       <IconButton icon={Compass} colorClass="text-[#dbdee1] group-hover:bg-[#dbdee1] group-hover:text-[#1e1f22]" onClick={onOpenDiscover} />
       
       <div className="mt-auto pt-2">
-        <IconButton icon={Download} colorClass="text-[#dbdee1] group-hover:bg-[#dbdee1] group-hover:text-[#1e1f22]" />
+        <IconButton 
+          icon={LogOut} 
+          colorClass="text-[#dbdee1] group-hover:bg-[#f23f43] group-hover:text-white" 
+          onClick={onLogout} 
+        />
       </div>
     </div>
   );
