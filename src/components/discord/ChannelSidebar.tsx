@@ -1,14 +1,20 @@
 import React from "react";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings } from "lucide-react";
-import { MOCK_CHANNELS, CURRENT_USER } from "@/data/mockData";
-import { Channel } from "@/types/discord";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut } from "lucide-react";
+import { MOCK_CHANNELS } from "@/data/mockData";
+import { Channel, User } from "@/types/discord";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChannelSidebarProps {
   activeChannelId: string;
   onChannelSelect: (channel: Channel) => void;
+  currentUser: User;
 }
 
-export const ChannelSidebar = ({ activeChannelId, onChannelSelect }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeChannelId, onChannelSelect, currentUser }: ChannelSidebarProps) => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10">
       {/* Server Header */}
@@ -58,11 +64,11 @@ export const ChannelSidebar = ({ activeChannelId, onChannelSelect }: ChannelSide
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
         <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
           <div className="relative">
-            <img src={CURRENT_USER.avatar} alt="Avatar" className="w-8 h-8 rounded-full" />
+            <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
             <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
           </div>
           <div className="ml-2 flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-white truncate leading-tight">{CURRENT_USER.name}</span>
+            <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser.name}</span>
             <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
           </div>
         </div>
@@ -70,7 +76,7 @@ export const ChannelSidebar = ({ activeChannelId, onChannelSelect }: ChannelSide
         <div className="flex items-center text-[#dbdee1]">
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
-          <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Settings size={18} /></button>
+          <button onClick={handleLogout} title="Disconnetti" className="p-1.5 hover:bg-[#3f4147] rounded transition-colors text-[#f23f43] hover:text-white hover:bg-[#f23f43]"><LogOut size={18} /></button>
         </div>
       </div>
     </div>
