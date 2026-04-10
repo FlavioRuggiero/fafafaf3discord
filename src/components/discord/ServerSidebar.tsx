@@ -118,9 +118,9 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
   return (
     <div className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 flex-shrink-0 z-20 overflow-y-auto custom-scrollbar relative">
       <ServerIcon 
-        name="Home" 
+        name="Discord Canary 2" 
         serverId="home"
-        image="https://api.dicebear.com/7.x/shapes/svg?seed=home" 
+        image="/discord-canary-2.png" 
         active={activeServerId === 'home'} 
         onClick={() => onServerSelect('home')} 
       />

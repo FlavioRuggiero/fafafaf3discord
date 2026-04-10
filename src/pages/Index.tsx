@@ -411,7 +411,7 @@ const Index = () => {
               <Menu size={24} />
             </button>
             <Home size={20} className="text-[#80848e] mr-2" />
-            <h2 className="font-semibold text-white">Home</h2>
+            <h2 className="font-semibold text-white">Discord Canary 2</h2>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
