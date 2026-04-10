@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Plus, Gift, FileText, Smile, Users, Menu, Volume2 } from "lucide-react";
+import { Hash, Users, Menu, Volume2 } from "lucide-react";
 import { Message, Channel } from "@/types/discord";
 
 interface ChatAreaProps {
@@ -107,10 +107,6 @@ export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers, on
       {/* Input Area */}
       <div className="p-4 pt-0 flex-shrink-0">
         <div className="bg-[#383a40] rounded-lg flex items-center px-4 py-2.5 min-w-0">
-          <button className="w-6 h-6 rounded-full bg-[#b5bac1] hover:bg-[#dbdee1] text-[#383a40] flex items-center justify-center mr-4 transition-colors flex-shrink-0">
-            <Plus size={16} />
-          </button>
-          
           <input
             type="text"
             value={inputValue}
@@ -119,12 +115,6 @@ export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers, on
             placeholder={`Invia un messaggio in ${channel.type === 'text' ? '#' : ''}${channel.name}`}
             className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e]"
           />
-          
-          <div className="flex items-center text-[#b5bac1] space-x-3 ml-2 flex-shrink-0">
-            <button className="hover:text-[#dbdee1] transition-colors"><Gift size={22} /></button>
-            <button className="hover:text-[#dbdee1] transition-colors"><FileText size={22} /></button>
-            <button className="hover:text-[#dbdee1] transition-colors"><Smile size={22} /></button>
-          </div>
         </div>
       </div>
     </div>
