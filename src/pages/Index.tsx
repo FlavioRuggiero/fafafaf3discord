@@ -3,7 +3,7 @@ import { ServerSidebar } from "@/components/discord/ServerSidebar";
 import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
 import { ChatArea } from "@/components/discord/ChatArea";
 import { MemberList } from "@/components/discord/MemberList";
-import { DiscoverServersModal, CreateServerModal } from "@/components/discord/ServerModals";
+import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { INITIAL_MESSAGES, MOCK_USERS } from "@/data/mockData";
 import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +32,7 @@ const Index = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Caricamento dati iniziali
   useEffect(() => {
@@ -154,6 +155,29 @@ const Index = () => {
     setShowDiscoverModal(true);
   };
 
+  const handleUpdateServer = async (id: string, name: string, iconUrl: string) => {
+    const { error } = await supabase.from('servers').update({ name, icon_url: iconUrl }).eq('id', id);
+    if (error) {
+      showError("Impossibile aggiornare il server");
+      return;
+    }
+    setServers(servers.map(s => s.id === id ? { ...s, name, icon_url: iconUrl } : s));
+    setShowSettingsModal(false);
+    showSuccess("Impostazioni salvate con successo!");
+  };
+
+  const handleDeleteServer = async (id: string) => {
+    const { error } = await supabase.from('servers').delete().eq('id', id);
+    if (error) {
+      showError("Impossibile eliminare il server");
+      return;
+    }
+    setServers(servers.filter(s => s.id !== id));
+    setActiveServerId('home');
+    setShowSettingsModal(false);
+    showSuccess("Server eliminato!");
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -189,6 +213,7 @@ const Index = () => {
             activeChannelId={activeChannel?.id || ''} 
             onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
             currentUser={currentUser}
+            onOpenSettings={() => setShowSettingsModal(true)}
           />
         ) : (
           <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">
@@ -240,7 +265,6 @@ const Index = () => {
         </>
       ) : activeServerId === 'home' ? (
         <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-          {/* Header per la Home (Essenziale per Mobile) */}
           <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
             <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
               <Menu size={24} />
@@ -249,7 +273,6 @@ const Index = () => {
             <h2 className="font-semibold text-white">Home</h2>
           </div>
           
-          {/* Contenuto di Benvenuto */}
           <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
             <div className="max-w-xl w-full text-center">
               <div className="w-20 h-20 bg-brand rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
@@ -295,6 +318,14 @@ const Index = () => {
         isOpen={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
         onCreate={handleCreateServer}
+      />
+
+      <ServerSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        server={activeServer || null}
+        onUpdate={handleUpdateServer}
+        onDelete={handleDeleteServer}
       />
     </div>
   );

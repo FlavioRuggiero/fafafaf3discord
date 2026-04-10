@@ -1,5 +1,5 @@
 import React from "react";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, LogOut } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, LogOut, Settings } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -9,21 +9,38 @@ interface ChannelSidebarProps {
   activeChannelId: string;
   onChannelSelect: (channel: Channel) => void;
   currentUser: User;
+  onOpenSettings?: () => void;
 }
 
-export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings }: ChannelSidebarProps) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
   const serverChannels = channels.filter(c => c.server_id === activeServer.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
+  
+  // Controlla se l'utente corrente è il proprietario del server
+  const isOwner = activeServer.created_by === currentUser.id;
 
   return (
     <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10">
-      <div className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm cursor-pointer hover:bg-[#35373c] transition-colors">
-        <h1 className="font-semibold text-white truncate">{activeServer.name}</h1>
-        <ChevronDown size={18} className="text-[#dbdee1]" />
+      <div 
+        className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm cursor-pointer hover:bg-[#35373c] transition-colors group"
+      >
+        <h1 className="font-semibold text-white truncate pr-2">{activeServer.name}</h1>
+        <div className="flex items-center flex-shrink-0">
+          {isOwner && onOpenSettings && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+              className="p-1 text-[#dbdee1] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Impostazioni Server"
+            >
+              <Settings size={16} />
+            </button>
+          )}
+          <ChevronDown size={18} className="text-[#dbdee1] ml-1" />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-4">

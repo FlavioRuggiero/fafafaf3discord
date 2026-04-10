@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Server } from "@/types/discord";
-import { X, Hash, Search } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 
 interface DiscoverModalProps {
   isOpen: boolean;
@@ -121,6 +121,120 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate }: CreateModalProp
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+interface ServerSettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  server: Server | null;
+  onUpdate: (id: string, name: string, iconUrl: string) => void;
+  onDelete: (id: string) => void;
+}
+
+export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete }: ServerSettingsModalProps) => {
+  const [name, setName] = useState("");
+  const [iconUrl, setIconUrl] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    if (server) {
+      setName(server.name);
+      setIconUrl(server.icon_url || "");
+      setConfirmDelete(false);
+    }
+  }, [server, isOpen]);
+
+  if (!isOpen || !server) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name.trim()) {
+      onUpdate(server.id, name.trim(), iconUrl.trim());
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+      <div className="bg-[#313338] w-full max-w-md rounded-lg shadow-2xl flex flex-col">
+        <div className="p-6 relative border-b border-[#1f2023]">
+          <button onClick={onClose} className="absolute top-6 right-6 text-[#b5bac1] hover:text-white p-1"><X size={20} /></button>
+          <h2 className="text-xl font-bold text-white">Impostazioni Server</h2>
+          <p className="text-[#b5bac1] text-sm mt-1">Modifica i dettagli di {server.name}</p>
+        </div>
+        
+        <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar">
+          <form id="server-settings-form" onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                Nome del server <span className="text-[#f23f43]">*</span>
+              </label>
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                URL Immagine (Icona)
+              </label>
+              <input 
+                type="text" 
+                value={iconUrl}
+                onChange={(e) => setIconUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+              />
+            </div>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-[#1f2023]">
+            <h3 className="text-[#f23f43] font-bold text-sm uppercase mb-2">Zona Pericolosa</h3>
+            {!confirmDelete ? (
+              <button 
+                type="button" 
+                onClick={() => setConfirmDelete(true)}
+                className="w-full flex items-center justify-center bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-2 rounded transition-colors"
+              >
+                <Trash2 size={16} className="mr-2" />
+                Elimina Server
+              </button>
+            ) : (
+              <div className="bg-[#f23f43]/10 p-3 rounded border border-[#f23f43]/30">
+                <p className="text-white text-sm font-medium mb-3">Sei sicuro? Questa azione non può essere annullata.</p>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setConfirmDelete(false)}
+                    className="flex-1 bg-[#35373c] hover:bg-[#404249] text-white py-1.5 rounded text-sm transition-colors"
+                  >
+                    Annulla
+                  </button>
+                  <button 
+                    onClick={() => onDelete(server.id)}
+                    className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white py-1.5 rounded text-sm transition-colors"
+                  >
+                    Sì, elimina
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="p-4 bg-[#2b2d31] rounded-b-lg flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="text-sm font-medium text-white hover:underline px-4">
+            Annulla
+          </button>
+          <button type="submit" form="server-settings-form" className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors">
+            Salva modifiche
+          </button>
+        </div>
       </div>
     </div>
   );
