@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Server } from "@/types/discord";
 import { X, Trash2, Upload, Mic, Square, Volume2 } from "lucide-react";
+import { CustomAudioPlayer } from "./CustomAudioPlayer";
 
 interface DiscoverModalProps {
   isOpen: boolean;
@@ -48,12 +49,12 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
                       <p className="text-[#b5bac1] text-sm line-clamp-2 mb-3">{server.description || "Nessuna descrizione."}</p>
                       
                       {server.audio_url && (
-                        <div className="mt-auto mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#35373c]">
+                        <div className="mt-auto mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#2b2d31]">
                           <div className="flex items-center text-brand mb-2">
                             <Volume2 size={16} className="mr-1.5" />
-                            <span className="text-xs font-bold uppercase tracking-wider">Perchè dovresti entrare</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Perchè dovresti entrare</span>
                           </div>
-                          <audio src={server.audio_url} controls className="w-full h-8 outline-none" />
+                          <CustomAudioPlayer src={server.audio_url} />
                         </div>
                       )}
                       
@@ -270,15 +271,17 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                 </div>
 
                 {audioPreview && (
-                  <div className="flex items-center gap-2 bg-[#1e1f22] p-2 rounded">
-                    <audio src={audioPreview} controls className="h-8 flex-1 outline-none" />
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex-1 min-w-0">
+                      <CustomAudioPlayer src={audioPreview} />
+                    </div>
                     <button 
                       type="button" 
                       disabled={isCreating}
                       onClick={() => { setAudioFile(null); setAudioPreview(null); }} 
-                      className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/10 rounded transition-colors disabled:opacity-50"
+                      className="p-2 text-[#f23f43] hover:bg-[#f23f43]/10 rounded transition-colors disabled:opacity-50 flex-shrink-0"
                     >
-                      <X size={16} />
+                      <X size={20} />
                     </button>
                   </div>
                 )}
@@ -497,15 +500,17 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
               </div>
 
               {audioPreview && (
-                <div className="flex items-center gap-2 bg-[#1e1f22] p-2 rounded">
-                  <audio src={audioPreview} controls className="h-8 flex-1 outline-none" />
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="flex-1 min-w-0">
+                    <CustomAudioPlayer src={audioPreview} />
+                  </div>
                   <button 
                     type="button" 
                     disabled={isUpdating}
                     onClick={() => { setAudioFile(null); setAudioPreview(null); }} 
-                    className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/10 rounded transition-colors disabled:opacity-50"
+                    className="p-2 text-[#f23f43] hover:bg-[#f23f43]/10 rounded transition-colors disabled:opacity-50 flex-shrink-0"
                   >
-                    <X size={16} />
+                    <X size={20} />
                   </button>
                 </div>
               )}
