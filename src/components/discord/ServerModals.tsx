@@ -35,7 +35,7 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {availableServers.length === 0 ? (
               <div className="col-span-2 text-center py-10 text-[#b5bac1]">
-                Hai già unito tutti i server disponibili!
+                sei già entrato in tutti i server disponibili, strunz
               </div>
             ) : (
               availableServers.map(server => (
