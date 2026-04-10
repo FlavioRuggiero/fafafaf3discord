@@ -1,7 +1,6 @@
--- Permette al proprietario di modificare i dettagli del server
-CREATE POLICY "Gli utenti possono aggiornare i propri server" 
-ON public.servers FOR UPDATE TO authenticated USING (auth.uid() = created_by);
+-- Rimuove la policy restrittiva che limitava la lettura al solo proprietario del profilo
+DROP POLICY IF EXISTS "profiles_select_policy" ON public.profiles;
 
--- Permette al proprietario di eliminare il proprio server
-CREATE POLICY "Gli utenti possono eliminare i propri server" 
-ON public.servers FOR DELETE TO authenticated USING (auth.uid() = created_by);
+-- Crea una nuova policy che permette a tutti gli utenti autenticati di leggere le informazioni di base (come il nickname)
+CREATE POLICY "profiles_select_policy" ON public.profiles
+FOR SELECT TO authenticated USING (true);
