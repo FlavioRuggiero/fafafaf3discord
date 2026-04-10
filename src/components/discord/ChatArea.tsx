@@ -8,9 +8,10 @@ interface ChatAreaProps {
   onSendMessage: (content: string) => void;
   onToggleMembers: () => void;
   onToggleSidebar: () => void;
+  showMembers?: boolean;
 }
 
-export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers, onToggleSidebar }: ChatAreaProps) => {
+export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers }: ChatAreaProps) => {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +47,11 @@ export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers, on
           <h2 className="font-semibold text-white truncate">{channel.name}</h2>
         </div>
         <div className="flex items-center text-[#b5bac1]">
-          <button onClick={onToggleMembers} className="p-1 hover:text-[#dbdee1] transition-colors lg:hidden block">
+          <button 
+            onClick={onToggleMembers} 
+            className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`}
+            title="Alterna Elenco Membri"
+          >
             <Users size={24} />
           </button>
         </div>

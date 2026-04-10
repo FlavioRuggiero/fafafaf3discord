@@ -4,12 +4,12 @@ import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
 import { ChatArea } from "@/components/discord/ChatArea";
 import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
-import { INITIAL_MESSAGES, MOCK_USERS } from "@/data/mockData";
+import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones } from "lucide-react";
+import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
@@ -27,6 +27,9 @@ const Index = () => {
 
   const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({});
   
+  // State per i membri reali del server
+  const [serverMembersList, setServerMembersList] = useState<User[]>([]);
+
   // States per UI
   const [showMembers, setShowMembers] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -64,6 +67,45 @@ const Index = () => {
     
     loadInitialData();
   }, [user]);
+
+  // Caricamento membri quando si cambia server
+  useEffect(() => {
+    const fetchServerMembers = async () => {
+      if (!activeServerId || activeServerId === 'home') {
+        setServerMembersList([]);
+        return;
+      }
+      
+      // Prendi gli ID utente
+      const { data: membersData } = await supabase
+        .from('server_members')
+        .select('user_id')
+        .eq('server_id', activeServerId);
+        
+      if (membersData && membersData.length > 0) {
+        const userIds = membersData.map(m => m.user_id);
+        
+        // Prendi i profili completi
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+          
+        if (profilesData) {
+          const formattedMembers: User[] = profilesData.map(p => ({
+            id: p.id,
+            name: p.first_name || "Utente",
+            avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+            status: "online",
+            global_role: "USER"
+          }));
+          setServerMembersList(formattedMembers);
+        }
+      }
+    };
+
+    fetchServerMembers();
+  }, [activeServerId]);
 
   // Seleziona automaticamente il primo canale
   useEffect(() => {
@@ -212,7 +254,6 @@ const Index = () => {
   }
 
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
-  const currentUsersList = [...MOCK_USERS.filter(u => u.id !== 'u1'), currentUser];
 
   return (
     <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
@@ -282,9 +323,16 @@ const Index = () => {
             onSendMessage={handleSendMessage}
             onToggleMembers={() => setShowMembers(!showMembers)}
             onToggleSidebar={() => setShowSidebar(true)}
+            showMembers={showMembers}
           />
-          <div className={`hidden lg:block h-full transition-all ${showMembers ? 'w-[240px]' : 'w-0 overflow-hidden'}`}>
-            <MemberList users={currentUsersList} isOpen={showMembers} />
+          {/* Wrapper per l'elenco membri aggiornato per funzionare su tutti gli schermi tramite pannello laterale scorrevole/espandibile */}
+          <div className={`
+            absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
+            h-full transition-all duration-300
+            ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
+            overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
+          `}>
+            <MemberList users={serverMembersList} isOpen={showMembers} />
           </div>
         </>
       ) : activeServerId === 'home' ? (
