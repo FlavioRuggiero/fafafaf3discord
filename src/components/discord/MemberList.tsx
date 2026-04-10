@@ -33,8 +33,8 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
   const offlineUsers = otherUsers.filter(u => u.status === 'offline');
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
-    // Controlla se l'utente è un admin (supporta varie proprietà che potrebbero indicarlo)
-    const isAdmin = (user as any).role === 'admin' || (user as any).role === 'ADMIN' || (user as any).isAdmin;
+    // Utilizza la proprietà global_role definita nei type di Discord (se ADMIN o CREATOR, mostrerà l'etichetta)
+    const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
 
     return (
       <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">

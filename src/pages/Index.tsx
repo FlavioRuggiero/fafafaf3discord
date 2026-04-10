@@ -45,12 +45,16 @@ const Index = () => {
   const serverMembersList: User[] = serverProfiles.map(p => {
     // L'utente corrente è sempre online per se stesso, gli altri dipendono dalla Presence
     const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
+    const name = p.first_name || "Utente";
+    // Applica lo stesso criterio per il ruolo usato nel profilo principale
+    const isVerifiedUser = name.toLowerCase() === 'faf3tto';
+
     return {
       id: p.id,
-      name: p.first_name || "Utente",
+      name: name,
       avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
       status: isOnline ? "online" : "offline",
-      global_role: "USER"
+      global_role: isVerifiedUser ? "CREATOR" : "USER"
     };
   });
 
