@@ -15,6 +15,13 @@ const statusColors = {
   offline: "bg-[#80848e]",
 };
 
+const statusText = {
+  online: "Online",
+  idle: "Assente",
+  dnd: "Non disturbare",
+  offline: "Offline",
+};
+
 export const MemberList = ({ users, creatorId }: MemberListProps) => {
   // Separa il creatore dagli altri utenti
   const creator = users.find(u => u.id === creatorId);
@@ -33,9 +40,21 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
             <Crown size={16} className="fill-yellow-400" />
           </div>
         )}
-        <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full ${user.status === 'offline' ? 'opacity-50' : ''}`} />
-        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
+        <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
+        
+        {/* Pallino di stato con Tooltip */}
+        <div className="absolute -bottom-0.5 -right-0.5 group/status">
+          <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
+          
+          {/* Tooltip */}
+          <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
+            {statusText[user.status]}
+            {/* Freccina del tooltip */}
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-[#111214]"></div>
+          </div>
+        </div>
       </div>
+      
       <div className="flex flex-col min-w-0">
         <span className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'}`}>
           {user.name}

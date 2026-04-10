@@ -45,6 +45,9 @@ const Index = () => {
     const loadInitialData = async () => {
       if (!user) return;
       
+      // Aggiorniamo l'orario di attività per indicare che l'utente è "Online"
+      await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
+      
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
@@ -99,13 +102,21 @@ const Index = () => {
           .in('id', userIds);
           
         if (profilesData) {
-          const formattedMembers: User[] = profilesData.map(p => ({
-            id: p.id,
-            name: p.first_name || "Utente",
-            avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
-            status: "online",
-            global_role: "USER"
-          }));
+          const now = new Date().getTime();
+          
+          const formattedMembers: User[] = profilesData.map(p => {
+            // Se l'utente è stato attivo negli ultimi 5 minuti consideralo online
+            const lastSeen = new Date(p.updated_at || 0).getTime();
+            const isOnline = (now - lastSeen) < 5 * 60 * 1000;
+            
+            return {
+              id: p.id,
+              name: p.first_name || "Utente",
+              avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+              status: isOnline ? "online" : "offline",
+              global_role: "USER"
+            };
+          });
           setServerMembersList(formattedMembers);
         }
       }
@@ -352,7 +363,7 @@ const Index = () => {
             
             <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
               <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
-                <div className="relative">
+                <div className="relative group/status cursor-default">
                   <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
                   <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
                 </div>
