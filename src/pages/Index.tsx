@@ -421,9 +421,7 @@ const Index = () => {
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
               <p className="text-[#b5bac1] mb-8 text-lg">
-                {canCreate 
-                  ? "Inizia subito a chattare unendoti a una community o creando il tuo server personale."
-                  : "Inizia subito a chattare esplorando i server pubblici disponibili."}
+                Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
               </p>
               
               <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
