@@ -13,6 +13,7 @@ export type Server = {
   icon_url?: string;
   created_by: string;
   description?: string;
+  audio_url?: string;
 };
 
 export type Channel = {

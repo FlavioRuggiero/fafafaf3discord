@@ -168,7 +168,7 @@ const Index = () => {
     }));
   };
 
-  const handleCreateServer = async (name: string, description: string, imageFile: File | null) => {
+  const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
     if (!currentUser) return;
     
     // Doppio controllo di sicurezza per la creazione
@@ -181,6 +181,7 @@ const Index = () => {
     setIsCreatingServer(true);
     
     let icon_url = `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`;
+    let audio_url = null;
 
     if (imageFile) {
       const fileExt = imageFile.name.split('.').pop();
@@ -194,8 +195,21 @@ const Index = () => {
       if (!uploadError) {
         const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
         icon_url = data.publicUrl;
-      } else {
-        showError("Errore durante il caricamento dell'immagine, verrà usata quella di default.");
+      }
+    }
+
+    if (audioFile) {
+      const fileExt = audioFile instanceof File ? audioFile.name.split('.').pop() : 'webm';
+      const fileName = `audio_${Math.random()}.${fileExt}`;
+      const filePath = `${currentUser.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('icons') // Usiamo lo stesso bucket accessibile pubblicamente
+        .upload(filePath, audioFile);
+
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        audio_url = data.publicUrl;
       }
     }
     
@@ -205,7 +219,8 @@ const Index = () => {
         name,
         created_by: currentUser.id,
         description: description || "Il tuo nuovo server privato.",
-        icon_url
+        icon_url,
+        audio_url
       })
       .select()
       .single();
@@ -280,11 +295,12 @@ const Index = () => {
     setShowDiscoverModal(true);
   };
 
-  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null) => {
+  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined) => {
     if (!currentUser) return;
     setIsUpdatingServer(true);
     
     let icon_url = servers.find(s => s.id === id)?.icon_url;
+    let audio_url = servers.find(s => s.id === id)?.audio_url;
 
     if (imageFile) {
       const fileExt = imageFile.name.split('.').pop();
@@ -298,19 +314,37 @@ const Index = () => {
       if (!uploadError) {
         const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
         icon_url = data.publicUrl;
-      } else {
-        showError("Errore durante il caricamento dell'immagine.");
       }
     }
 
-    const { error } = await supabase.from('servers').update({ name, description, icon_url }).eq('id', id);
+    // Gestione aggiornamento audio (undefined = non modificato, null = eliminato, file = nuovo)
+    if (audioFile !== undefined) {
+      if (audioFile === null) {
+        audio_url = null;
+      } else {
+        const fileExt = audioFile instanceof File ? audioFile.name.split('.').pop() : 'webm';
+        const fileName = `audio_${Math.random()}.${fileExt}`;
+        const filePath = `${currentUser.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('icons')
+          .upload(filePath, audioFile);
+
+        if (!uploadError) {
+          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+          audio_url = data.publicUrl;
+        }
+      }
+    }
+
+    const { error } = await supabase.from('servers').update({ name, description, icon_url, audio_url }).eq('id', id);
     if (error) {
       showError("Impossibile aggiornare il server");
       setIsUpdatingServer(false);
       return;
     }
     
-    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url } : s));
+    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url, audio_url } : s));
     setShowSettingsModal(false);
     showSuccess("Impostazioni salvate con successo!");
     setIsUpdatingServer(false);
