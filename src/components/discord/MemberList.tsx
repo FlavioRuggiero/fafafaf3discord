@@ -1,9 +1,11 @@
 import React from "react";
 import { User } from "@/types/discord";
+import { Crown } from "lucide-react";
 
 interface MemberListProps {
   users: User[];
   isOpen?: boolean;
+  creatorId?: string;
 }
 
 const statusColors = {
@@ -13,16 +15,24 @@ const statusColors = {
   offline: "bg-[#80848e]",
 };
 
-export const MemberList = ({ users }: MemberListProps) => {
-  // Rimuoviamo "if (!isOpen) return null;" per permettere l'animazione fluida
-  // Il genitore (Index.tsx) gestirà la larghezza (w-[240px] -> w-0) nascondendo il contenuto
+export const MemberList = ({ users, creatorId }: MemberListProps) => {
+  // Separa il creatore dagli altri utenti
+  const creator = users.find(u => u.id === creatorId);
+  
+  // Ordina in ordine alfabetico gli altri utenti
+  const otherUsers = users.filter(u => u.id !== creatorId).sort((a, b) => a.name.localeCompare(b.name));
 
-  const onlineUsers = users.filter(u => u.status !== 'offline');
-  const offlineUsers = users.filter(u => u.status === 'offline');
+  const onlineUsers = otherUsers.filter(u => u.status !== 'offline');
+  const offlineUsers = otherUsers.filter(u => u.status === 'offline');
 
-  const UserItem = ({ user }: { user: User }) => (
+  const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => (
     <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
-      <div className="relative mr-3">
+      <div className="relative mr-3 mt-1.5">
+        {isCreator && (
+          <div className="absolute -top-3.5 -right-1 z-10 text-yellow-400 rotate-[15deg] drop-shadow-md">
+            <Crown size={16} className="fill-yellow-400" />
+          </div>
+        )}
         <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full ${user.status === 'offline' ? 'opacity-50' : ''}`} />
         <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
       </div>
@@ -44,23 +54,36 @@ export const MemberList = ({ users }: MemberListProps) => {
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pr-2">
-        <div className="mb-6">
-          <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
-            Disponibili — {onlineUsers.length}
-          </h3>
-          {onlineUsers.map(user => (
-            <UserItem key={user.id} user={user} />
-          ))}
-        </div>
+        {creator && (
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
+              Proprietario — 1
+            </h3>
+            <UserItem user={creator} isCreator={true} />
+          </div>
+        )}
 
-        <div>
-          <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
-            Offline — {offlineUsers.length}
-          </h3>
-          {offlineUsers.map(user => (
-            <UserItem key={user.id} user={user} />
-          ))}
-        </div>
+        {onlineUsers.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
+              Disponibili — {onlineUsers.length}
+            </h3>
+            {onlineUsers.map(user => (
+              <UserItem key={user.id} user={user} />
+            ))}
+          </div>
+        )}
+
+        {offlineUsers.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
+              Offline — {offlineUsers.length}
+            </h3>
+            {offlineUsers.map(user => (
+              <UserItem key={user.id} user={user} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

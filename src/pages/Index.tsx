@@ -390,7 +390,7 @@ const Index = () => {
             ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
             overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
           `}>
-            <MemberList users={serverMembersList} isOpen={showMembers} />
+            <MemberList users={serverMembersList} isOpen={showMembers} creatorId={activeServer?.created_by} />
           </div>
         </>
       ) : activeServerId === 'home' ? (
