@@ -8,9 +8,13 @@ const Login = () => {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  
+  // Stati separati per Login e Registrazione per evitare confusioni nell'interfaccia
+  const [loginIdentifier, setLoginIdentifier] = useState(''); // Email o Username per l'accesso
+  const [email, setEmail] = useState(''); // Email per la registrazione
+  const [username, setUsername] = useState(''); // Username per la registrazione
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
+  
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -25,13 +29,34 @@ const Login = () => {
 
     try {
       if (isLogin) {
+        let targetEmail = loginIdentifier.trim();
+
+        // Se l'input non contiene '@', presumiamo sia un Nome Utente
+        if (!targetEmail.includes('@')) {
+          // Richiamiamo la funzione RPC appena creata su Supabase
+          const { data: fetchedEmail, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: targetEmail });
+
+          if (rpcError || !fetchedEmail) {
+            throw new Error('Nome utente non trovato. Controlla di averlo scritto correttamente.');
+          }
+          targetEmail = fetchedEmail;
+        }
+
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: targetEmail,
           password,
         });
-        if (error) throw error;
+
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Credenziali non valide. Riprova.');
+          }
+          throw error;
+        }
+        
         showSuccess('Accesso effettuato con successo!');
       } else {
+        // Registrazione
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -43,8 +68,7 @@ const Login = () => {
         });
         if (error) throw error;
         showSuccess('Registrazione completata! Puoi effettuare il login.');
-        // Opzionale: passa in automatico al login dopo la registrazione
-        if (!error) setIsLogin(true);
+        setIsLogin(true);
       }
     } catch (error: any) {
       showError(error.message || 'Si è verificato un errore');
@@ -68,33 +92,50 @@ const Login = () => {
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
+          
+          {isLogin ? (
+            // Modulo di Login
             <div>
               <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-                Nome utente
+                Email o Nome utente <span className="text-[#f23f43]">*</span>
               </label>
               <input 
                 type="text" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required={!isLogin}
+                value={loginIdentifier}
+                onChange={(e) => setLoginIdentifier(e.target.value)}
+                required
                 className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
               />
             </div>
+          ) : (
+            // Moduli di Registrazione
+            <>
+              <div>
+                <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                  Nome utente <span className="text-[#f23f43]">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+                />
+              </div>
+              <div>
+                <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                  Email <span className="text-[#f23f43]">*</span>
+                </label>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+                />
+              </div>
+            </>
           )}
-          
-          <div>
-            <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-              Email <span className="text-[#f23f43]">*</span>
-            </label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
-            />
-          </div>
           
           <div>
             <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
