@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Plus, Gift, FileText, Smile, Users } from "lucide-react";
+import { Hash, Plus, Gift, FileText, Smile, Users, Menu, Volume2 } from "lucide-react";
 import { Message, Channel } from "@/types/discord";
-import { CURRENT_USER } from "@/data/mockData";
 
 interface ChatAreaProps {
   channel: Channel;
   messages: Message[];
   onSendMessage: (content: string) => void;
   onToggleMembers: () => void;
+  onToggleSidebar: () => void;
 }
 
-export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers }: ChatAreaProps) => {
+export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers, onToggleSidebar }: ChatAreaProps) => {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +34,15 @@ export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers }: 
       {/* Header */}
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0">
         <div className="flex items-center min-w-0">
-          <Hash size={24} className="text-[#80848e] mr-2" />
+          <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
+            <Menu size={24} />
+          </button>
+          
+          {channel.type === 'text' ? (
+            <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+          ) : (
+            <Volume2 size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+          )}
           <h2 className="font-semibold text-white truncate">{channel.name}</h2>
         </div>
         <div className="flex items-center text-[#b5bac1]">
@@ -44,15 +52,23 @@ export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers }: 
         </div>
       </div>
 
+      {/* Voice Connection Banner */}
+      {channel.type === 'voice' && (
+        <div className="bg-[#23a559]/10 border-b border-[#23a559]/20 p-2 px-4 flex items-center text-[#23a559]">
+          <Volume2 size={16} className="mr-2" />
+          <span className="font-medium text-sm">Connesso alla chat vocale. Questa è anche la chat testuale del canale.</span>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {/* Welcome Section */}
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
-            <Hash size={32} />
+            {channel.type === 'text' ? <Hash size={32} /> : <Volume2 size={32} />}
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in #{channel.name}!</h1>
-          <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">#{channel.name}</span>.</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in {channel.type === 'text' ? '#' : ''}{channel.name}!</h1>
+          <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">{channel.type === 'text' ? '#' : ''}{channel.name}</span>.</p>
         </div>
 
         {messages.map((msg, idx) => {
@@ -95,7 +111,7 @@ export const ChatArea = ({ channel, messages, onSendMessage, onToggleMembers }: 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Invia un messaggio in #${channel.name}`}
+            placeholder={`Invia un messaggio in ${channel.type === 'text' ? '#' : ''}${channel.name}`}
             className="flex-1 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e]"
           />
           
