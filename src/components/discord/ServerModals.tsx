@@ -170,29 +170,41 @@ interface ServerSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   server: Server | null;
-  onUpdate: (id: string, name: string, iconUrl: string) => void;
+  onUpdate: (id: string, name: string, imageFile: File | null) => void;
   onDelete: (id: string) => void;
+  isUpdating?: boolean;
 }
 
-export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete }: ServerSettingsModalProps) => {
+export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete, isUpdating = false }: ServerSettingsModalProps) => {
   const [name, setName] = useState("");
-  const [iconUrl, setIconUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (server) {
+    if (server && isOpen) {
       setName(server.name);
-      setIconUrl(server.icon_url || "");
+      setPreviewUrl(server.icon_url || null);
+      setImageFile(null);
       setConfirmDelete(false);
     }
   }, [server, isOpen]);
 
   if (!isOpen || !server) return null;
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onUpdate(server.id, name.trim(), iconUrl.trim());
+    if (name.trim() && !isUpdating) {
+      onUpdate(server.id, name.trim(), imageFile);
     }
   };
 
@@ -200,13 +212,41 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
       <div className="bg-[#313338] w-full max-w-md rounded-lg shadow-2xl flex flex-col">
         <div className="p-6 relative border-b border-[#1f2023]">
-          <button onClick={onClose} className="absolute top-6 right-6 text-[#b5bac1] hover:text-white p-1"><X size={20} /></button>
+          <button onClick={onClose} disabled={isUpdating} className="absolute top-6 right-6 text-[#b5bac1] hover:text-white p-1 disabled:opacity-50"><X size={20} /></button>
           <h2 className="text-xl font-bold text-white">Impostazioni Server</h2>
           <p className="text-[#b5bac1] text-sm mt-1">Modifica i dettagli di {server.name}</p>
         </div>
         
         <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar">
-          <form id="server-settings-form" onSubmit={handleSubmit} className="space-y-4">
+          <form id="server-settings-form" onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex justify-center mb-2 relative">
+              <div 
+                onClick={() => !isUpdating && fileInputRef.current?.click()}
+                className={`w-24 h-24 border-2 ${!previewUrl ? 'border-dashed border-[#b5bac1]' : 'border-transparent'} rounded-full flex flex-col items-center justify-center text-[#b5bac1] cursor-pointer hover:opacity-80 transition-all overflow-hidden relative group ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                {previewUrl ? (
+                  <>
+                    <img src={previewUrl} alt="Server Icon" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Upload size={24} className="text-white" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={24} className="mb-1" />
+                    <div className="font-bold text-[10px] uppercase">Upload</div>
+                  </>
+                )}
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/png, image/jpeg, image/gif, image/webp" 
+                onChange={handleFileChange} 
+              />
+            </div>
+
             <div>
               <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
                 Nome del server <span className="text-[#f23f43]">*</span>
@@ -216,20 +256,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-                URL Immagine (Icona)
-              </label>
-              <input 
-                type="text" 
-                value={iconUrl}
-                onChange={(e) => setIconUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+                disabled={isUpdating}
+                className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
               />
             </div>
           </form>
@@ -240,7 +268,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
               <button 
                 type="button" 
                 onClick={() => setConfirmDelete(true)}
-                className="w-full flex items-center justify-center bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-2 rounded transition-colors"
+                disabled={isUpdating}
+                className="w-full flex items-center justify-center bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-2 rounded transition-colors disabled:opacity-50"
               >
                 <Trash2 size={16} className="mr-2" />
                 Elimina Server
@@ -251,13 +280,15 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setConfirmDelete(false)}
-                    className="flex-1 bg-[#35373c] hover:bg-[#404249] text-white py-1.5 rounded text-sm transition-colors"
+                    disabled={isUpdating}
+                    className="flex-1 bg-[#35373c] hover:bg-[#404249] text-white py-1.5 rounded text-sm transition-colors disabled:opacity-50"
                   >
                     Annulla
                   </button>
                   <button 
                     onClick={() => onDelete(server.id)}
-                    className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white py-1.5 rounded text-sm transition-colors"
+                    disabled={isUpdating}
+                    className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white py-1.5 rounded text-sm transition-colors disabled:opacity-50"
                   >
                     Sì, elimina
                   </button>
@@ -268,11 +299,11 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
         </div>
         
         <div className="p-4 bg-[#2b2d31] rounded-b-lg flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="text-sm font-medium text-white hover:underline px-4">
+          <button type="button" onClick={onClose} disabled={isUpdating} className="text-sm font-medium text-white hover:underline px-4 disabled:opacity-50">
             Annulla
           </button>
-          <button type="submit" form="server-settings-form" className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors">
-            Salva modifiche
+          <button type="submit" form="server-settings-form" disabled={isUpdating} className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {isUpdating ? 'Salvataggio...' : 'Salva modifiche'}
           </button>
         </div>
       </div>

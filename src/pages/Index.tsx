@@ -36,7 +36,9 @@ const Index = () => {
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  
   const [isCreatingServer, setIsCreatingServer] = useState(false);
+  const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
   // Caricamento dati iniziali
   useEffect(() => {
@@ -76,7 +78,6 @@ const Index = () => {
         return;
       }
       
-      // Prendi gli ID utente
       const { data: membersData } = await supabase
         .from('server_members')
         .select('user_id')
@@ -85,7 +86,6 @@ const Index = () => {
       if (membersData && membersData.length > 0) {
         const userIds = membersData.map(m => m.user_id);
         
-        // Prendi i profili completi
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('*')
@@ -235,15 +235,40 @@ const Index = () => {
     setShowDiscoverModal(true);
   };
 
-  const handleUpdateServer = async (id: string, name: string, iconUrl: string) => {
-    const { error } = await supabase.from('servers').update({ name, icon_url: iconUrl }).eq('id', id);
+  const handleUpdateServer = async (id: string, name: string, imageFile: File | null) => {
+    if (!currentUser) return;
+    setIsUpdatingServer(true);
+    
+    let icon_url = servers.find(s => s.id === id)?.icon_url;
+
+    if (imageFile) {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${currentUser.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('icons')
+        .upload(filePath, imageFile);
+
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        icon_url = data.publicUrl;
+      } else {
+        showError("Errore durante il caricamento dell'immagine.");
+      }
+    }
+
+    const { error } = await supabase.from('servers').update({ name, icon_url }).eq('id', id);
     if (error) {
       showError("Impossibile aggiornare il server");
+      setIsUpdatingServer(false);
       return;
     }
-    setServers(servers.map(s => s.id === id ? { ...s, name, icon_url: iconUrl } : s));
+    
+    setServers(servers.map(s => s.id === id ? { ...s, name, icon_url: icon_url || s.icon_url } : s));
     setShowSettingsModal(false);
     showSuccess("Impostazioni salvate con successo!");
+    setIsUpdatingServer(false);
   };
 
   const handleDeleteServer = async (id: string) => {
@@ -338,11 +363,9 @@ const Index = () => {
             onToggleSidebar={() => setShowSidebar(true)}
             showMembers={showMembers}
           />
-          {/* Overlay scuro su mobile/tablet per chiudere la lista membri cliccando fuori */}
           {showMembers && (
             <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
           )}
-          {/* Wrapper per l'elenco membri aggiornato per funzionare su tutti gli schermi tramite pannello laterale scorrevole/espandibile */}
           <div className={`
             absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
             h-full transition-all duration-300
@@ -415,6 +438,7 @@ const Index = () => {
         server={activeServer || null}
         onUpdate={handleUpdateServer}
         onDelete={handleDeleteServer}
+        isUpdating={isUpdatingServer}
       />
     </div>
   );
