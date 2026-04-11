@@ -45,10 +45,8 @@ const Index = () => {
 
   // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
   const serverMembersList: User[] = serverProfiles.map(p => {
-    // L'utente corrente è sempre online per se stesso, gli altri dipendono dalla Presence
     const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
     const name = p.first_name || "Utente";
-    // Applica lo stesso criterio per il ruolo usato nel profilo principale
     const isVerifiedUser = name.toLowerCase() === 'faf3tto';
 
     return {
@@ -57,7 +55,9 @@ const Index = () => {
       avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
       status: isOnline ? "online" : "offline",
       global_role: isVerifiedUser ? "CREATOR" : "USER",
-      bio: p.bio || ""
+      bio: p.bio || "",
+      banner_color: p.banner_color || "#5865F2",
+      banner_url: p.banner_url || undefined
     };
   });
 
@@ -65,11 +65,10 @@ const Index = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Crea un canale per tracciare chi è attualmente nell'app
     const channel = supabase.channel('global_presence', {
       config: {
         presence: {
-          key: user.id, // Usa l'ID utente come chiave univoca
+          key: user.id, 
         },
       },
     });
@@ -78,19 +77,16 @@ const Index = () => {
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
         const onlineIds = new Set<string>();
-        // Estrapola tutti gli ID degli utenti attualmente connessi
         Object.keys(presenceState).forEach(id => onlineIds.add(id));
         setOnlineUserIds(onlineIds);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          // Quando sei connesso al canale, trasmetti il tuo stato
           await channel.track({ online_at: new Date().toISOString() });
         }
       });
 
     return () => {
-      // Disconnessione automatica quando il componente viene smontato (es. chiudi scheda)
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -100,14 +96,11 @@ const Index = () => {
     const loadInitialData = async () => {
       if (!user) return;
       
-      // Aggiorniamo l'orario nel DB per tracciare storicamente l'ultimo accesso
       await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
-      
-      // Controllo per gli utenti verificati (attualmente solo faf3tto)
       const isVerifiedUser = userName.toLowerCase() === 'faf3tto';
 
       const loadedUser: User = {
@@ -116,7 +109,9 @@ const Index = () => {
         avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
         global_role: isVerifiedUser ? "CREATOR" : "USER",
-        bio: profile?.bio || ""
+        bio: profile?.bio || "",
+        banner_color: profile?.banner_color || "#5865F2",
+        banner_url: profile?.banner_url || undefined
       };
       
       setCurrentUser(loadedUser);
@@ -136,7 +131,6 @@ const Index = () => {
     loadInitialData();
   }, [user]);
 
-  // Caricamento profili membri del server corrente
   useEffect(() => {
     const fetchServerMembers = async () => {
       if (!activeServerId || activeServerId === 'home') {
@@ -166,7 +160,6 @@ const Index = () => {
     fetchServerMembers();
   }, [activeServerId]);
 
-  // Seleziona automaticamente il primo canale
   useEffect(() => {
     if (activeServerId !== 'home') {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
@@ -180,7 +173,6 @@ const Index = () => {
     }
   }, [activeServerId, allChannels]);
 
-  // Gestione responsive della lista membri
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
@@ -212,7 +204,6 @@ const Index = () => {
   const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
     if (!currentUser) return;
     
-    // Doppio controllo di sicurezza per la creazione
     const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
     if (!canCreate) {
       showError("Non hai i permessi per creare un server. Serve un account verificato.");
@@ -245,7 +236,7 @@ const Index = () => {
       const filePath = `${currentUser.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('icons') // Usiamo lo stesso bucket accessibile pubblicamente
+        .from('icons')
         .upload(filePath, audioFile);
 
       if (!uploadError) {
@@ -358,7 +349,6 @@ const Index = () => {
       }
     }
 
-    // Gestione aggiornamento audio (undefined = non modificato, null = eliminato, file = nuovo)
     if (audioFile !== undefined) {
       if (audioFile === null) {
         audio_url = null;
@@ -403,20 +393,60 @@ const Index = () => {
     showSuccess("Server eliminato!");
   };
 
-  const handleUpdateProfile = async (nickname: string, bio: string) => {
+  const handleUpdateProfile = async (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined) => {
     if (!currentUser) return;
+
+    let avatar_url = currentUser.avatar;
+    let banner_url = currentUser.banner_url;
+
+    if (avatarFile) {
+      const fileExt = avatarFile.name.split('.').pop();
+      const filePath = `avatars/${currentUser.id}_${Math.random()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, avatarFile);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        avatar_url = data.publicUrl;
+      }
+    }
+
+    if (bannerFile !== undefined) {
+      if (bannerFile === null) {
+        banner_url = undefined; // eliminato
+      } else {
+        const fileExt = bannerFile.name.split('.').pop();
+        const filePath = `banners/${currentUser.id}_${Math.random()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, bannerFile);
+        if (!uploadError) {
+          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+          banner_url = data.publicUrl;
+        }
+      }
+    }
 
     const { error } = await supabase
       .from('profiles')
-      .update({ first_name: nickname, bio: bio })
+      .update({ 
+        first_name: nickname, 
+        bio: bio,
+        avatar_url: avatar_url,
+        banner_color: bannerColor,
+        banner_url: banner_url || null
+      })
       .eq('id', currentUser.id);
 
     if (error) {
-      showError("Impossibile aggiornare il profilo.");
+      showError("Impossibile aggiornare il profilo. Ricordati di eseguire lo script SQL per il banner!");
       return;
     }
 
-    setCurrentUser({ ...currentUser, name: nickname, bio: bio });
+    setCurrentUser({ 
+      ...currentUser, 
+      name: nickname, 
+      bio: bio,
+      avatar: avatar_url,
+      banner_color: bannerColor,
+      banner_url: banner_url
+    });
     showSuccess("Profilo aggiornato con successo!");
     setShowUserSettingsModal(false);
   };
@@ -478,7 +508,7 @@ const Index = () => {
             <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
               <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
                 <div className="relative group/status cursor-default">
-                  <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
+                  <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
                   <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
                 </div>
                 <div className="ml-2 flex flex-col min-w-0">

@@ -6,6 +6,8 @@ export type User = {
   customStatus?: string;
   global_role?: "USER" | "CREATOR" | "ADMIN";
   bio?: string;
+  banner_color?: string;
+  banner_url?: string;
 };
 
 export type Server = {

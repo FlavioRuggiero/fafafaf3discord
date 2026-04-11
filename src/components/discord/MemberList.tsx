@@ -24,17 +24,13 @@ const statusText = {
 };
 
 export const MemberList = ({ users, creatorId }: MemberListProps) => {
-  // Separa il creatore dagli altri utenti
   const creator = users.find(u => u.id === creatorId);
-  
-  // Ordina in ordine alfabetico gli altri utenti
   const otherUsers = users.filter(u => u.id !== creatorId).sort((a, b) => a.name.localeCompare(b.name));
 
   const onlineUsers = otherUsers.filter(u => u.status !== 'offline');
   const offlineUsers = otherUsers.filter(u => u.status === 'offline');
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
-    // Utilizza la proprietà global_role definita nei type di Discord (se ADMIN o CREATOR, mostrerà l'etichetta)
     const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
 
     return (
@@ -49,11 +45,9 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
               )}
               <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full object-cover ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
               
-              {/* Pallino di stato con Tooltip (Visibile solo se non attiva l'HoverCard principale) */}
               <div className="absolute -bottom-0.5 -right-0.5 group/status">
                 <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
                 
-                {/* Tooltip dello status */}
                 <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
                   {statusText[user.status]}
                   <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-[#111214]"></div>
@@ -79,7 +73,6 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
           </div>
         </HoverCard.Trigger>
         
-        {/* Usiamo esplicitamente Portal per evitare clip dai container con overflow-hidden */}
         <HoverCard.Portal>
           <HoverCard.Content 
             side="left" 
@@ -88,18 +81,21 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
             collisionPadding={20}
             className="w-[300px] p-0 bg-[#111214] border border-[#1e1f22] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
           >
-            {/* Banner */}
-            <div className="h-[60px] bg-brand relative flex-shrink-0">
-              {/* Avatar container */}
+            {/* Banner Section */}
+            <div 
+              className="h-[60px] relative flex-shrink-0 bg-cover bg-center"
+              style={{ 
+                backgroundColor: user.banner_color || '#5865F2',
+                backgroundImage: user.banner_url ? `url(${user.banner_url})` : undefined
+              }}
+            >
               <div className="absolute -bottom-10 left-4 rounded-full border-[6px] border-[#111214] bg-[#111214]">
                 <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
-                {/* Stato più grande nell'anteprima */}
                 <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-[#111214] ${statusColors[user.status]}`} title={statusText[user.status]} />
               </div>
             </div>
             
             <div className="p-4 pt-12 pb-5">
-              {/* Nickname & Ruoli */}
               <div className="flex items-center flex-wrap gap-2 mb-1">
                 <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
                 {isAdmin && (
@@ -113,7 +109,6 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
                 <div className="mt-2 text-[13px] text-[#dbdee1]">{user.customStatus}</div>
               )}
               
-              {/* Sezione Biografia */}
               <div className="mt-4 pt-4 border-t border-[#2b2d31]">
                 <h4 className="text-[11px] font-bold uppercase text-[#b5bac1] mb-2 tracking-wider">Su di me</h4>
                 {user.bio ? (
@@ -132,7 +127,6 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
   return (
     <div className="w-[240px] h-full bg-[#2b2d31] flex flex-col flex-shrink-0 border-l border-[#1f2023]">
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-end px-4 flex-shrink-0">
-        {/* Placeholder per allineamento con l'header della chat */}
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pr-2">
