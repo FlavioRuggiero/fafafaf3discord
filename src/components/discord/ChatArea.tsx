@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { ProfilePopover } from "./ProfilePopover";
+import { BombParty } from "./BombParty";
 
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
@@ -54,6 +55,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [activeActivity, setActiveActivity] = useState<string | null>(null);
 
   // Stato per gli utenti connessi al canale vocale
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
@@ -699,7 +701,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col relative">
-          {focusedMember ? (
+          {activeActivity === 'bombparty' ? (
+            <BombParty 
+              channelId={channel.id} 
+              currentUser={currentUser} 
+              voiceMembers={displayVoiceMembers} 
+              onClose={() => setActiveActivity(null)} 
+            />
+          ) : focusedMember ? (
             <div className="flex-1 flex flex-col min-h-0 bg-black animate-in fade-in duration-200">
               <div className="flex-1 relative flex items-center justify-center min-h-0 p-4">
                 
@@ -828,7 +837,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
            <button 
              onClick={() => setShowActivitiesModal(true)}
-             className="w-14 h-14 rounded-full flex items-center justify-center bg-[#313338] hover:bg-[#23a559] text-[#dbdee1] hover:text-white transition-all duration-300"
+             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${activeActivity ? 'bg-[#23a559] text-white shadow-[0_0_20px_rgba(35,165,89,0.3)]' : 'bg-[#313338] hover:bg-[#23a559] text-[#dbdee1] hover:text-white'}`}
              title="Avvia un'attività"
            >
              <Rocket size={24} />
@@ -1202,18 +1211,23 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             <div className="p-6 overflow-y-auto custom-scrollbar max-h-[60vh] bg-[#2b2d31]">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
+                  { id: 'bombparty', name: 'BombParty', desc: 'Trova la parola prima che esploda!', color: 'from-gray-800 to-black', icon: '💣' },
                   { id: 'yt', name: 'YouTube Together', desc: 'Guarda video', color: 'from-red-500 to-red-700', icon: '▶️' },
                   { id: 'poker', name: 'Poker Night', desc: 'Texas Hold\'em', color: 'from-green-600 to-green-800', icon: '🃏' },
                   { id: 'draw', name: 'Sketch Heads', desc: 'Disegna e indovina', color: 'from-blue-500 to-purple-600', icon: '🎨' },
                   { id: 'chess', name: 'Scacchi nel Parco', desc: 'Metti alla prova la mente', color: 'from-gray-600 to-gray-800', icon: '♟️' },
-                  { id: 'golf', name: 'Putt Party', desc: 'Minigolf multigiocatore', color: 'from-yellow-500 to-orange-600', icon: '⛳' },
-                  { id: 'checkers', name: 'Dama', desc: 'Classico da tavolo', color: 'from-red-800 to-black', icon: '🔴' }
+                  { id: 'golf', name: 'Putt Party', desc: 'Minigolf multigiocatore', color: 'from-yellow-500 to-orange-600', icon: '⛳' }
                 ].map(activity => (
                   <div 
                     key={activity.id} 
                     onClick={() => {
-                      showError(`Avvio attività: ${activity.name} non ancora implementato nel server.`);
-                      setShowActivitiesModal(false);
+                      if (activity.id === 'bombparty') {
+                        setActiveActivity('bombparty');
+                        setShowActivitiesModal(false);
+                      } else {
+                        showError(`Avvio attività: ${activity.name} non ancora implementato nel server.`);
+                        setShowActivitiesModal(false);
+                      }
                     }}
                     className="bg-[#1e1f22] rounded-xl overflow-hidden border border-[#1e1f22] hover:border-[#5865F2] hover:shadow-[0_0_15px_rgba(88,101,242,0.2)] transition-all cursor-pointer group flex flex-col"
                   >
