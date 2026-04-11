@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
+import { playSound } from "@/utils/sounds";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -48,6 +49,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
+  const prevMembersRef = useRef<ServerMemberWithProfile[]>([]);
   
   const { 
     joinVoiceChannel, 
@@ -191,6 +193,36 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       supabase.removeChannel(memberSub);
     };
   }, [activeServer?.id]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId || !currentUser) return;
+
+    const currentVCUserIds = new Set(
+      members
+        .filter(m => m.voice_channel_id === activeVoiceChannelId)
+        .map(m => m.user_id)
+    );
+    
+    const prevVCUserIds = new Set(
+      prevMembersRef.current
+        .filter(m => m.voice_channel_id === activeVoiceChannelId)
+        .map(m => m.user_id)
+    );
+
+    currentVCUserIds.forEach(userId => {
+      if (!prevVCUserIds.has(userId) && userId !== currentUser.id) {
+        playSound('/enter.mp3');
+      }
+    });
+
+    prevVCUserIds.forEach(userId => {
+      if (!currentVCUserIds.has(userId) && userId !== currentUser.id) {
+        playSound('/exit.mp3');
+      }
+    });
+
+    prevMembersRef.current = members;
+  }, [members, activeVoiceChannelId, currentUser]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
