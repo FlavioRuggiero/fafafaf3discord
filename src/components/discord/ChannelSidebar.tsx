@@ -137,57 +137,75 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
-  // Gestione Membri Server per Chat Vocali: uniamo i dati manualmente per evitare errori PGRST200
+  // Gestione Membri Server per Chat Vocali: ottimizzato per aggiornamenti istantanei
   useEffect(() => {
     if (!activeServer?.id) return;
 
     let isMounted = true;
 
-    const fetchMembers = async () => {
-      // Step 1: Prendiamo i server_members senza provare a fare JOIN
+    const fetchInitialMembers = async () => {
       const { data: membersData, error: membersError } = await supabase
         .from('server_members')
         .select('*')
         .eq('server_id', activeServer.id);
       
-      if (membersError) {
+      if (membersError || !membersData) {
         console.error("Error fetching server members:", membersError);
+        if (isMounted) setMembers([]);
         return;
       }
       
-      if (membersData && isMounted) {
-        if (membersData.length === 0) {
-          setMembers([]);
-          return;
-        }
+      if (membersData.length === 0) {
+        if (isMounted) setMembers([]);
+        return;
+      }
 
-        // Step 2: Estraiamo gli ID e prendiamo i profili
-        const userIds = membersData.map(m => m.user_id);
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
+      const userIds = membersData.map(m => m.user_id);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds);
 
-        // Step 3: Uniamo i dati lato client
-        const combinedData = membersData.map(m => ({
-          ...m,
-          profiles: profilesData?.find(p => p.id === m.user_id) || null
-        }));
+      const combinedData = membersData.map(m => ({
+        ...m,
+        profiles: profilesData?.find(p => p.id === m.user_id) || null
+      }));
 
+      if (isMounted) {
         setMembers(combinedData as ServerMemberWithProfile[]);
       }
     };
 
-    fetchMembers();
+    fetchInitialMembers();
 
     const memberSub = supabase.channel(`realtime:server_members:${activeServer.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'server_members'
-      }, () => {
-        if (isMounted) {
-          fetchMembers(); // Ricarichiamo manualmente se notiamo cambiamenti (es: utente in chat vocale)
+        table: 'server_members',
+        filter: `server_id=eq.${activeServer.id}`
+      }, async (payload) => {
+        if (!isMounted) return;
+
+        if (payload.eventType === 'UPDATE') {
+          const updatedMember = payload.new as ServerMember;
+          setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
+        } else if (payload.eventType === 'INSERT') {
+          const newMember = payload.new as ServerMember;
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', newMember.user_id)
+            .single();
+          if (isMounted) {
+            setMembers(prev => {
+              if (prev.some(m => m.user_id === newMember.user_id)) return prev;
+              return [...prev, { ...newMember, profiles: profileData || null }];
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const deletedMember = payload.old as { user_id: string };
+          setMembers(prev => prev.filter(m => m.user_id !== deletedMember.user_id));
         }
       })
       .subscribe();
@@ -707,7 +725,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
                               {connectedMembers.map(member => (
-                                <div key={member.user_id} className="flex items-center group/member">
+                                <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
                                   <div className="relative">
                                     <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
                                     <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
@@ -739,7 +757,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               {localChannels.find(c => c.id === activeVoiceChannelId)?.name}
             </span>
             <button 
-              onClick={() => leaveVoiceChannel()}
+              onClick={() => {
+                playTone(440, 200);
+                leaveVoiceChannel();
+              }}
               className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
               title="Disconnetti"
             >
