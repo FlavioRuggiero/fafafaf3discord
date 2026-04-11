@@ -21,6 +21,7 @@ interface ChannelSidebarProps {
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
@@ -30,50 +31,53 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Sottoscrizione realtime robusta
+  // Sottoscrizione realtime globale senza filtri server per assicurare la ricezione
   useEffect(() => {
     if (!activeServer?.id) return;
 
+    let mounted = true;
+
     // Caricamento iniziale sicuro dal DB
     const loadChannels = async () => {
-      const { data } = await supabase.from('channels').select('*').eq('server_id', activeServer.id);
-      if (data) {
+      const { data, error } = await supabase.from('channels').select('*').eq('server_id', activeServer.id);
+      if (data && mounted) {
         setLocalChannels(data as Channel[]);
+        setDeletedIds(new Set()); // Reset dei canali eliminati al ricaricamento
       }
     };
     loadChannels();
 
-    const channelSub = supabase.channel(`sidebar-channels-${activeServer.id}`)
+    // Sottoscrizione a TUTTI gli eventi dei canali e filtraggio locale (molto più affidabile)
+    const channelSub = supabase.channel(`public:channels:${activeServer.id}-${Date.now()}`)
       .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'channels',
-        filter: `server_id=eq.${activeServer.id}`
-      }, (payload) => {
-        setLocalChannels(prev => {
-          if (prev.some(c => c.id === payload.new.id)) return prev;
-          return [...prev, payload.new as Channel];
-        });
-      })
-      .on('postgres_changes', { 
-        event: 'DELETE', 
+        event: '*', 
         schema: 'public', 
         table: 'channels'
-        // NESSUN FILTRO QUI: Supabase restituisce solo l'ID nelle delete
       }, (payload) => {
-        setDeletedIds(prev => new Set(prev).add(payload.old.id));
-      })
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'channels',
-        filter: `server_id=eq.${activeServer.id}`
-      }, (payload) => {
-        setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+        
+        if (payload.eventType === 'INSERT') {
+          if (payload.new.server_id === activeServer.id) {
+            setLocalChannels(prev => {
+              if (prev.some(c => c.id === payload.new.id)) return prev;
+              return [...prev, payload.new as Channel];
+            });
+          }
+        } 
+        else if (payload.eventType === 'DELETE') {
+          setDeletedIds(prev => new Set(prev).add(payload.old.id));
+          // Rimuovi anche localmente in modo diretto
+          setLocalChannels(prev => prev.filter(c => c.id !== payload.old.id));
+        } 
+        else if (payload.eventType === 'UPDATE') {
+          if (payload.new.server_id === activeServer.id) {
+            setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+          }
+        }
       })
       .subscribe();
 
     return () => {
+      mounted = false;
       supabase.removeChannel(channelSub);
     };
   }, [activeServer?.id]);
@@ -104,6 +108,18 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   
   const isOwner = activeServer?.created_by === currentUser?.id;
 
+  const toggleCategory = (category: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
   const handleAddChannelClick = (category: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedCategory(category);
@@ -130,6 +146,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setLocalChannels(prev => [...prev, newChannel]);
     setIsAddingChannel(false);
     setNewChannelName("");
+    
+    // Se la categoria era chiusa, aprila per far vedere il nuovo canale
+    if (collapsedCategories.has(selectedCategory)) {
+      toggleCategory(selectedCategory);
+    }
 
     try {
       const { data, error } = await supabase.from('channels').insert({
@@ -169,6 +190,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
     // Aggiornamento ottimistico
     setDeletedIds(prev => new Set(prev).add(id));
+    setLocalChannels(prev => prev.filter(c => c.id !== id));
 
     try {
       const { error } = await supabase.from('channels').delete().eq('id', id);
@@ -231,11 +253,16 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         ) : (
           categories.map((category, idx) => {
             const categoryChannels = serverChannels.filter(c => c.category === category);
+            const isCollapsed = collapsedCategories.has(category);
+            
             return (
               <div key={idx}>
-                <div className="flex items-center justify-between text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1 group/category">
+                <div 
+                  onClick={() => toggleCategory(category)}
+                  className="flex items-center justify-between text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1 group/category"
+                >
                   <div className="flex items-center">
-                    <ChevronDown size={12} className="mr-1" />
+                    <ChevronDown size={12} className={`mr-1 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
                     <span className="text-xs font-semibold uppercase tracking-wider">{category}</span>
                   </div>
                   {isOwner && (
@@ -249,54 +276,56 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   )}
                 </div>
                 
-                <div className="space-y-[2px]">
-                  {categoryChannels.map(channel => {
-                    const isActive = channel.id === activeChannelId;
-                    const Icon = channel.type === 'text' ? Hash : Volume2;
-                    const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
-                    
-                    return (
-                      <div
-                        key={channel.id}
-                        onClick={() => onChannelSelect(channel)}
-                        className={`flex items-center px-2 py-1.5 rounded cursor-pointer group ${
-                          isActive 
-                            ? 'bg-[#404249] text-white' 
-                            : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                        } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
-                      >
-                        <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
-                        <span className="truncate flex-1">{channel.name}</span>
-                        
-                        <div className="flex items-center flex-shrink-0">
-                          {channel.unread && !isActive && (
-                            <div className="w-2 h-2 rounded-full bg-white mr-1" />
-                          )}
-                          {isOwner && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isLastTextChannel) {
-                                  showError("Il server deve avere almeno un canale testuale.");
-                                } else {
-                                  setChannelToDelete(channel);
-                                }
-                              }}
-                              className={`ml-1 p-0.5 transition-all ${
-                                isLastTextChannel 
-                                  ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
-                                  : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
-                              }`}
-                              title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
+                {!isCollapsed && (
+                  <div className="space-y-[2px]">
+                    {categoryChannels.map(channel => {
+                      const isActive = channel.id === activeChannelId;
+                      const Icon = channel.type === 'text' ? Hash : Volume2;
+                      const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
+                      
+                      return (
+                        <div
+                          key={channel.id}
+                          onClick={() => onChannelSelect(channel)}
+                          className={`flex items-center px-2 py-1.5 rounded cursor-pointer group ${
+                            isActive 
+                              ? 'bg-[#404249] text-white' 
+                              : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
+                          } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
+                        >
+                          <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
+                          <span className="truncate flex-1">{channel.name}</span>
+                          
+                          <div className="flex items-center flex-shrink-0">
+                            {channel.unread && !isActive && (
+                              <div className="w-2 h-2 rounded-full bg-white mr-1" />
+                            )}
+                            {isOwner && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isLastTextChannel) {
+                                    showError("Il server deve avere almeno un canale testuale.");
+                                  } else {
+                                    setChannelToDelete(channel);
+                                  }
+                                }}
+                                className={`ml-1 p-0.5 transition-all ${
+                                  isLastTextChannel 
+                                    ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
+                                    : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
+                                }`}
+                                title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })
