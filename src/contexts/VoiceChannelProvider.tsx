@@ -76,6 +76,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       setIsMuted(muted);
       if (currentUser) {
         setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: muted } }));
+        // Sincronizzazione globale Database
+        supabase.from('server_members').update({ is_muted: muted }).eq('user_id', currentUser.id).then();
       }
 
       if (!muted && playSounds) playSound('/unmute.mp3');
@@ -87,6 +89,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       setIsMuted(true);
       if (currentUser) {
         setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
+        // Sincronizzazione globale Database
+        supabase.from('server_members').update({ is_muted: true }).eq('user_id', currentUser.id).then();
       }
       return null;
     }
@@ -103,6 +107,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
             setIsMuted(true);
             if (currentUser) {
               setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
+              // Sincronizzazione globale Database
+              supabase.from('server_members').update({ is_muted: true }).eq('user_id', currentUser.id).then();
             }
           }
         } catch (e) {
@@ -138,6 +144,10 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       else playSound('/unmute.mp3');
 
       setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: newMutedState } }));
+      
+      // Sincronizzazione globale Database
+      supabase.from('server_members').update({ is_muted: newMutedState }).eq('user_id', currentUser.id).then();
+
       if (signalingChannelRef.current) {
         signalingChannelRef.current.send({
           type: 'broadcast',
@@ -179,6 +189,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
     
     setMemberStates(prev => ({ ...prev, [currentUser.id]: { isMuted: finalMuteState, isDeafened: newDeafenState } }));
+
+    // Sincronizzazione globale Database
+    supabase.from('server_members').update({ is_muted: finalMuteState, is_deafened: newDeafenState }).eq('user_id', currentUser.id).then();
 
     if (signalingChannelRef.current) {
       signalingChannelRef.current.send({
@@ -309,7 +322,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     channel.on('presence', { event: 'join' }, ({ key }) => {
       if (key !== currentUser?.id) {
         playSound('/enter.mp3');
-        // When someone else joins, I send them my current state.
         if (currentUser) {
           channel.send({
             type: 'broadcast',

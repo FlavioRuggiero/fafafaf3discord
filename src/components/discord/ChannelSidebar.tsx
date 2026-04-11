@@ -52,8 +52,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const { 
     joinVoiceChannel, 
     leaveVoiceChannel, 
-    activeVoiceChannelId, 
-    memberStates
+    activeVoiceChannelId
   } = useVoiceChannel();
 
   useEffect(() => {
@@ -114,7 +113,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
-  // Gestione Membri Server per Chat Vocali: ottimizzato per aggiornamenti istantanei
+  // Gestione Membri Server per Chat Vocali: ottimizzato per aggiornamenti istantanei DB
   useEffect(() => {
     if (!activeServer?.id) return;
 
@@ -166,6 +165,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
         if (payload.eventType === 'UPDATE') {
           const updatedMember = payload.new as ServerMember;
+          // Usa lo spread state sicuro: {...m, ...updatedMember}
+          // In questo modo preserviamo i "profiles" ed evitiamo che la lista sparisca!
           setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
         } else if (payload.eventType === 'INSERT') {
           const newMember = payload.new as ServerMember;
@@ -701,9 +702,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
                               {connectedMembers.map(member => {
-                                const voiceState = memberStates[member.user_id];
-                                const memberIsMuted = voiceState?.isMuted ?? false;
-                                const memberIsDeafened = voiceState?.isDeafened ?? false;
+                                // Ora i dati muto/sordomuto vengono letti direttamente e in modo affidabile dal Database
+                                const memberIsMuted = member.is_muted ?? false;
+                                const memberIsDeafened = member.is_deafened ?? false;
 
                                 return (
                                   <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
