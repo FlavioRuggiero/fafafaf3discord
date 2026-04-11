@@ -25,6 +25,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [tableExists, setTableExists] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,7 +35,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     scrollToBottom();
   }, [realMessages, propMessages, typingUsers]);
 
-  // Recupero dell'utente corrente
+  // Pulizia del timer per l'indicatore di digitazione
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
+  // Recupero dell'utente corrente e profilo
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -51,7 +59,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
-  // Recupero storico messaggi e iscrizione agli eventi in tempo reale
+  // Recupero storico messaggi e iscrizione Realtime
   useEffect(() => {
     if (!channel?.id) return;
     
@@ -71,7 +79,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.warn("Tabella messages non trovata o errore di fetch. Utilizzo i messaggi di fallback.", error);
+        console.warn("Tabella messages non trovata. Utilizzo i messaggi di fallback.");
         setTableExists(false);
         setIsLoading(false);
         return;
@@ -98,7 +106,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
-    // Sottoscrizione in tempo reale per i nuovi messaggi
+    // Sottoscrizione messaggi in tempo reale
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', {
@@ -125,6 +133,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         };
         
         setRealMessages(prev => {
+          // Preveniamo duplicati tra update ottimistici e Realtime
+          const isTemp = prev.some(m => m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id);
+          if (isTemp) {
+            return prev.map(m => (m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id) ? newMsg : m);
+          }
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
@@ -180,10 +193,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     
     if (typingChannel && currentUserProfile) {
       const userName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente';
-      typingChannel.track({
-        isTyping: value.length > 0,
-        userName: userName
-      });
+      
+      if (value.length > 0) {
+        typingChannel.track({ isTyping: true, userName });
+        
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        
+        // Rimuove la scritta automaticamente dopo 3 secondi in cui non si premono tasti
+        typingTimeoutRef.current = setTimeout(() => {
+          typingChannel.track({ isTyping: false, userName });
+        }, 3000);
+      } else {
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingChannel.track({ isTyping: false, userName });
+      }
     }
   };
 
@@ -192,24 +215,44 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       const content = inputValue.trim();
       setInputValue("");
       
-      if (typingChannel) {
-        typingChannel.track({ isTyping: false });
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      
+      if (typingChannel && currentUserProfile) {
+        const userName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente';
+        typingChannel.track({ isTyping: false, userName });
       }
 
       if (currentUser && channel && tableExists) {
-        // Salvataggio nel database
-        const { error } = await supabase.from('messages').insert({
+        // AGGIORNAMENTO OTTIMISTICO: mostra il messaggio subito per chi lo invia
+        const tempId = `temp-${Date.now()}`;
+        const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
+        const avatar = currentUserProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`;
+        
+        const optimisticMsg: Message = {
+          id: tempId,
+          content: content,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          user: { id: currentUser.id, name: userName, avatar }
+        };
+        
+        setRealMessages(prev => [...prev, optimisticMsg]);
+
+        // Salvataggio effettivo nel database
+        const { data, error } = await supabase.from('messages').insert({
           channel_id: channel.id,
           user_id: currentUser.id,
           content: content
-        });
+        }).select().single();
         
         if (error) {
-          console.error("Errore durante l'invio del messaggio:", error);
-          onSendMessage(content);
+          console.error("Errore durante l'invio:", error);
+          // Rimuove il messaggio ottimistico se c'è un errore
+          setRealMessages(prev => prev.filter(m => m.id !== tempId));
+        } else if (data) {
+          // Aggiorna l'ID temporaneo con quello vero
+          setRealMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id } : m));
         }
       } else {
-        // Fallback locale
         onSendMessage(content);
       }
     }
