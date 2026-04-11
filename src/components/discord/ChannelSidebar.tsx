@@ -57,6 +57,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     speakingStates
   } = useVoiceChannel();
 
+  // Reference hooks per evitare dipendenze instabili nei listener realtime
+  const activeChannelIdRef = useRef(activeChannelId);
+  useEffect(() => { activeChannelIdRef.current = activeChannelId; }, [activeChannelId]);
+
+  const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
+  useEffect(() => { activeVoiceChannelIdRef.current = activeVoiceChannelId; }, [activeVoiceChannelId]);
+
   useEffect(() => {
     if (!activeServer?.id) return;
     const saved = localStorage.getItem(`collapsed-categories-${activeServer.id}`);
@@ -89,28 +96,50 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
     const channelSub = supabase.channel(`public:channels:server=${activeServer.id}`)
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'channels',
         filter: `server_id=eq.${activeServer.id}`
       }, (payload) => {
         if (!isMounted) return;
-        if (payload.eventType === 'INSERT') {
-          setLocalChannels(prev => {
-            if (prev.some(c => c.id === payload.new.id)) return prev;
-            return [...prev, payload.new as Channel];
-          });
-        } 
-        else if (payload.eventType === 'DELETE') {
-          const deletedChannelId = payload.old.id as string;
-          if (activeVoiceChannelId === deletedChannelId) {
-            leaveVoiceChannel();
-          }
-          setLocalChannels(prev => prev.filter(c => c.id !== deletedChannelId));
-        } 
-        else if (payload.eventType === 'UPDATE') {
-          setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+        setLocalChannels(prev => {
+          if (prev.some(c => c.id === payload.new.id)) return prev;
+          return [...prev, payload.new as Channel];
+        });
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'channels',
+        filter: `server_id=eq.${activeServer.id}`
+      }, (payload) => {
+        if (!isMounted) return;
+        setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'channels'
+        // NESSUN FILTRO QUI: Il payload di eliminazione contiene solo l'ID, non il server_id
+      }, (payload) => {
+        if (!isMounted) return;
+        const deletedChannelId = payload.old.id as string;
+        
+        if (activeVoiceChannelIdRef.current === deletedChannelId) {
+          leaveVoiceChannel();
         }
+        
+        setLocalChannels(prev => {
+          const remaining = prev.filter(c => c.id !== deletedChannelId);
+          // Se l'utente era nel canale che è appena stato eliminato, sposta la visualizzazione
+          if (activeChannelIdRef.current === deletedChannelId) {
+            const fallback = remaining.find(c => c.type === 'text') || remaining[0];
+            if (fallback) {
+              setTimeout(() => onChannelSelect(fallback), 0);
+            }
+          }
+          return remaining;
+        });
       })
       .subscribe();
 
@@ -118,7 +147,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(channelSub);
     };
-  }, [activeServer?.id, activeVoiceChannelId, leaveVoiceChannel]);
+  }, [activeServer?.id, leaveVoiceChannel, onChannelSelect]);
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -671,7 +700,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 onChannelSelect(channel);
                               } else if (channel.type === 'voice') {
                                 handleVoiceChannelSelect(channel);
-                                onChannelSelect(channel); // Aggiunto per fare switch alla vista griglia
+                                onChannelSelect(channel);
                               }
                             }}
                             className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${

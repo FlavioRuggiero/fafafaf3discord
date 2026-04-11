@@ -105,7 +105,7 @@ const Index = () => {
     };
   }, [user]);
 
-  // Listener Realtime per la tabella Profiles
+  // Listener Realtime per la tabella Profiles e Channels
   useEffect(() => {
     const profileSubscription = supabase
       .channel('public:profiles_index')
@@ -130,6 +130,18 @@ const Index = () => {
             global_role: isVerifiedUser ? "CREATOR" : "USER"
           };
         });
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'channels' }, (payload) => {
+        setAllChannels(prev => {
+          if (prev.some(c => c.id === payload.new.id)) return prev;
+          return [...prev, payload.new as Channel];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'channels' }, (payload) => {
+        setAllChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'channels' }, (payload) => {
+        setAllChannels(prev => prev.filter(c => c.id !== payload.old.id));
       })
       .subscribe();
 
@@ -238,7 +250,18 @@ const Index = () => {
     if (activeServerId !== 'home') {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
       if (newServerChannels.length > 0) {
-        setActiveChannel(newServerChannels[0]);
+        setActiveChannel(current => {
+          // Se non c'è un canale attivo, o quello attivo appartiene a un altro server, imposta il primo
+          if (!current || current.server_id !== activeServerId) {
+             return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
+          }
+          // Se il canale attivo è stato rimosso (cancellato globalmente), fa un fallback sicuro
+          if (!newServerChannels.some(c => c.id === current.id)) {
+             return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
+          }
+          // Altrimenti lascia invariato l'activeChannel
+          return current;
+        });
       } else {
         setActiveChannel(null);
       }
