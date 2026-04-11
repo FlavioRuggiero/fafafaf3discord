@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2 } from "lucide-react";
 import * as HoverCard from "@radix-ui/react-hover-card";
 import * as Popover from "@radix-ui/react-popover";
+import EmojiPicker, { Theme } from "emoji-picker-react";
 import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
@@ -126,6 +127,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [editContent, setEditContent] = useState("");
   const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
   
+  // Stato per Picker Emoji Chat
+  const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
+
   // Stato per Modale di Eliminazione
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
@@ -446,10 +450,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
+  const handleChatEmojiSelect = (emojiObject: any) => {
+    setInputValue(prev => prev + emojiObject.emoji);
+    chatInputRef.current?.focus();
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && inputValue.trim()) {
       const content = inputValue.trim();
       setInputValue("");
+      setShowChatEmojiPicker(false);
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setTypingStatus(false); 
@@ -904,6 +914,29 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             placeholder={replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in ${channel.type === 'text' ? '#' : ''}${channel.name}`}
             className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e]"
           />
+          <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
+            <Popover.Trigger asChild>
+              <button className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none" title="Scegli Emoji">
+                <SmilePlus size={24} />
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content 
+                side="top" 
+                align="end" 
+                sideOffset={10} 
+                className="z-[99999] border-none shadow-2xl bg-transparent"
+                onInteractOutside={() => setShowChatEmojiPicker(false)}
+              >
+                <EmojiPicker 
+                  theme={Theme.DARK} 
+                  onEmojiClick={handleChatEmojiSelect} 
+                  searchPlaceHolder="Cerca emoji..." 
+                  lazyLoadEmojis={true} 
+                />
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
         </div>
       </div>
 
