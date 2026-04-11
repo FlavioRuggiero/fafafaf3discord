@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2 } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2 } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -25,15 +25,29 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
-  const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
+  const [newChannelType, setNewChannelType] = useState<'text' | 'voice' | 'minigame'>('text');
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
   
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Reset dello stato delle categorie quando si cambia server
+  // Stato per la modifica
+  const [channelToEdit, setChannelToEdit] = useState<Channel | null>(null);
+  const [editChannelName, setEditChannelName] = useState("");
+
+  // Ripristina lo stato delle categorie salvato nel localStorage
   useEffect(() => {
-    setCollapsedCategories(new Set());
+    if (!activeServer?.id) return;
+    const saved = localStorage.getItem(`collapsed-categories-${activeServer.id}`);
+    if (saved) {
+      try {
+        setCollapsedCategories(new Set(JSON.parse(saved)));
+      } catch (e) {
+        setCollapsedCategories(new Set());
+      }
+    } else {
+      setCollapsedCategories(new Set());
+    }
   }, [activeServer?.id]);
 
   // Sottoscrizione realtime globale senza filtri server per assicurare la ricezione
@@ -120,6 +134,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         next.delete(category);
       } else {
         next.add(category);
+      }
+      // Salva nel localStorage
+      if (activeServer?.id) {
+        localStorage.setItem(`collapsed-categories-${activeServer.id}`, JSON.stringify(Array.from(next)));
       }
       return next;
     });
@@ -218,6 +236,34 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
+  const handleEditChannelSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editChannelName.trim() || !channelToEdit) return;
+
+    const newName = editChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+    if (newName === channelToEdit.name) {
+      setChannelToEdit(null);
+      return;
+    }
+
+    // Aggiornamento ottimistico
+    setLocalChannels(prev => prev.map(c => c.id === channelToEdit.id ? { ...c, name: newName } : c));
+    const channelId = channelToEdit.id;
+    setChannelToEdit(null);
+
+    try {
+      const { error } = await supabase.from('channels').update({ name: newName }).eq('id', channelId);
+      if (error) {
+        console.error("Errore modifica canale:", error);
+        showError("Errore durante la modifica del nome.");
+      } else {
+        showSuccess("Canale rinominato.");
+      }
+    } catch (error) {
+      console.error("Errore modifica canale:", error);
+    }
+  };
+
   if (!activeServer) return null;
 
   return (
@@ -285,7 +331,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   <div className="space-y-[2px]">
                     {categoryChannels.map(channel => {
                       const isActive = channel.id === activeChannelId;
-                      const Icon = channel.type === 'text' ? Hash : Volume2;
+                      // Selezione dinamica dell'icona
+                      const Icon = channel.type === 'text' ? Hash : channel.type === 'voice' ? Volume2 : Gamepad2;
                       const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
                       
                       return (
@@ -306,24 +353,37 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               <div className="w-2 h-2 rounded-full bg-white mr-1" />
                             )}
                             {isOwner && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isLastTextChannel) {
-                                    showError("Il server deve avere almeno un canale testuale.");
-                                  } else {
-                                    setChannelToDelete(channel);
-                                  }
-                                }}
-                                className={`ml-1 p-0.5 transition-all ${
-                                  isLastTextChannel 
-                                    ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
-                                    : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
-                                }`}
-                                title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setChannelToEdit(channel);
+                                    setEditChannelName(channel.name);
+                                  }}
+                                  className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all"
+                                  title="Rinomina Canale"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isLastTextChannel) {
+                                      showError("Il server deve avere almeno un canale testuale.");
+                                    } else {
+                                      setChannelToDelete(channel);
+                                    }
+                                  }}
+                                  className={`ml-1 p-0.5 transition-all ${
+                                    isLastTextChannel 
+                                      ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
+                                      : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
+                                  }`}
+                                  title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>
@@ -360,7 +420,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         </div>
       </div>
 
-      {/* Modale Creazione Canale Renderizzato tramite Portal */}
+      {/* Modale Creazione Canale */}
       {isAddingChannel && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setIsAddingChannel(false)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -396,6 +456,17 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                       </div>
                       <input type="radio" className="hidden" checked={newChannelType === 'voice'} onChange={() => setNewChannelType('voice')} />
                     </label>
+                    <label className={`flex items-center p-3 rounded cursor-pointer transition-colors ${newChannelType === 'minigame' ? 'bg-[#404249]' : 'bg-[#2b2d31] hover:bg-[#3f4147]'}`}>
+                      <Gamepad2 className="text-[#949ba4] mr-3" size={24} />
+                      <div className="flex-1">
+                        <div className="text-white font-medium text-base">Minigiochi</div>
+                        <div className="text-xs text-[#b5bac1]">Area dedicata per avviare minigiochi e tornei nel server.</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${newChannelType === 'minigame' ? 'border-[#5865f2]' : 'border-[#b5bac1]'}`}>
+                        {newChannelType === 'minigame' && <div className="w-2.5 h-2.5 rounded-full bg-[#5865f2]"></div>}
+                      </div>
+                      <input type="radio" className="hidden" checked={newChannelType === 'minigame'} onChange={() => setNewChannelType('minigame')} />
+                    </label>
                   </div>
                 </div>
 
@@ -403,7 +474,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome Canale</label>
                   <div className="relative flex items-center bg-[#1e1f22] rounded overflow-hidden p-1">
                     <div className="pl-2 pr-1 text-[#949ba4]">
-                      {newChannelType === 'text' ? <Hash size={18} /> : <Volume2 size={18} />}
+                      {newChannelType === 'text' ? <Hash size={18} /> : newChannelType === 'voice' ? <Volume2 size={18} /> : <Gamepad2 size={18} />}
                     </div>
                     <input 
                       type="text" 
@@ -439,7 +510,55 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         document.body
       )}
 
-      {/* Modale Eliminazione Canale Renderizzato tramite Portal */}
+      {/* Modale Rinomina Canale */}
+      {channelToEdit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setChannelToEdit(null)}>
+          <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[#1e1f22]">
+              <h2 className="text-xl font-bold text-white">Rinomina Canale</h2>
+              <p className="text-sm text-[#b5bac1] mt-1">Stai modificando il nome del canale.</p>
+            </div>
+            
+            <form onSubmit={handleEditChannelSubmit} className="flex flex-col">
+              <div className="p-4">
+                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nuovo Nome Canale</label>
+                <div className="relative flex items-center bg-[#1e1f22] rounded overflow-hidden p-1">
+                  <div className="pl-2 pr-1 text-[#949ba4]">
+                    {channelToEdit.type === 'text' ? <Hash size={18} /> : channelToEdit.type === 'voice' ? <Volume2 size={18} /> : <Gamepad2 size={18} />}
+                  </div>
+                  <input 
+                    type="text" 
+                    value={editChannelName}
+                    onChange={(e) => setEditChannelName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                    className="w-full bg-transparent text-white p-2 pl-1 focus:outline-none placeholder-[#878a91]"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end items-center bg-[#2b2d31] p-4">
+                <button 
+                  type="button" 
+                  onClick={() => setChannelToEdit(null)} 
+                  className="text-white hover:underline text-sm px-6 py-2 mr-2"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!editChannelName.trim() || editChannelName === channelToEdit.name} 
+                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Salva Modifiche
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modale Eliminazione Canale */}
       {channelToDelete && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setChannelToDelete(null)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
