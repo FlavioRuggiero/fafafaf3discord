@@ -176,12 +176,24 @@ const Index = () => {
       
       setCurrentUser(loadedUser);
 
-      const { data: memberData } = await supabase.from('server_members').select('server_id').eq('user_id', user.id);
+      // Recuperiamo i server dell'utente in ordine di posizione
+      const { data: memberData } = await supabase
+        .from('server_members')
+        .select('server_id, position')
+        .eq('user_id', user.id)
+        .order('position', { ascending: true });
+
       const joinedServerIds = memberData?.map(m => m.server_id) || [];
 
       if (joinedServerIds.length > 0) {
         const { data: serversData } = await supabase.from('servers').select('*').in('id', joinedServerIds);
-        if (serversData) setServers(serversData);
+        if (serversData) {
+          // Ricostruisce la lista di server usando l'ordine fornito da memberData (position)
+          const sortedServers = memberData
+            .map(m => serversData.find(s => s.id === m.server_id))
+            .filter(Boolean) as Server[];
+          setServers(sortedServers);
+        }
 
         const { data: channelsData } = await supabase.from('channels').select('*').in('server_id', joinedServerIds);
         if (channelsData) setAllChannels(channelsData);
@@ -323,7 +335,12 @@ const Index = () => {
       return;
     }
 
-    await supabase.from('server_members').insert({ server_id: newServer.id, user_id: currentUser.id });
+    const maxPosition = servers.length;
+    await supabase.from('server_members').insert({ 
+      server_id: newServer.id, 
+      user_id: currentUser.id,
+      position: maxPosition
+    });
 
     const { data: newChannel } = await supabase
       .from('channels')
@@ -348,7 +365,13 @@ const Index = () => {
   const handleJoinServer = async (server: Server) => {
     if (!currentUser) return;
 
-    const { error } = await supabase.from('server_members').insert({ server_id: server.id, user_id: currentUser.id });
+    const maxPosition = servers.length;
+    const { error } = await supabase.from('server_members').insert({ 
+      server_id: server.id, 
+      user_id: currentUser.id,
+      position: maxPosition
+    });
+
     if (error) {
       showError("Errore durante l'unione al server");
       return;

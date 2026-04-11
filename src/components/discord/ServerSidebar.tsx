@@ -221,7 +221,22 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
   useEffect(() => {
     // Sincronizza lo stato locale coi props solo se non stiamo trascinando
     if (draggedIndex === null) {
-      setLocalServers(servers);
+      setLocalServers(prev => {
+        if (prev.length === 0) return servers;
+        
+        const prevIds = prev.map(s => s.id);
+        const nextIds = servers.map(s => s.id);
+        
+        // 1. Tieni gli elementi che c'erano già, nell'ordine locale (aggiornando i dati)
+        const reordered = prev
+          .filter(s => nextIds.includes(s.id))
+          .map(s => servers.find(server => server.id === s.id)!);
+          
+        // 2. Aggiungi i nuovi server che non erano presenti in precedenza (es. appena uniti)
+        const added = servers.filter(s => !prevIds.includes(s.id));
+        
+        return [...reordered, ...added];
+      });
     }
   }, [servers, draggedIndex]);
 
@@ -258,7 +273,8 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
   };
 
   const handleDragEnd = async () => {
-    setDraggedIndex(null);
+    setDraggedIndex(null); // LocalServers mantiene il nuovo ordine grazie all'useEffect aggiornato
+    
     // Salva l'ordine aggiornando la posizione dei server nel database per questo utente
     if (localServers.length > 0) {
       try {
