@@ -5,12 +5,13 @@ import { Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 
 // Componente Tooltip che fluttua al di fuori della barra per non essere tagliato dall'overflow
-const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElement, text?: string, subtext?: React.ReactNode }) => {
+const HoverTooltip = ({ children, text, subtext, disabled }: { children: React.ReactElement, text?: string, subtext?: React.ReactNode, disabled?: boolean }) => {
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLElement>(null);
 
   const handleMouseEnter = (e: React.MouseEvent) => {
+    if (disabled) return;
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       setCoords({
@@ -20,6 +21,10 @@ const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElemen
       setVisible(true);
     }
   };
+
+  useEffect(() => {
+    if (disabled) setVisible(false);
+  }, [disabled]);
 
   if (!text) return children;
 
@@ -37,7 +42,7 @@ const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElemen
         }
       })}
       
-      {visible && typeof window !== 'undefined' && createPortal(
+      {visible && !disabled && typeof window !== 'undefined' && createPortal(
         <div 
           className="fixed z-[9999] bg-[#111214] text-white px-3 py-2 rounded shadow-xl flex flex-col pointer-events-none animate-in fade-in zoom-in-95 duration-100"
           style={{ top: coords.top, left: coords.left, transform: 'translateY(-50%)' }}
@@ -54,7 +59,28 @@ const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElemen
   );
 };
 
-const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void, serverId?: string, audioUrl?: string }) => {
+interface ServerIconProps {
+  image?: string;
+  name?: string;
+  active?: boolean;
+  notify?: boolean;
+  onClick?: () => void;
+  serverId?: string;
+  audioUrl?: string;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragEnter?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  isDragging?: boolean;
+  isAnyDragging?: boolean;
+}
+
+const ServerIcon = ({ 
+  image, name, active, notify, onClick, serverId, audioUrl,
+  draggable, onDragStart, onDragEnter, onDragOver, onDragEnd, onDrop, isDragging, isAnyDragging
+}: ServerIconProps) => {
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [staticImage, setStaticImage] = useState<string | null>(null);
@@ -99,11 +125,23 @@ const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }
     }
   }, [image, isGif]);
 
+  // Interrompi l'audio e resetta l'hover se sta avvenendo un trascinamento
+  useEffect(() => {
+    if (isAnyDragging) {
+      setIsHovered(false);
+      if (audioUrl && audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    }
+  }, [isAnyDragging, audioUrl]);
+
   const subtext = serverId && serverId !== 'home' && memberCount !== null 
     ? `${memberCount} ${memberCount === 1 ? 'membro' : 'membri'}` 
     : undefined;
 
   const handleMouseEnter = () => {
+    if (isAnyDragging) return;
     setIsHovered(true);
     if (audioUrl && audioRef.current) {
       audioRef.current.volume = 0.5; // Dimezza il volume
@@ -126,21 +164,27 @@ const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }
   const displayImage = (isGif && !isHovered && staticImage) ? staticImage : image;
 
   return (
-    <HoverTooltip text={name} subtext={subtext}>
+    <HoverTooltip text={name} subtext={subtext} disabled={isAnyDragging}>
       <div 
-        className="relative group flex items-center justify-center cursor-pointer mb-2" 
+        className={`relative group flex items-center justify-center cursor-pointer mb-2 transition-transform duration-200 ${isDragging ? 'scale-105 z-50' : 'scale-100 z-10'}`} 
         onClick={onClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        draggable={draggable}
+        onDragStart={onDragStart}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+        onDrop={onDrop}
       >
         {audioUrl && <audio ref={audioRef} src={audioUrl} preload="none" className="hidden" />}
         <div className={`absolute left-0 w-1 bg-white rounded-r-lg transition-all duration-300 ${active ? 'h-10' : 'h-0 group-hover:h-5'} ${notify && !active ? 'h-2' : ''}`} />
         
         <div className={`w-12 h-12 flex items-center justify-center overflow-hidden transition-all duration-300 ${active ? 'rounded-2xl bg-brand' : 'rounded-[24px] group-hover:rounded-2xl bg-[#313338] group-hover:bg-brand text-[#dbdee1] group-hover:text-white'}`}>
           {image ? (
-            <img src={displayImage} alt={name || "Server"} className="w-full h-full object-cover" />
+            <img src={displayImage} alt={name || "Server"} className="w-full h-full object-cover pointer-events-none" draggable={false} />
           ) : (
-            <span className="font-medium text-lg">{name?.substring(0, 2).toUpperCase()}</span>
+            <span className="font-medium text-lg pointer-events-none select-none">{name?.substring(0, 2).toUpperCase()}</span>
           )}
         </div>
       </div>
@@ -171,6 +215,68 @@ interface ServerSidebarProps {
 export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout }: ServerSidebarProps) => {
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
+  const [localServers, setLocalServers] = useState<Server[]>(servers);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Sincronizza lo stato locale coi props solo se non stiamo trascinando
+    if (draggedIndex === null) {
+      setLocalServers(servers);
+    }
+  }, [servers, draggedIndex]);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    // Nascondi l'immagine fantasma nativa del browser creandone una trasparente
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnter = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    setLocalServers(prev => {
+      const newServers = [...prev];
+      const draggedItem = newServers[draggedIndex];
+      newServers.splice(draggedIndex, 1);
+      newServers.splice(index, 0, draggedItem);
+      return newServers;
+    });
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedIndex(null);
+    // Salva l'ordine aggiornando la posizione dei server nel database per questo utente
+    if (localServers.length > 0) {
+      try {
+        for (let i = 0; i < localServers.length; i++) {
+          await supabase
+            .from('server_members')
+            .update({ position: i })
+            .eq('server_id', localServers[i].id)
+            .eq('user_id', currentUser.id);
+        }
+      } catch (err) {
+        console.error("Errore nel salvataggio dell'ordine dei server:", err);
+      }
+    }
+  };
+
+  const isAnyDragging = draggedIndex !== null;
+
   return (
     <div className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 flex-shrink-0 z-20 overflow-y-auto custom-scrollbar relative">
       <ServerIcon 
@@ -179,11 +285,12 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
         image="/discord-canary-2.png" 
         active={activeServerId === 'home'} 
         onClick={() => onServerSelect('home')} 
+        isAnyDragging={isAnyDragging}
       />
       
       <div className="w-8 h-[2px] bg-[#35363c] rounded-full my-2 flex-shrink-0" />
       
-      {servers.map(server => (
+      {localServers.map((server, index) => (
         <ServerIcon 
           key={server.id} 
           serverId={server.id}
@@ -192,6 +299,14 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
           active={activeServerId === server.id} 
           onClick={() => onServerSelect(server.id)} 
           audioUrl={server.audio_url}
+          draggable={true}
+          onDragStart={(e) => handleDragStart(e, index)}
+          onDragEnter={(e) => handleDragEnter(e, index)}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDrop={handleDrop}
+          isDragging={draggedIndex === index}
+          isAnyDragging={isAnyDragging}
         />
       ))}
       
