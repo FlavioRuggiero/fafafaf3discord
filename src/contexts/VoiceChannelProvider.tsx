@@ -126,6 +126,63 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     };
   }, [requestMicrophone, currentUser]);
 
+  // Effect for local user speaking indicator
+  useEffect(() => {
+    if (!activeVoiceChannelId || !localStreamRef.current || !currentUser || isMuted) {
+      if (currentUser && speakingStates[currentUser.id]) {
+        setSpeakingStates(prev => {
+          const next = { ...prev };
+          delete next[currentUser.id];
+          return next;
+        });
+      }
+      return;
+    }
+
+    const stream = localStreamRef.current;
+    const audioContext = new AudioContext();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+    analyser.fftSize = 256;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    let animationFrameId: number;
+
+    const checkVolume = () => {
+      analyser.getByteFrequencyData(dataArray);
+      const sum = dataArray.reduce((a, b) => a + b, 0);
+      const avg = bufferLength > 0 ? sum / bufferLength : 0;
+      const isSpeaking = avg > 30;
+
+      setSpeakingStates(prev => {
+        if (!!prev[currentUser.id] === isSpeaking) return prev;
+        return { ...prev, [currentUser.id]: isSpeaking };
+      });
+
+      animationFrameId = requestAnimationFrame(checkVolume);
+    };
+
+    checkVolume();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (audioContext.state !== 'closed') {
+        audioContext.close();
+      }
+      if (currentUser) {
+        setSpeakingStates(prev => {
+          if (prev[currentUser.id]) {
+            const next = { ...prev };
+            delete next[currentUser.id];
+            return next;
+          }
+          return prev;
+        });
+      }
+    };
+  }, [activeVoiceChannelId, currentUser, isMuted]);
+
   const toggleMute = useCallback(async () => {
     if (!currentUser) return;
     let stream = localStreamRef.current;
