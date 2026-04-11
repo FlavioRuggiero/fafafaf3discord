@@ -55,12 +55,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCategoryName,<think>**Finalizing Optimistic Updates**
-
-I've reviewed and finalized the code for `ChannelSidebar.tsx`. I'm confident in the approach; it directly addresses the need for immediate visual feedback for the current user when joining or leaving a voice channel. The changes are localized and use optimistic updates to the component's state, followed by calls to the existing functions. I am now preparing to implement these changes.
-
-
-</think> setNewCategoryName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
   
   const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
   const [editCategoryName, setEditCategoryName] = useState("");
