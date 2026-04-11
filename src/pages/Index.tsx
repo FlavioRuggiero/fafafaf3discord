@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut, Settings } from "lucide-react";
+import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 
 const Index = () => {
   const { user } = useAuth();
@@ -557,195 +558,197 @@ const Index = () => {
   const xpPercentage = Math.min(100, (userXp / userXpNeeded) * 100);
 
   return (
-    <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
-      
-      {showSidebar && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setShowSidebar(false)} />
-      )}
-
-      <div className={`fixed inset-y-0 left-0 z-50 flex h-full transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${showSidebar ? "translate-x-0" : "-translate-x-full"}`}>
-        <ServerSidebar 
-          servers={servers}
-          activeServerId={activeServerId}
-          onServerSelect={(id) => { setActiveServerId(id); setShowSidebar(false); }}
-          onOpenCreate={() => setShowCreateModal(true)}
-          onOpenDiscover={handleOpenDiscover}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          onReorderServers={setServers}
-        />
+    <VoiceChannelProvider currentUser={currentUser}>
+      <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
         
-        {activeServerId !== 'home' && activeServer ? (
-          <ChannelSidebar 
-            activeServer={activeServer}
-            channels={allChannels}
-            activeChannelId={activeChannel?.id || ''} 
-            onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
+        {showSidebar && (
+          <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setShowSidebar(false)} />
+        )}
+
+        <div className={`fixed inset-y-0 left-0 z-50 flex h-full transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${showSidebar ? "translate-x-0" : "-translate-x-full"}`}>
+          <ServerSidebar 
+            servers={servers}
+            activeServerId={activeServerId}
+            onServerSelect={(id) => { setActiveServerId(id); setShowSidebar(false); }}
+            onOpenCreate={() => setShowCreateModal(true)}
+            onOpenDiscover={handleOpenDiscover}
             currentUser={currentUser}
-            onOpenSettings={() => setShowSettingsModal(true)}
-            onLeaveServer={() => handleLeaveServer(activeServer.id)}
-            onOpenUserSettings={() => setShowUserSettingsModal(true)}
+            onLogout={handleLogout}
+            onReorderServers={setServers}
           />
-        ) : (
-          <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">
-            <div className="h-12 flex items-center px-4 border-b border-[#1f2023] shadow-sm">
-              <h1 className="font-semibold text-white">Dashboard</h1>
-            </div>
-            <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-              <h2 className="text-white font-bold text-xs mb-3 uppercase tracking-wider">Le tue attività</h2>
-              <div className="text-[#949ba4] text-sm bg-[#1e1f22] p-3 rounded-lg border border-[#1f2023]">
-                {canCreate 
-                  ? "Per iniziare, esplora i server pubblici o creane uno tuo usando i pulsanti nella schermata principale!"
-                  : "Per iniziare, esplora i server pubblici usando i pulsanti nella schermata principale!"}
+          
+          {activeServerId !== 'home' && activeServer ? (
+            <ChannelSidebar 
+              activeServer={activeServer}
+              channels={allChannels}
+              activeChannelId={activeChannel?.id || ''} 
+              onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
+              currentUser={currentUser}
+              onOpenSettings={() => setShowSettingsModal(true)}
+              onLeaveServer={() => handleLeaveServer(activeServer.id)}
+              onOpenUserSettings={() => setShowUserSettingsModal(true)}
+            />
+          ) : (
+            <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">
+              <div className="h-12 flex items-center px-4 border-b border-[#1f2023] shadow-sm">
+                <h1 className="font-semibold text-white">Dashboard</h1>
               </div>
+              <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+                <h2 className="text-white font-bold text-xs mb-3 uppercase tracking-wider">Le tue attività</h2>
+                <div className="text-[#949ba4] text-sm bg-[#1e1f22] p-3 rounded-lg border border-[#1f2023]">
+                  {canCreate 
+                    ? "Per iniziare, esplora i server pubblici o creane uno tuo usando i pulsanti nella schermata principale!"
+                    : "Per iniziare, esplora i server pubblici usando i pulsanti nella schermata principale!"}
+                </div>
+              </div>
+              
+              <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
+                <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
+                  
+                  {/* Tooltip Livello e Soldi (Appare in hover) */}
+                  <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-white font-bold text-sm">Livello {userLevel}</span>
+                      <span className="text-[#b5bac1] text-xs font-medium">
+                        {userXp} / {userXpNeeded} XP
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#2b2d31] h-2.5 rounded-full overflow-hidden mb-3">
+                      <div 
+                        className="bg-gradient-to-r from-[#5865f2] to-[#eb459e] h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${xpPercentage}%` }} 
+                      />
+                    </div>
+                    <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
+                      <img src="/digitalcardus.png" className="w-4 h-4 mr-2 object-contain" alt="DC" />
+                      {userDigitalcardus} Digitalcardus
+                    </div>
+                    <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
+                  </div>
+
+                  <div className="relative">
+                    <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
+                  </div>
+                  <div className="ml-2 flex flex-col min-w-0">
+                    <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser.name}</span>
+                    <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center text-[#dbdee1]">
+                  <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
+                  <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
+                  <button onClick={() => setShowUserSettingsModal(true)} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
+                    <Settings size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {activeServerId !== 'home' && activeChannel ? (
+          <>
+            <ChatArea 
+              channel={activeChannel} 
+              messages={currentMessages} 
+              onSendMessage={handleSendMessage}
+              onToggleMembers={() => setShowMembers(!showMembers)}
+              onToggleSidebar={() => setShowSidebar(true)}
+              showMembers={showMembers}
+              serverCreatorId={activeServer?.created_by}
+            />
+            {showMembers && (
+              <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
+            )}
+            <div className={`
+              absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
+              h-full transition-all duration-300
+              ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
+              overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
+            `}>
+              <MemberList users={serverMembersList} isOpen={showMembers} creatorId={activeServer?.created_by} />
+            </div>
+          </>
+        ) : activeServerId === 'home' ? (
+          <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
+            <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
+              <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
+                <Menu size={24} />
+              </button>
+              <Home size={20} className="text-[#80848e] mr-2" />
+              <h2 className="font-semibold text-white">Discord Canary 2</h2>
             </div>
             
-            <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
-              <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
+              <div className="max-w-xl w-full text-center">
+                <div className="w-20 h-20 bg-brand rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
+                  <MessageSquare size={40} className="text-white" />
+                </div>
+                <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
+                <p className="text-[#b5bac1] mb-8 text-lg">
+                  Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
+                </p>
                 
-                {/* Tooltip Livello e Soldi (Appare in hover) */}
-                <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-white font-bold text-sm">Livello {userLevel}</span>
-                    <span className="text-[#b5bac1] text-xs font-medium">
-                      {userXp} / {userXpNeeded} XP
-                    </span>
-                  </div>
-                  <div className="w-full bg-[#2b2d31] h-2.5 rounded-full overflow-hidden mb-3">
-                    <div 
-                      className="bg-gradient-to-r from-[#5865f2] to-[#eb459e] h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${xpPercentage}%` }} 
-                    />
-                  </div>
-                  <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
-                    <img src="/digitalcardus.png" className="w-4 h-4 mr-2 object-contain" alt="DC" />
-                    {userDigitalcardus} Digitalcardus
-                  </div>
-                  <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
-                </div>
-
-                <div className="relative">
-                  <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
-                </div>
-                <div className="ml-2 flex flex-col min-w-0">
-                  <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser.name}</span>
-                  <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center text-[#dbdee1]">
-                <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
-                <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
-                <button onClick={() => setShowUserSettingsModal(true)} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
-                  <Settings size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {activeServerId !== 'home' && activeChannel ? (
-        <>
-          <ChatArea 
-            channel={activeChannel} 
-            messages={currentMessages} 
-            onSendMessage={handleSendMessage}
-            onToggleMembers={() => setShowMembers(!showMembers)}
-            onToggleSidebar={() => setShowSidebar(true)}
-            showMembers={showMembers}
-            serverCreatorId={activeServer?.created_by}
-          />
-          {showMembers && (
-            <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
-          )}
-          <div className={`
-            absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
-            h-full transition-all duration-300
-            ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
-            overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
-          `}>
-            <MemberList users={serverMembersList} isOpen={showMembers} creatorId={activeServer?.created_by} />
-          </div>
-        </>
-      ) : activeServerId === 'home' ? (
-        <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-          <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
-            <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
-              <Menu size={24} />
-            </button>
-            <Home size={20} className="text-[#80848e] mr-2" />
-            <h2 className="font-semibold text-white">Discord Canary 2</h2>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
-            <div className="max-w-xl w-full text-center">
-              <div className="w-20 h-20 bg-brand rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
-                <MessageSquare size={40} className="text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
-              <p className="text-[#b5bac1] mb-8 text-lg">
-                Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
-              </p>
-              
-              <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
-                <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                  <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Compass size={24} className="text-[#23a559]" />
-                  </div>
-                  <h3 className="font-bold text-white mb-1">Esplora Server</h3>
-                  <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
-                </button>
-                
-                {canCreate && (
-                  <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                    <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Plus size={24} className="text-brand" />
+                <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
+                  <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                    <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Compass size={24} className="text-[#23a559]" />
                     </div>
-                    <h3 className="font-bold text-white mb-1">Crea un Server</h3>
-                    <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
+                    <h3 className="font-bold text-white mb-1">Esplora Server</h3>
+                    <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
                   </button>
-                )}
+                  
+                  {canCreate && (
+                    <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                      <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Plus size={24} className="text-brand" />
+                      </div>
+                      <h3 className="font-bold text-white mb-1">Crea un Server</h3>
+                      <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
-      )}
+        ) : (
+          <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
+        )}
 
-      <DiscoverServersModal 
-        isOpen={showDiscoverModal} 
-        onClose={() => setShowDiscoverModal(false)} 
-        servers={publicServers}
-        joinedServerIds={servers.map(s => s.id)}
-        onJoin={handleJoinServer}
-      />
-      
-      <CreateServerModal 
-        isOpen={showCreateModal} 
-        onClose={() => setShowCreateModal(false)} 
-        onCreate={handleCreateServer}
-        isCreating={isCreatingServer}
-      />
+        <DiscoverServersModal 
+          isOpen={showDiscoverModal} 
+          onClose={() => setShowDiscoverModal(false)} 
+          servers={publicServers}
+          joinedServerIds={servers.map(s => s.id)}
+          onJoin={handleJoinServer}
+        />
+        
+        <CreateServerModal 
+          isOpen={showCreateModal} 
+          onClose={() => setShowCreateModal(false)} 
+          onCreate={handleCreateServer}
+          isCreating={isCreatingServer}
+        />
 
-      <ServerSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        server={activeServer || null}
-        onUpdate={handleUpdateServer}
-        onDelete={handleDeleteServer}
-        isUpdating={isUpdatingServer}
-      />
+        <ServerSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          server={activeServer || null}
+          onUpdate={handleUpdateServer}
+          onDelete={handleDeleteServer}
+          isUpdating={isUpdatingServer}
+        />
 
-      <UserSettingsModal
-        isOpen={showUserSettingsModal}
-        onClose={() => setShowUserSettingsModal(false)}
-        user={currentUser}
-        onUpdate={handleUpdateProfile}
-      />
-    </div>
+        <UserSettingsModal
+          isOpen={showUserSettingsModal}
+          onClose={() => setShowUserSettingsModal(false)}
+          user={currentUser}
+          onUpdate={handleUpdateProfile}
+        />
+      </div>
+    </VoiceChannelProvider>
   );
 };
 
