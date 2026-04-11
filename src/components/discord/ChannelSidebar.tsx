@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet, PhoneOff } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -383,6 +383,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     const newVoiceChannelId = activeVoiceChannelId === channel.id ? null : channel.id;
     const oldVoiceChannelId = activeVoiceChannelId;
 
+    // Play sound based on action
+    if (newVoiceChannelId) {
+      new Audio('/connect.mp3').play().catch(e => console.error("Error playing connect sound:", e));
+    } else {
+      new Audio('/disconnect.mp3').play().catch(e => console.error("Error playing disconnect sound:", e));
+    }
+
     setActiveVoiceChannelId(newVoiceChannelId);
     setMembers(prev => prev.map(m => 
       m.user_id === currentUser.id ? { ...m, voice_channel_id: newVoiceChannelId } : m
@@ -704,6 +711,30 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           })
         )}
       </div>
+
+      {activeVoiceChannelId && (
+        <div className="px-2 py-2.5 bg-[#232428] border-t border-[#35363c] flex-shrink-0">
+          <div className="text-xs font-bold text-[#23a559] mb-2 flex items-center">
+            <Volume2 size={16} className="mr-1.5" />
+            Connesso
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white truncate pr-2">
+              {localChannels.find(c => c.id === activeVoiceChannelId)?.name}
+            </span>
+            <button 
+              onClick={() => {
+                const voiceChannel = localChannels.find(c => c.id === activeVoiceChannelId);
+                if (voiceChannel) handleVoiceChannelSelect(voiceChannel);
+              }}
+              className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
+              title="Disconnetti"
+            >
+              <PhoneOff size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
         <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
