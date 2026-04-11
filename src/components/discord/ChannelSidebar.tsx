@@ -1,6 +1,9 @@
-import React from "react";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut } from "lucide-react";
+"use client";
+
+import React, { useState } from "react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2 } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChannelSidebarProps {
   activeServer: Server;
@@ -14,14 +17,74 @@ interface ChannelSidebarProps {
 }
 
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
+  const [isAddingChannel, setIsAddingChannel] = useState(false);
+  const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
+  const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
   const serverChannels = channels.filter(c => c.server_id === activeServer.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
+  if (categories.length === 0 && activeServer) categories.push("Generale");
   
   // Controlla se l'utente corrente è il proprietario del server
-  const isOwner = activeServer.created_by === currentUser.id;
+  const isOwner = activeServer?.created_by === currentUser?.id;
+
+  const handleAddChannelClick = (category: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedCategory(category);
+    setNewChannelName("");
+    setNewChannelType('text');
+    setIsAddingChannel(true);
+  };
+
+  const handleAddChannel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newChannelName.trim()) return;
+
+    try {
+      const { error } = await supabase.from('channels').insert({
+        server_id: activeServer.id,
+        name: newChannelName.trim().toLowerCase().replace(/\s+/g, '-'),
+        type: newChannelType,
+        category: selectedCategory
+      });
+
+      if (error) {
+        console.error("Errore creazione canale:", error);
+        alert("Errore durante la creazione del canale");
+        return;
+      }
+      
+      setIsAddingChannel(false);
+      setNewChannelName("");
+    } catch (error) {
+      console.error("Errore aggiunta canale:", error);
+    }
+  };
+
+  const handleDeleteChannel = async (e: React.MouseEvent, channelId: string) => {
+    e.stopPropagation();
+    if (confirm("Sei sicuro di voler eliminare questo canale? Questa azione è irreversibile.")) {
+      try {
+        setIsDeleting(channelId);
+        const { error } = await supabase.from('channels').delete().eq('id', channelId);
+        if (error) {
+          console.error("Errore eliminazione canale:", error);
+          alert("Errore durante l'eliminazione del canale");
+        }
+      } catch (error) {
+        console.error("Errore eliminazione canale:", error);
+      } finally {
+        setIsDeleting(null);
+      }
+    }
+  };
+
+  if (!activeServer) return null;
 
   return (
-    <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10">
+    <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative">
       <div 
         className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm cursor-pointer hover:bg-[#35373c] transition-colors group"
       >
@@ -60,9 +123,20 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             const categoryChannels = serverChannels.filter(c => c.category === category);
             return (
               <div key={idx}>
-                <div className="flex items-center text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1">
-                  <ChevronDown size={12} className="mr-1" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">{category}</span>
+                <div className="flex items-center justify-between text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1 group/category">
+                  <div className="flex items-center">
+                    <ChevronDown size={12} className="mr-1" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">{category}</span>
+                  </div>
+                  {isOwner && (
+                    <button 
+                      onClick={(e) => handleAddChannelClick(category, e)}
+                      className="p-1 opacity-0 group-hover/category:opacity-100 transition-opacity text-[#dbdee1] hover:text-white"
+                      title="Crea Canale"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
                 </div>
                 
                 <div className="space-y-[2px]">
@@ -78,13 +152,25 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           isActive 
                             ? 'bg-[#404249] text-white' 
                             : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                        } ${channel.unread && !isActive ? 'text-white font-medium' : ''}`}
+                        } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
                       >
-                        <Icon size={18} className="mr-1.5 opacity-70" />
-                        <span className="truncate">{channel.name}</span>
-                        {channel.unread && !isActive && (
-                          <div className="w-2 h-2 rounded-full bg-white ml-auto" />
-                        )}
+                        <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
+                        <span className="truncate flex-1">{channel.name}</span>
+                        
+                        <div className="flex items-center flex-shrink-0">
+                          {channel.unread && !isActive && (
+                            <div className="w-2 h-2 rounded-full bg-white mr-1" />
+                          )}
+                          {isOwner && (
+                            <button
+                              onClick={(e) => handleDeleteChannel(e, channel.id)}
+                              className="opacity-0 group-hover:opacity-100 hover:text-[#f23f43] transition-all ml-1 p-0.5"
+                              title="Elimina Canale"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -98,16 +184,16 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
         <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
           <div className="relative">
-            <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
+            <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
             <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
           </div>
           <div className="ml-2 flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser.name}</span>
+            <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser?.name}</span>
             <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
           </div>
         </div>
         
-        <div className="flex items-center text-[#dbdee1]">
+        <div className="flex items-center text-[#dbdee1] flex-shrink-0">
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
           {onOpenUserSettings && (
@@ -117,6 +203,84 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           )}
         </div>
       </div>
+
+      {/* Modale Creazione Canale */}
+      {isAddingChannel && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setIsAddingChannel(false)}>
+          <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[#1e1f22]">
+              <h2 className="text-xl font-semibold text-white">Crea Canale</h2>
+              <p className="text-sm text-[#b5bac1] mt-1">in {selectedCategory}</p>
+            </div>
+            
+            <form onSubmit={handleAddChannel} className="flex flex-col flex-1">
+              <div className="p-4 flex-1">
+                <div className="mb-6">
+                  <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Tipo Canale</label>
+                  <div className="space-y-2">
+                    <label className={`flex items-center p-3 rounded cursor-pointer transition-colors ${newChannelType === 'text' ? 'bg-[#404249]' : 'bg-[#2b2d31] hover:bg-[#3f4147]'}`}>
+                      <Hash className="text-[#949ba4] mr-3" size={24} />
+                      <div className="flex-1">
+                        <div className="text-white font-medium text-base">Testuale</div>
+                        <div className="text-xs text-[#b5bac1]">Invia messaggi, immagini, GIF, emoji, opinioni e battute.</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${newChannelType === 'text' ? 'border-[#5865f2]' : 'border-[#b5bac1]'}`}>
+                        {newChannelType === 'text' && <div className="w-2.5 h-2.5 rounded-full bg-[#5865f2]"></div>}
+                      </div>
+                      <input type="radio" className="hidden" checked={newChannelType === 'text'} onChange={() => setNewChannelType('text')} />
+                    </label>
+                    <label className={`flex items-center p-3 rounded cursor-pointer transition-colors ${newChannelType === 'voice' ? 'bg-[#404249]' : 'bg-[#2b2d31] hover:bg-[#3f4147]'}`}>
+                      <Volume2 className="text-[#949ba4] mr-3" size={24} />
+                      <div className="flex-1">
+                        <div className="text-white font-medium text-base">Vocale</div>
+                        <div className="text-xs text-[#b5bac1]">Ritrovatevi qui con voce, video e condivisione schermo.</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${newChannelType === 'voice' ? 'border-[#5865f2]' : 'border-[#b5bac1]'}`}>
+                        {newChannelType === 'voice' && <div className="w-2.5 h-2.5 rounded-full bg-[#5865f2]"></div>}
+                      </div>
+                      <input type="radio" className="hidden" checked={newChannelType === 'voice'} onChange={() => setNewChannelType('voice')} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mb-2">
+                  <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome Canale</label>
+                  <div className="relative flex items-center bg-[#1e1f22] rounded overflow-hidden p-1">
+                    <div className="pl-2 pr-1 text-[#949ba4]">
+                      {newChannelType === 'text' ? <Hash size={18} /> : <Volume2 size={18} />}
+                    </div>
+                    <input 
+                      type="text" 
+                      value={newChannelName}
+                      onChange={(e) => setNewChannelName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                      placeholder="nuovo-canale"
+                      className="w-full bg-transparent text-white p-2 pl-1 focus:outline-none placeholder-[#878a91]"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end items-center bg-[#2b2d31] p-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddingChannel(false)} 
+                  className="text-white hover:underline text-sm px-6 py-2 mr-2"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!newChannelName.trim()} 
+                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Crea Canale
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
