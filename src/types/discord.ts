@@ -24,14 +24,15 @@ export type Server = {
 
 export type Channel = {
   id: string;
-  server_id: string;
+  server_id: string | null;
   name: string;
-  type: "text" | "voice" | "minigame";
+  type: "text" | "voice" | "minigame" | "dm";
   category: string;
   unread?: boolean;
   position?: number;
   category_position?: number;
   created_at?: string;
+  recipient?: User;
 };
 
 export type Message = {
@@ -64,4 +65,19 @@ export type ServerMember = {
   voice_channel_id?: string | null;
   is_muted?: boolean;
   is_deafened?: boolean;
+};
+
+export type Friendship = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: 'pending' | 'accepted';
+  created_at: string;
+};
+
+export type DMChannel = {
+  id: string;
+  user1_id: string;
+  user2_id: string;
+  created_at: string;
 };
