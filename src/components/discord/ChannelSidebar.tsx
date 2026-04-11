@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, MicOff, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet, PhoneOff, Users } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, MicOff, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet, PhoneOff } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -70,7 +70,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
-  const [showAllVoiceMembers, setShowAllVoiceMembers] = useState(false);
   
   const { 
     joinVoiceChannel, 
@@ -82,20 +81,16 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   useEffect(() => {
     if (!activeServer?.id) return;
-    const savedCollapsed = localStorage.getItem(`collapsed-categories-${activeServer.id}`);
-    if (savedCollapsed) {
+    const saved = localStorage.getItem(`collapsed-categories-${activeServer.id}`);
+    if (saved) {
       try {
-        setCollapsedCategories(new Set(JSON.parse(savedCollapsed)));
+        setCollapsedCategories(new Set(JSON.parse(saved)));
       } catch (e) {
         setCollapsedCategories(new Set());
       }
     } else {
       setCollapsedCategories(new Set());
     }
-
-    const savedShowAll = localStorage.getItem(`show-all-voice-members-${activeServer.id}`);
-    setShowAllVoiceMembers(savedShowAll === 'true');
-
   }, [activeServer?.id]);
 
   useEffect(() => {
@@ -237,14 +232,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       }
       return next;
     });
-  };
-
-  const toggleShowAllVoiceMembers = () => {
-    const newValue = !showAllVoiceMembers;
-    setShowAllVoiceMembers(newValue);
-    if (activeServer?.id) {
-      localStorage.setItem(`show-all-voice-members-${activeServer.id}`, String(newValue));
-    }
   };
 
   const handleAddChannelClick = (category: string, e: React.MouseEvent) => {
@@ -558,18 +545,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       >
         <h1 className="font-semibold text-white truncate pr-2">{activeServer.name}</h1>
         <div className="flex items-center flex-shrink-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleShowAllVoiceMembers(); }}
-            className={`p-1 rounded transition-colors ${showAllVoiceMembers ? 'text-white bg-brand/20' : 'text-[#dbdee1] hover:text-white'}`}
-            title={showAllVoiceMembers ? "Nascondi tutti i membri vocali" : "Mostra tutti i membri vocali"}
-          >
-            <Users size={16} />
-          </button>
           {isOwner ? (
             <>
               <button 
                 onClick={(e) => { e.stopPropagation(); setIsAddingCategory(true); setNewCategoryName(""); }}
-                className="p-1 text-[#dbdee1] hover:text-white transition-opacity ml-1"
+                className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
                 title="Crea Categoria"
               >
                 <FolderPlus size={16} />
@@ -588,7 +568,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             onLeaveServer && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onLeaveServer(); }}
-                className="p-1 text-[#dbdee1] hover:text-[#f23f43] transition-colors ml-1"
+                className="p-1 text-[#dbdee1] hover:text-[#f23f43] transition-colors"
                 title="Esci dal Server"
               >
                 <LogOut size={16} />
@@ -723,7 +703,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               )}
                             </div>
                           </div>
-                          {isVoiceChannel && (showAllVoiceMembers || activeVoiceChannelId === channel.id) && connectedMembers.length > 0 && (
+                          {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
                               {connectedMembers.map(member => (
                                 <div key={member.user_id} className="flex items-center group/member">
