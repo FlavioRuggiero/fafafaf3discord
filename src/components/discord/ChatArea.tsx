@@ -8,7 +8,7 @@ import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 
-type LocalMessage = Message & { rawCreatedAt?: string };
+type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
 const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔", "👎", "💯", "✨", "💀"];
 
@@ -161,20 +161,38 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     setEditingMessageId(null);
 
     const fetchMessages = async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('messages')
         .select(`
           id,
           content,
           created_at,
+          updated_at,
           user_id,
           profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
 
+      // Fallback nel caso in cui lo script SQL per la colonna updated_at non sia stato eseguito
+      if (error && error.message.includes('updated_at')) {
+        const fallback = await supabase
+          .from('messages')
+          .select(`
+            id,
+            content,
+            created_at,
+            user_id,
+            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url)
+          `)
+          .eq('channel_id', channel.id)
+          .order('created_at', { ascending: true });
+        data = fallback.data;
+        error = fallback.error;
+      }
+
       if (error) {
-        console.warn("Tabella messages non trovata. Utilizzo messaggi di fallback.");
+        console.warn("Tabella messages non trovata o errore imprevisto.");
         setTableExists(false);
         setIsLoading(false);
         return;
@@ -191,6 +209,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             content: m.content,
             timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             rawCreatedAt: m.created_at,
+            updatedAt: m.updated_at,
             user: {
               id: m.profiles?.id || m.user_id,
               name: name,
@@ -225,7 +244,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             setReactionsEnabled(false);
           }
         } else {
-          // Check if table exists
           const { error: checkError } = await supabase.from('message_reactions').select('id').limit(1);
           if (!checkError) setReactionsEnabled(true);
         }
@@ -237,57 +255,72 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
+    // Supabase di default non invia la riga completa quando elimini un record (invia solo l'ID).
+    // Questo significa che se filtriamo le notifiche per `channel_id`, le eliminazioni vengono bloccate!
+    // Soluzione: Ascoltiamo le eliminazioni di TUTTI i messaggi globalmente, e filtriamo internamente lo stato.
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public',
         table: 'messages',
         filter: `channel_id=eq.${channel.id}`
       }, async (payload) => {
-        
-        if (payload.eventType === 'INSERT') {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url')
-            .eq('id', payload.new.user_id)
-            .single();
-            
-          const name = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente';
-          const isVerified = name.toLowerCase() === 'faf3tto';
-
-          const newMsg: LocalMessage = {
-            id: payload.new.id,
-            content: payload.new.content,
-            timestamp: new Date(payload.new.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            rawCreatedAt: payload.new.created_at,
-            user: {
-              id: payload.new.user_id,
-              name: name,
-              avatar: profileData?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.new.user_id}`,
-              bio: profileData?.bio || "",
-              banner_color: profileData?.banner_color || "#5865F2",
-              banner_url: profileData?.banner_url || undefined,
-              global_role: isVerified ? "CREATOR" : "USER",
-              status: "online"
-            }
-          };
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url')
+          .eq('id', payload.new.user_id)
+          .single();
           
-          setRealMessages(prev => {
-            const isTemp = prev.some(m => m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id);
-            if (isTemp) {
-              return prev.map(m => (m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id) ? newMsg : m);
-            }
-            if (prev.some(m => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
-        } 
-        else if (payload.eventType === 'UPDATE') {
-          setRealMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, content: payload.new.content } : m));
-        }
-        else if (payload.eventType === 'DELETE') {
-          setRealMessages(prev => prev.filter(m => m.id !== payload.old.id));
-        }
+        const name = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente';
+        const isVerified = name.toLowerCase() === 'faf3tto';
+
+        const newMsg: LocalMessage = {
+          id: payload.new.id,
+          content: payload.new.content,
+          timestamp: new Date(payload.new.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          rawCreatedAt: payload.new.created_at,
+          updatedAt: payload.new.updated_at,
+          user: {
+            id: payload.new.user_id,
+            name: name,
+            avatar: profileData?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.new.user_id}`,
+            bio: profileData?.bio || "",
+            banner_color: profileData?.banner_color || "#5865F2",
+            banner_url: profileData?.banner_url || undefined,
+            global_role: isVerified ? "CREATOR" : "USER",
+            status: "online"
+          }
+        };
+        
+        setRealMessages(prev => {
+          const isTemp = prev.some(m => m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id);
+          if (isTemp) {
+            return prev.map(m => (m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id) ? newMsg : m);
+          }
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public',
+        table: 'messages',
+        filter: `channel_id=eq.${channel.id}`
+      }, (payload) => {
+        setRealMessages(prev => prev.map(m => m.id === payload.new.id ? { 
+          ...m, 
+          content: payload.new.content,
+          updatedAt: payload.new.updated_at
+        } : m));
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public',
+        table: 'messages'
+      }, (payload) => {
+        // Nessun filtro channel_id per i DELETE per garantire l'arrivo della notifica
+        setRealMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (payload) => {
         setReactionsByMessage(prev => {
@@ -429,7 +462,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           console.error("Errore durante l'invio:", error);
           setRealMessages(prev => prev.filter(m => m.id !== tempId));
         } else if (data) {
-          setRealMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id, rawCreatedAt: data.created_at } : m));
+          setRealMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id, rawCreatedAt: data.created_at, updatedAt: data.updated_at } : m));
         }
       } else {
         onSendMessage(content);
@@ -487,11 +520,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       finalContent = `${replyMatch[0]}${finalContent}`;
     }
 
-    setRealMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent } : m));
+    const now = new Date().toISOString();
+    setRealMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent, updatedAt: now } : m));
     setEditingMessageId(null);
 
-    const { error } = await supabase.from('messages').update({ content: finalContent }).eq('id', msgId);
-    if (error) console.error("Errore salvataggio modifica:", error);
+    const { error } = await supabase.from('messages').update({ content: finalContent, updated_at: now }).eq('id', msgId);
+    if (error) {
+      console.error("Errore salvataggio modifica:", error);
+      showError("Errore durante il salvataggio della modifica.");
+    }
   };
 
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, msgId: string) => {
@@ -760,7 +797,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                       </div>
                     </div>
                   ) : (
-                    <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">{displayContent}</div>
+                    <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">
+                      {displayContent}
+                      {msg.updatedAt && (
+                        <span 
+                          className="text-[10px] text-[#949ba4] ml-1.5 select-none hover:text-[#dbdee1] cursor-default transition-colors" 
+                          title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
+                        >
+                          (modificato)
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   {/* Rendering dei badge delle reazioni */}
@@ -838,7 +885,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <p className="text-[#dbdee1] text-[15px] mb-4">Sei sicuro di voler eliminare questo messaggio?</p>
               
               <div className="bg-[#2b2d31] border border-[#1e1f22] p-3 rounded flex items-start gap-3 shadow-inner">
-                <img src={msgToDeleteData.user.avatar} className="w-10 h-10 rounded-full object-cover" />
+                <img src={msgToDeleteData.user.avatar} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="font-medium text-[#dbdee1]">{msgToDeleteData.user.name}</span>
