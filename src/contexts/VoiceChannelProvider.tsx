@@ -59,6 +59,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
   const activeServerIdRef = useRef(activeServerId);
   const wasMutedBeforeDeafen = useRef(false);
+  const sessionTokenRef = useRef<string | null>(null);
 
   const isMutedRef = useRef(isMuted);
   const isDeafenedRef = useRef(isDeafened);
@@ -70,6 +71,17 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     activeServerIdRef.current = activeServerId;
   }, [activeVoiceChannelId, activeServerId]);
 
+  // Recupero il token di sessione in background per il fetch di disconnessione (keepalive)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      sessionTokenRef.current = data.session?.access_token || null;
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      sessionTokenRef.current = session?.access_token || null;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const requestMicrophone = useCallback(async (playSounds = true) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
@@ -79,7 +91,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       setIsMuted(muted);
       if (currentUser) {
         setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: muted } }));
-        // Sincronizzazione globale Database
         supabase.from('server_members').update({ is_muted: muted }).eq('user_id', currentUser.id).then();
       }
 
@@ -92,7 +103,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       setIsMuted(true);
       if (currentUser) {
         setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
-        // Sincronizzazione globale Database
         supabase.from('server_members').update({ is_muted: true }).eq('user_id', currentUser.id).then();
       }
       return null;
@@ -110,7 +120,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
             setIsMuted(true);
             if (currentUser) {
               setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
-              // Sincronizzazione globale Database
               supabase.from('server_members').update({ is_muted: true }).eq('user_id', currentUser.id).then();
             }
           }
@@ -126,7 +135,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     };
   }, [requestMicrophone, currentUser]);
 
-  // Effect for local user speaking indicator
   useEffect(() => {
     if (!activeVoiceChannelId || !localStreamRef.current || !currentUser || isMuted) {
       if (currentUser && speakingStates[currentUser.id]) {
@@ -205,7 +213,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: newMutedState } }));
       
-      // Sincronizzazione globale Database
       supabase.from('server_members').update({ is_muted: newMutedState }).eq('user_id', currentUser.id).then();
 
       if (signalingChannelRef.current) {
@@ -250,7 +257,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     
     setMemberStates(prev => ({ ...prev, [currentUser.id]: { isMuted: finalMuteState, isDeafened: newDeafenState } }));
 
-    // Sincronizzazione globale Database
     supabase.from('server_members').update({ is_muted: finalMuteState, is_deafened: newDeafenState }).eq('user_id', currentUser.id).then();
 
     if (signalingChannelRef.current) {
@@ -302,7 +308,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       audio.setAttribute('data-user-id', userId);
       document.body.appendChild(audio);
 
-      // Setup audio analysis for speaking indicator
       const audioContext = new AudioContext();
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(remoteStream);
@@ -316,7 +321,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         analyser.getByteFrequencyData(dataArray);
         const sum = dataArray.reduce((a, b) => a + b, 0);
         const avg = bufferLength > 0 ? sum / bufferLength : 0;
-        const isSpeaking = avg > 30; // Threshold for speaking
+        const isSpeaking = avg > 30;
 
         setSpeakingStates(prev => {
           if (!!prev[userId] === isSpeaking) return prev;
@@ -430,6 +435,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     channel.on('presence', { event: 'join' }, ({ key }) => {
       if (key !== currentUser?.id) {
+        playSound('/enter.mp3'); // Spostato qui per riprodurlo solo quando entra qualcun altro
         if (currentUser) {
           channel.send({
             type: 'broadcast',
@@ -444,6 +450,10 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     });
     
     channel.on('presence', { event: 'leave' }, ({ key }) => {
+      if (key !== currentUser?.id) {
+        playSound('/exit.mp3'); // Spostato qui per riprodurlo solo quando esce qualcun altro
+      }
+      
       const peerData = peersRef.current.find(p => p.userId === key);
       if (peerData) {
         peerData.peer.destroy();
@@ -494,10 +504,23 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     signalingChannelRef.current = channel;
   }, [currentUser, createPeer, leaveVoiceChannel, requestMicrophone, isMuted, isDeafened]);
 
+  // Gestione robusta della chiusura del tab/finestra (Keepalive)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (activeVoiceChannelIdRef.current) {
-        leaveVoiceChannel();
+      if (activeVoiceChannelIdRef.current && activeServerIdRef.current && currentUser && sessionTokenRef.current) {
+        const SUPABASE_URL = "https://ihweyawbtgehuvvjrqhy.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlod2V5YXdidGdlaHV2dmpycWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NDM0MDAsImV4cCI6MjA5MTQxOTQwMH0.0H0gVSN8_CCdw76Qcld099bEsw0wfX4M284SHTOsLrg";
+
+        fetch(`${SUPABASE_URL}/rest/v1/server_members?server_id=eq.${activeServerIdRef.current}&user_id=eq.${currentUser.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${sessionTokenRef.current}`
+          },
+          body: JSON.stringify({ voice_channel_id: null }),
+          keepalive: true
+        });
       }
     };
 
@@ -506,7 +529,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [leaveVoiceChannel]);
+  }, [currentUser]);
 
   const value = {
     joinVoiceChannel,

@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
-import { playSound } from "@/utils/sounds";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -56,36 +55,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     activeVoiceChannelId,
     speakingStates
   } = useVoiceChannel();
-
-  const previousVoiceMembersRef = useRef<ServerMemberWithProfile[]>([]);
-
-  useEffect(() => {
-    if (!activeVoiceChannelId) {
-      previousVoiceMembersRef.current = [];
-      return;
-    }
-
-    const currentVoiceMembers = members.filter(m => m.voice_channel_id === activeVoiceChannelId);
-    const previousVoiceMemberIds = new Set(previousVoiceMembersRef.current.map(m => m.user_id));
-    const currentVoiceMemberIds = new Set(currentVoiceMembers.map(m => m.user_id));
-
-    // Find who joined
-    currentVoiceMemberIds.forEach(id => {
-      if (!previousVoiceMemberIds.has(id) && id !== currentUser.id) {
-        playSound('/enter.mp3');
-      }
-    });
-
-    // Find who left
-    previousVoiceMemberIds.forEach(id => {
-      if (!currentVoiceMemberIds.has(id) && id !== currentUser.id) {
-        playSound('/exit.mp3');
-      }
-    });
-
-    previousVoiceMembersRef.current = currentVoiceMembers;
-
-  }, [members, activeVoiceChannelId, currentUser.id]);
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -145,7 +114,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
-  // Gestione Membri Server per Chat Vocali: ottimizzato per aggiornamenti istantanei DB
   useEffect(() => {
     if (!activeServer?.id) return;
 
@@ -197,8 +165,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
         if (payload.eventType === 'UPDATE') {
           const updatedMember = payload.new as ServerMember;
-          // Usa lo spread state sicuro: {...m, ...updatedMember}
-          // In questo modo preserviamo i "profiles" ed evitiamo che la lista sparisca!
           setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
         } else if (payload.eventType === 'INSERT') {
           const newMember = payload.new as ServerMember;
@@ -680,6 +646,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 onChannelSelect(channel);
                               } else if (channel.type === 'voice') {
                                 handleVoiceChannelSelect(channel);
+                                onChannelSelect(channel); // Aggiunto per fare switch alla vista griglia
                               }
                             }}
                             className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${
