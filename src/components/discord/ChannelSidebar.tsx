@@ -342,7 +342,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
-  // L'algoritmo di riordino totalmente riscritto e migliorato
   const handleDrop = async (e: React.DragEvent, targetId: string, targetType: 'category' | 'channel', targetCategoryStr?: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -356,6 +355,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (!source || !target || !activeServer) return;
     if (source.id === target.id && source.type === target.type) return; 
 
+    const channelsCopy = [...localChannels];
+
     if (source.type === 'category' && target.type === 'category') {
       const cats = Array.from(new Set(displayChannels.map(c => c.category)));
       const sIdx = cats.indexOf(source.id);
@@ -368,36 +369,31 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
       const updates: {id: string, category_position: number}[] = [];
       cats.forEach((cat, idx) => {
-        localChannels.forEach(c => {
+        channelsCopy.forEach(c => {
           if (c.category === cat) {
+            c.category_position = idx;
             updates.push({ id: c.id, category_position: idx });
           }
         });
       });
       
-      setLocalChannels(prev => prev.map(c => {
-        const u = updates.find(x => x.id === c.id);
-        return u ? { ...c, category_position: u.category_position } : c;
-      }));
+      setLocalChannels(channelsCopy);
       
       try {
-        for (const u of updates) {
-          await supabase.from('channels').update({ category_position: u.category_position }).eq('id', u.id);
-        }
+        await Promise.all(updates.map(u => supabase.from('channels').update({ category_position: u.category_position }).eq('id', u.id)));
       } catch(err) {
         showError("Errore durante il salvataggio della posizione.");
       }
     } 
     else if (source.type === 'channel') {
       const tCat = targetType === 'category' ? target.id : targetCategoryStr!;
+      const sourceChannel = channelsCopy.find(c => c.id === source.id);
+      if (!sourceChannel) return;
       
-      // Prendiamo i canali ESCLUSO quello che stiamo spostando (perché sta cambiando posto)
-      const catChannels = localChannels
+      // Estrai tutti i canali della categoria di destinazione senza includere quello spostato
+      const catChannels = channelsCopy
         .filter(c => c.category === tCat && c.id !== source.id)
         .sort((a, b) => (a.position || 0) - (b.position || 0));
-
-      const sourceChannel = localChannels.find(c => c.id === source.id);
-      if (!sourceChannel) return;
 
       let insertIdx = catChannels.length;
       if (targetType === 'channel') {
@@ -405,39 +401,46 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         if (cIdx !== -1) {
            insertIdx = target.position === 'top' ? cIdx : cIdx + 1;
         }
-      } else if (targetType === 'category') {
-         insertIdx = target.position === 'top' ? 0 : catChannels.length;
       }
 
       catChannels.splice(insertIdx, 0, sourceChannel);
+      sourceChannel.category = tCat;
 
-      const targetCatPos = localChannels.find(c => c.category === tCat)?.category_position || 0;
+      const targetCatPos = channelsCopy.find(c => c.category === tCat)?.category_position || 0;
+      sourceChannel.category_position = targetCatPos;
 
       const updates: {id: string, position: number, category: string, category_position: number}[] = [];
       
+      // Riapplica ai canali locali l'aggiornamento (mutazione nell'array channelsCopy)
       catChannels.forEach((c, idx) => {
+        c.position = idx;
         updates.push({ id: c.id, position: idx, category: tCat, category_position: targetCatPos });
       });
       
-      // Applica le modifiche in React assicurandoti di generare copie nuove
-      setLocalChannels(prev => prev.map(c => {
-        const u = updates.find(x => x.id === c.id);
-        return u ? { ...c, ...u } : c;
-      }));
+      setLocalChannels([...channelsCopy]);
       
-      // Sincronizza ogni modifica con il database
       try {
-        for (const u of updates) {
-          await supabase.from('channels').update({ 
+        await Promise.all(updates.map(u => 
+          supabase.from('channels').update({ 
             position: u.position, 
             category: u.category, 
             category_position: u.category_position 
-          }).eq('id', u.id);
-        }
+          }).eq('id', u.id)
+        ));
       } catch(err) {
         showError("Errore durante il salvataggio della posizione.");
       }
     }
+  };
+
+  const getDropIndicator = (id: string, type: 'category' | 'channel') => {
+    if (dragOverInfo?.id === id && dragOverInfo?.type === type) {
+      // Un indicatore blu netto per il drop
+      return dragOverInfo.position === 'top' 
+        ? 'shadow-[0_-3px_0_#5865F2] z-20' 
+        : 'shadow-[0_3px_0_#5865F2] z-20';
+    }
+    return '';
   };
 
   if (!activeServer) return null;
@@ -505,13 +508,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 onDragOver={(e) => handleDragOver(e, category, 'category')}
                 onDrop={(e) => handleDrop(e, category, 'category')}
                 onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
-                className={`relative rounded-sm transition-all duration-100 ${dragItem?.id === category ? 'opacity-40' : ''}`}
+                className={`relative rounded-sm transition-all duration-100 ${getDropIndicator(category, 'category')} ${dragItem?.id === category ? 'opacity-40' : ''}`}
               >
-                {/* Linea indicatore posizionamento categorie (absolute per evitare deformazioni) */}
-                {dragOverInfo?.id === category && dragOverInfo.type === 'category' && (
-                  <div className={`absolute left-1 right-1 h-[2px] bg-brand z-50 rounded-full pointer-events-none ${dragOverInfo.position === 'top' ? '-top-[1px]' : '-bottom-[1px]'}`} />
-                )}
-                
                 <div 
                   onClick={() => toggleCategory(category)}
                   className="flex items-center justify-between text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1 group/category"
@@ -560,13 +558,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                             isActive 
                               ? 'bg-[#404249] text-white' 
                               : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                          } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
+                          } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''} ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
                         >
-                          {/* Linea indicatore posizionamento canali (absolute per evitare deformazioni) */}
-                          {dragOverInfo?.id === channel.id && dragOverInfo.type === 'channel' && (
-                            <div className={`absolute left-0 right-0 h-[2px] bg-brand z-50 rounded-full pointer-events-none ${dragOverInfo.position === 'top' ? '-top-[1px]' : '-bottom-[1px]'}`} />
-                          )}
-                          
                           <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
                           <span className="truncate flex-1">{channel.name}</span>
                           
@@ -619,7 +612,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         )}
       </div>
 
-      {/* Area Utente con Tooltip Profilo */}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
         <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
           
@@ -637,7 +629,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               />
             </div>
             <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
-              <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 mr-2 object-contain" />
+              <Wallet size={16} className="mr-2" />
               {userDigitalcardus} Digitalcardus
             </div>
             <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
