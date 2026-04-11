@@ -158,9 +158,6 @@ const ServerIcon = ({
     }
   };
 
-  // Determina quale immagine mostrare:
-  // Se è una GIF e NON siamo in hover e abbiamo generato l'immagine statica, mostra l'immagine statica.
-  // Altrimenti mostra l'immagine originale (che sarà animata nel caso delle GIF)
   const displayImage = (isGif && !isHovered && staticImage) ? staticImage : image;
 
   return (
@@ -210,9 +207,10 @@ interface ServerSidebarProps {
   onOpenDiscover: () => void;
   currentUser: User;
   onLogout: () => void;
+  onReorderServers?: (servers: Server[]) => void;
 }
 
-export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout }: ServerSidebarProps) => {
+export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers }: ServerSidebarProps) => {
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
   const [localServers, setLocalServers] = useState<Server[]>(servers);
@@ -221,22 +219,7 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
   useEffect(() => {
     // Sincronizza lo stato locale coi props solo se non stiamo trascinando
     if (draggedIndex === null) {
-      setLocalServers(prev => {
-        if (prev.length === 0) return servers;
-        
-        const prevIds = prev.map(s => s.id);
-        const nextIds = servers.map(s => s.id);
-        
-        // 1. Tieni gli elementi che c'erano già, nell'ordine locale (aggiornando i dati)
-        const reordered = prev
-          .filter(s => nextIds.includes(s.id))
-          .map(s => servers.find(server => server.id === s.id)!);
-          
-        // 2. Aggiungi i nuovi server che non erano presenti in precedenza (es. appena uniti)
-        const added = servers.filter(s => !prevIds.includes(s.id));
-        
-        return [...reordered, ...added];
-      });
+      setLocalServers(servers);
     }
   }, [servers, draggedIndex]);
 
@@ -273,17 +256,25 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
   };
 
   const handleDragEnd = async () => {
-    setDraggedIndex(null); // LocalServers mantiene il nuovo ordine grazie all'useEffect aggiornato
+    setDraggedIndex(null);
     
+    if (onReorderServers) {
+      onReorderServers(localServers);
+    }
+
     // Salva l'ordine aggiornando la posizione dei server nel database per questo utente
     if (localServers.length > 0) {
       try {
         for (let i = 0; i < localServers.length; i++) {
-          await supabase
+          const { error } = await supabase
             .from('server_members')
             .update({ position: i })
             .eq('server_id', localServers[i].id)
             .eq('user_id', currentUser.id);
+            
+          if (error) {
+            console.error("Errore salvataggio posizione DB:", error.message);
+          }
         }
       } catch (err) {
         console.error("Errore nel salvataggio dell'ordine dei server:", err);

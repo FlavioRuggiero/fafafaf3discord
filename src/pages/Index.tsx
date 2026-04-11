@@ -572,6 +572,7 @@ const Index = () => {
           onOpenDiscover={handleOpenDiscover}
           currentUser={currentUser}
           onLogout={handleLogout}
+          onReorderServers={setServers}
         />
         
         {activeServerId !== 'home' && activeServer ? (
