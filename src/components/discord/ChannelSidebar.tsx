@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Compass } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -630,15 +630,20 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   if (!activeServer) {
     return (
       <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative h-full border-r border-[#1f2023]">
-        <div className="h-12 flex items-center px-2 border-b border-[#1f2023] shadow-sm">
-          <button className="w-full bg-[#1e1f22] text-[#949ba4] text-sm px-2 py-1.5 rounded text-left hover:bg-[#1e1f22]/80 transition-colors">
-            Trova o inizia una conversazione
-          </button>
+        <div className="h-12 flex items-center px-4 border-b border-[#1f2023] shadow-sm">
+          <h2 className="font-semibold text-white">Menu Principale</h2>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           <button 
+            onClick={() => onChannelSelect({ id: 'welcome', name: 'Home', type: 'text', category: '', server_id: null })}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-[2px] transition-colors ${activeChannelId === 'welcome' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+          >
+            <Compass size={20} className="mr-3 flex-shrink-0" />
+            <span className="font-medium">Esplora</span>
+          </button>
+          <button 
             onClick={() => onChannelSelect({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 ${activeChannelId === 'friends' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'friends' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
           >
             <Users size={20} className="mr-3 flex-shrink-0" />
             <span className="font-medium">Amici</span>

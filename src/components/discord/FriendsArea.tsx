@@ -3,6 +3,7 @@ import { Users, Search, Check, X, MessageSquare } from "lucide-react";
 import { User, Friendship } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { ProfilePopover } from "./ProfilePopover";
 
 interface FriendsAreaProps {
   currentUser: User;
@@ -198,10 +199,12 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
                 <div className="space-y-2">
                   {searchResults.map(user => (
                     <div key={user.id} className="flex items-center justify-between p-3 bg-[#2b2d31] rounded-lg border border-[#1e1f22]">
-                      <div className="flex items-center">
-                        <img src={user.avatar} className="w-10 h-10 rounded-full bg-[#1e1f22]" />
-                        <span className="ml-3 text-white font-medium">{user.name}</span>
-                      </div>
+                      <ProfilePopover user={user} side="right">
+                        <div className="flex items-center cursor-pointer group/profile">
+                          <img src={user.avatar} className="w-10 h-10 rounded-full bg-[#1e1f22] group-hover/profile:opacity-80 transition-opacity" />
+                          <span className="ml-3 text-white font-medium group-hover/profile:underline">{user.name}</span>
+                        </div>
+                      </ProfilePopover>
                       <button 
                         onClick={() => sendFriendRequest(user.id)}
                         className="bg-[#23a559] hover:bg-[#1a7f44] text-white p-2 rounded-full transition-colors"
@@ -229,13 +232,15 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
                   const isIncoming = f.receiver_id === currentUser.id;
                   return (
                     <div key={f.id} className="flex items-center justify-between p-3 hover:bg-[#35373c] rounded-lg group border-t border-[#3f4147]">
-                      <div className="flex items-center">
-                        <img src={f.otherUser.avatar} className="w-8 h-8 rounded-full bg-[#1e1f22]" />
-                        <div className="ml-3 flex flex-col">
-                          <span className="text-white font-medium">{f.otherUser.name}</span>
-                          <span className="text-[#949ba4] text-xs">{isIncoming ? 'Richiesta ricevuta' : 'Richiesta inviata'}</span>
+                      <ProfilePopover user={f.otherUser} side="right">
+                        <div className="flex items-center cursor-pointer group/profile">
+                          <img src={f.otherUser.avatar} className="w-8 h-8 rounded-full bg-[#1e1f22] group-hover/profile:opacity-80 transition-opacity" />
+                          <div className="ml-3 flex flex-col">
+                            <span className="text-white font-medium group-hover/profile:underline">{f.otherUser.name}</span>
+                            <span className="text-[#949ba4] text-xs">{isIncoming ? 'Richiesta ricevuta' : 'Richiesta inviata'}</span>
+                          </div>
                         </div>
-                      </div>
+                      </ProfilePopover>
                       <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {isIncoming && (
                           <button onClick={() => acceptRequest(f.id)} className="w-9 h-9 rounded-full bg-[#2b2d31] flex items-center justify-center text-[#b5bac1] hover:text-[#23a559] transition-colors" title="Accetta">
@@ -278,16 +283,20 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
               <div className="space-y-[2px]">
                 {filteredFriends.map(f => (
                   <div key={f.id} className="flex items-center justify-between p-3 hover:bg-[#35373c] rounded-lg group border-t border-transparent hover:border-[#3f4147]">
-                    <div className="flex items-center cursor-pointer flex-1" onClick={() => onStartDM(f.otherUser.id)}>
-                      <div className="relative">
-                        <img src={f.otherUser.avatar} className="w-8 h-8 rounded-full bg-[#1e1f22]" />
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[3px] border-[#313338] group-hover:border-[#35373c] ${f.otherUser.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
+                    
+                    <ProfilePopover user={f.otherUser} side="right">
+                      <div className="flex items-center cursor-pointer flex-1 group/profile" onClick={() => onStartDM(f.otherUser.id)}>
+                        <div className="relative">
+                          <img src={f.otherUser.avatar} className="w-8 h-8 rounded-full bg-[#1e1f22] group-hover/profile:opacity-80 transition-opacity" />
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[3px] border-[#313338] group-hover:border-[#35373c] ${f.otherUser.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
+                        </div>
+                        <div className="ml-3 flex flex-col">
+                          <span className="text-white font-medium group-hover/profile:underline">{f.otherUser.name}</span>
+                          <span className="text-[#949ba4] text-xs">{f.otherUser.status === 'online' ? 'Online' : 'Offline'}</span>
+                        </div>
                       </div>
-                      <div className="ml-3 flex flex-col">
-                        <span className="text-white font-medium">{f.otherUser.name}</span>
-                        <span className="text-[#949ba4] text-xs">{f.otherUser.status === 'online' ? 'Online' : 'Offline'}</span>
-                      </div>
-                    </div>
+                    </ProfilePopover>
+
                     <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onStartDM(f.otherUser.id)} className="w-9 h-9 rounded-full bg-[#2b2d31] flex items-center justify-center text-[#b5bac1] hover:text-white transition-colors" title="Messaggio">
                         <MessageSquare size={18} />
