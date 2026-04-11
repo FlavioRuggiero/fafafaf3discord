@@ -28,26 +28,13 @@ export const useVoiceChannel = () => {
   return context;
 };
 
-const playTone = (frequency: number, duration: number) => {
+const playSound = (soundFile: string) => {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (!audioContext) return;
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration / 1000);
-
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + duration / 1000);
+    const audio = new Audio(soundFile);
+    audio.volume = 0.3; // Riduciamo un po' il volume per non essere troppo invasivi
+    audio.play().catch(e => console.error("La riproduzione automatica dell'audio è fallita", e));
   } catch (e) {
-    console.error("Web Audio API is not supported or failed.", e);
+    console.error("Impossibile riprodurre il suono", e);
   }
 };
 
@@ -132,7 +119,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     if (!currentUser || !channelToLeave || !serverToLeave) return;
     
-    playTone(440, 200);
+    playSound('/exit.mp3');
 
     if (signalingChannelRef.current) {
       await signalingChannelRef.current.untrack();
@@ -164,7 +151,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       await leaveVoiceChannel();
     }
     
-    playTone(880, 150);
+    playSound('/enter.mp3');
 
     setActiveVoiceChannelId(channelId);
     setActiveServerId(serverId);
@@ -191,13 +178,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     
     channel.on('presence', { event: 'join' }, ({ key }) => {
       if (key !== currentUser.id) {
-        playTone(880, 150);
+        playSound('/enter.mp3');
       }
     });
 
     channel.on('presence', { event: 'leave' }, ({ key }) => {
       if (key !== currentUser.id) {
-        playTone(440, 200);
+        playSound('/exit.mp3');
       }
       const peerData = peersRef.current.find(p => p.userId === key);
       if (peerData) {
