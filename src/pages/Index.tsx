@@ -555,6 +555,7 @@ const Index = () => {
             onToggleMembers={() => setShowMembers(!showMembers)}
             onToggleSidebar={() => setShowSidebar(true)}
             showMembers={showMembers}
+            serverCreatorId={activeServer?.created_by}
           />
           {showMembers && (
             <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />

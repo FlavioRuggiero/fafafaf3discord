@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2 } from "lucide-react";
 import * as HoverCard from "@radix-ui/react-hover-card";
 import * as Popover from "@radix-ui/react-popover";
 import { Message, Channel, User } from "@/types/discord";
@@ -73,9 +73,10 @@ interface ChatAreaProps {
   onToggleMembers: () => void;
   onToggleSidebar: () => void;
   showMembers?: boolean;
+  serverCreatorId?: string;
 }
 
-export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers }: ChatAreaProps) => {
+export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId }: ChatAreaProps) => {
   const [inputValue, setInputValue] = useState("");
   const [realMessages, setRealMessages] = useState<LocalMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
@@ -434,6 +435,22 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questo messaggio?")) return;
+
+    // Aggiornamento UI ottimistico
+    const previousMessages = [...realMessages];
+    setRealMessages(prev => prev.filter(m => m.id !== msgId));
+
+    const { error } = await supabase.from('messages').delete().eq('id', msgId);
+    
+    if (error) {
+      console.error("Errore eliminazione messaggio:", error);
+      showError("Impossibile eliminare il messaggio. Hai eseguito lo script SQL?");
+      setRealMessages(previousMessages); // Revert
+    }
+  };
+
   const startEditing = (msg: LocalMessage) => {
     setEditingMessageId(msg.id);
     const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
@@ -597,7 +614,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
           const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id && !isReply;
           const isMyMessage = currentUser?.id === msg.user.id;
+          const isServerCreator = currentUser?.id === serverCreatorId;
+          
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt);
+          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt)) || isServerCreator;
+          
           const isEditing = editingMessageId === msg.id;
           const isPopoverOpen = openPopoverId === msg.id;
           
@@ -663,6 +684,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   {canEdit && (
                     <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Modifica" onClick={() => startEditing(msg)}>
                       <Pencil size={18} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
+                      title={isServerCreator && !isMyMessage ? "Elimina come Moderatore" : "Elimina"} 
+                      onClick={() => handleDeleteMessage(msg.id)}
+                    >
+                      <Trash2 size={18} />
                     </button>
                   )}
                 </div>
