@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2 } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
+import { showError, showSuccess } from "@/utils/toast";
 
 interface ChannelSidebarProps {
   activeServer: Server;
@@ -140,22 +141,18 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
       if (error) {
         console.error("Errore creazione canale:", error);
-        alert("Errore durante la creazione del canale: " + error.message);
+        showError("Errore durante la creazione del canale.");
         setLocalChannels(prev => prev.filter(c => c.id !== tempId));
         return;
       }
       
       if (data) {
         setLocalChannels(prev => prev.map(c => c.id === tempId ? data as Channel : c));
+        showSuccess(`Canale ${data.name} creato con successo!`);
       }
     } catch (error) {
       console.error("Errore aggiunta canale:", error);
     }
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, channel: Channel) => {
-    e.stopPropagation();
-    setChannelToDelete(channel);
   };
 
   const confirmDeleteChannel = async () => {
@@ -177,13 +174,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       const { error } = await supabase.from('channels').delete().eq('id', id);
       if (error) {
         console.error("Errore eliminazione canale:", error);
-        alert("Errore durante l'eliminazione del canale");
+        showError("Impossibile eliminare. Assicurati di aver eseguito lo script SQL 'fix_channels_rls.sql' su Supabase.");
         // Annulla aggiornamento ottimistico in caso di errore
         setDeletedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
           return next;
         });
+      } else {
+        showSuccess("Canale eliminato.");
       }
     } catch (error) {
       console.error("Errore eliminazione canale:", error);
@@ -254,6 +253,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   {categoryChannels.map(channel => {
                     const isActive = channel.id === activeChannelId;
                     const Icon = channel.type === 'text' ? Hash : Volume2;
+                    const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
                     
                     return (
                       <div
@@ -274,9 +274,20 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           )}
                           {isOwner && (
                             <button
-                              onClick={(e) => handleDeleteClick(e, channel)}
-                              className="opacity-0 group-hover:opacity-100 hover:text-[#f23f43] transition-all ml-1 p-0.5"
-                              title="Elimina Canale"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isLastTextChannel) {
+                                  showError("Il server deve avere almeno un canale testuale.");
+                                } else {
+                                  setChannelToDelete(channel);
+                                }
+                              }}
+                              className={`ml-1 p-0.5 transition-all ${
+                                isLastTextChannel 
+                                  ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
+                                  : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
+                              }`}
+                              title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
                             >
                               <Trash2 size={14} />
                             </button>
