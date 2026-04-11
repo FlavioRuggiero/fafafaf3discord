@@ -10,9 +10,10 @@ interface ChannelSidebarProps {
   currentUser: User;
   onOpenSettings?: () => void;
   onLeaveServer?: () => void;
+  onOpenUserSettings?: () => void;
 }
 
-export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
   const serverChannels = channels.filter(c => c.server_id === activeServer.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   
@@ -109,6 +110,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         <div className="flex items-center text-[#dbdee1]">
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
+          {onOpenUserSettings && (
+            <button onClick={onOpenUserSettings} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
+              <Settings size={18} />
+            </button>
+          )}
         </div>
       </div>
     </div>

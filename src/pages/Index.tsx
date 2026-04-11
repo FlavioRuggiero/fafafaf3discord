@@ -4,12 +4,13 @@ import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
 import { ChatArea } from "@/components/discord/ChatArea";
 import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
+import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut } from "lucide-react";
+import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut, Settings } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
@@ -37,6 +38,7 @@ const Index = () => {
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showUserSettingsModal, setShowUserSettingsModal] = useState(false);
   
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
@@ -54,7 +56,8 @@ const Index = () => {
       name: name,
       avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
       status: isOnline ? "online" : "offline",
-      global_role: isVerifiedUser ? "CREATOR" : "USER"
+      global_role: isVerifiedUser ? "CREATOR" : "USER",
+      bio: p.bio || ""
     };
   });
 
@@ -112,7 +115,8 @@ const Index = () => {
         name: userName,
         avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
-        global_role: isVerifiedUser ? "CREATOR" : "USER"
+        global_role: isVerifiedUser ? "CREATOR" : "USER",
+        bio: profile?.bio || ""
       };
       
       setCurrentUser(loadedUser);
@@ -399,6 +403,24 @@ const Index = () => {
     showSuccess("Server eliminato!");
   };
 
+  const handleUpdateProfile = async (nickname: string, bio: string) => {
+    if (!currentUser) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ first_name: nickname, bio: bio })
+      .eq('id', currentUser.id);
+
+    if (error) {
+      showError("Impossibile aggiornare il profilo.");
+      return;
+    }
+
+    setCurrentUser({ ...currentUser, name: nickname, bio: bio });
+    showSuccess("Profilo aggiornato con successo!");
+    setShowUserSettingsModal(false);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -437,6 +459,7 @@ const Index = () => {
             currentUser={currentUser}
             onOpenSettings={() => setShowSettingsModal(true)}
             onLeaveServer={() => handleLeaveServer(activeServer.id)}
+            onOpenUserSettings={() => setShowUserSettingsModal(true)}
           />
         ) : (
           <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">
@@ -467,6 +490,9 @@ const Index = () => {
               <div className="flex items-center text-[#dbdee1]">
                 <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
                 <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
+                <button onClick={() => setShowUserSettingsModal(true)} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
+                  <Settings size={18} />
+                </button>
               </div>
             </div>
           </div>
@@ -563,6 +589,13 @@ const Index = () => {
         onUpdate={handleUpdateServer}
         onDelete={handleDeleteServer}
         isUpdating={isUpdatingServer}
+      />
+
+      <UserSettingsModal
+        isOpen={showUserSettingsModal}
+        onClose={() => setShowUserSettingsModal(false)}
+        user={currentUser}
+        onUpdate={handleUpdateProfile}
       />
     </div>
   );
