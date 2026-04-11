@@ -28,6 +28,29 @@ export const useVoiceChannel = () => {
   return context;
 };
 
+const playTone = (frequency: number, duration: number) => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContext) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration / 1000);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration / 1000);
+  } catch (e) {
+    console.error("Web Audio API is not supported or failed.", e);
+  }
+};
+
 interface VoiceChannelProviderProps {
   children: React.ReactNode;
   currentUser: User | null;
@@ -108,6 +131,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     const serverToLeave = activeServerIdRef.current;
 
     if (!currentUser || !channelToLeave || !serverToLeave) return;
+    
+    playTone(440, 200);
 
     if (signalingChannelRef.current) {
       await signalingChannelRef.current.untrack();
@@ -138,6 +163,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     if (activeVoiceChannelIdRef.current) {
       await leaveVoiceChannel();
     }
+    
+    playTone(880, 150);
 
     setActiveVoiceChannelId(channelId);
     setActiveServerId(serverId);
@@ -162,7 +189,16 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       });
     });
     
+    channel.on('presence', { event: 'join' }, ({ key }) => {
+      if (key !== currentUser.id) {
+        playTone(880, 150);
+      }
+    });
+
     channel.on('presence', { event: 'leave' }, ({ key }) => {
+      if (key !== currentUser.id) {
+        playTone(440, 200);
+      }
       const peerData = peersRef.current.find(p => p.userId === key);
       if (peerData) {
         peerData.peer.destroy();

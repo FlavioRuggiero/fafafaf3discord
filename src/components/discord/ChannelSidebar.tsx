@@ -21,29 +21,6 @@ interface ChannelSidebarProps {
   onOpenUserSettings?: () => void;
 }
 
-const playTone = (frequency: number, duration: number) => {
-  try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (!audioContext) return;
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration / 1000);
-
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + duration / 1000);
-  } catch (e) {
-    console.error("Web Audio API is not supported or failed.", e);
-  }
-};
-
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
@@ -431,8 +408,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (!currentUser || !activeServer) return;
 
     if (activeVoiceChannelId !== channel.id) {
-      playTone(880, 150);
-      
       // Aggiornamento ottimistico: sposta l'utente istantaneamente nella UI
       setMembers(prevMembers => 
         prevMembers.map(member => 
@@ -441,7 +416,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             : member
         )
       );
-
       joinVoiceChannel(channel.id, activeServer.id);
     }
   };
@@ -766,7 +740,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             </span>
             <button 
               onClick={() => {
-                playTone(440, 200);
                 // Aggiornamento ottimistico: rimuove l'utente istantaneamente dalla UI
                 setMembers(prevMembers => 
                   prevMembers.map(member => 
