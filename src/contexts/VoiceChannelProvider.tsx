@@ -120,14 +120,16 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     document.querySelectorAll('audio[data-user-id]').forEach(el => el.remove());
 
+    setActiveVoiceChannelId(null);
+    setActiveServerId(null);
+
+    // Aggiorniamo il database per notificare a tutti gli altri membri che l'utente è uscito
     await supabase
       .from('server_members')
       .update({ voice_channel_id: null })
       .eq('server_id', serverToLeave)
       .eq('user_id', currentUser.id);
 
-    setActiveVoiceChannelId(null);
-    setActiveServerId(null);
   }, [currentUser]);
 
   const joinVoiceChannel = useCallback(async (channelId: string, serverId: string) => {
@@ -140,6 +142,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     setActiveVoiceChannelId(channelId);
     setActiveServerId(serverId);
 
+    // Aggiorniamo il database per notificare a tutti gli altri membri che l'utente è entrato
     await supabase
       .from('server_members')
       .update({ voice_channel_id: channelId })
@@ -195,12 +198,10 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   };
   
   useEffect(() => {
-    // Aggiunto per evitare connessioni fantasma in caso l'utente chiuda in modo brusco la finestra
     const handleBeforeUnload = () => {
       const channelToLeave = activeVoiceChannelIdRef.current;
       const serverToLeave = activeServerIdRef.current;
       if (currentUser && channelToLeave && serverToLeave) {
-        // Fallback di disconnessione d'emergenza DB
         supabase
           .from('server_members')
           .update({ voice_channel_id: null })

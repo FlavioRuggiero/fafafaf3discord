@@ -137,6 +137,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
+  // Gestione Membri Server per Chat Vocali (Senza filtro stringente per fixare il bug)
   useEffect(() => {
     if (!activeServer?.id) return;
 
@@ -164,9 +165,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'server_members',
-        filter: `server_id=eq.${activeServer.id}`
-      }, (payload) => {
+        table: 'server_members'
+      }, () => {
+        // Ignoriamo il filtro lato Supabase e aggiorniamo sempre in locale 
+        // per assicurarci di vedere gli update dei canali vocali in tempo reale
         if (isMounted) {
           fetchMembers();
         }
@@ -613,6 +615,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                       const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
                       
                       const isVoiceChannel = channel.type === 'voice';
+                      // Visualizza i membri connessi alla chat vocale
                       const connectedMembers = isVoiceChannel 
                         ? members.filter(m => m.voice_channel_id === channel.id)
                         : [];
@@ -683,6 +686,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               )}
                             </div>
                           </div>
+                          
+                          {/* Rendering dei membri all'interno della chat vocale */}
                           {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
                               {connectedMembers.map(member => (
