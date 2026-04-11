@@ -10,8 +10,9 @@ import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut, Settings } from "lucide-react";
+import { Menu, Home, MessageSquare, Compass, Plus } from "lucide-react";
 import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
+import { UserPanel } from "@/components/discord/UserPanel";
 
 const Index = () => {
   const { user } = useAuth();
@@ -550,12 +551,6 @@ const Index = () => {
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
-  const userLevel = currentUser.level || 1;
-  const userXp = currentUser.xp || 0;
-  const userXpNeeded = userLevel * 5;
-  const userDigitalcardus = currentUser.digitalcardus ?? 25;
-  const xpPercentage = Math.min(100, (userXp / userXpNeeded) * 100);
-
   return (
     <VoiceChannelProvider currentUser={currentUser}>
       <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
@@ -576,74 +571,16 @@ const Index = () => {
             onReorderServers={setServers}
           />
           
-          {activeServerId !== 'home' && activeServer ? (
-            <ChannelSidebar 
-              activeServer={activeServer}
-              channels={allChannels}
-              activeChannelId={activeChannel?.id || ''} 
-              onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
-              currentUser={currentUser}
-              onOpenSettings={() => setShowSettingsModal(true)}
-              onLeaveServer={() => handleLeaveServer(activeServer.id)}
-              onOpenUserSettings={() => setShowUserSettingsModal(true)}
-            />
-          ) : (
-            <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 border-r border-[#1e1f22]">
-              <div className="h-12 flex items-center px-4 border-b border-[#1f2023] shadow-sm">
-                <h1 className="font-semibold text-white">Dashboard</h1>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-                <h2 className="text-white font-bold text-xs mb-3 uppercase tracking-wider">Le tue attività</h2>
-                <div className="text-[#949ba4] text-sm bg-[#1e1f22] p-3 rounded-lg border border-[#1f2023]">
-                  {canCreate 
-                    ? "Per iniziare, esplora i server pubblici o creane uno tuo usando i pulsanti nella schermata principale!"
-                    : "Per iniziare, esplora i server pubblici usando i pulsanti nella schermata principale!"}
-                </div>
-              </div>
-              
-              <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
-                <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
-                  
-                  <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-white font-bold text-sm">Livello {userLevel}</span>
-                      <span className="text-[#b5bac1] text-xs font-medium">
-                        {userXp} / {userXpNeeded} XP
-                      </span>
-                    </div>
-                    <div className="w-full bg-[#2b2d31] h-2.5 rounded-full overflow-hidden mb-3">
-                      <div 
-                        className="bg-gradient-to-r from-[#5865f2] to-[#eb459e] h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${xpPercentage}%` }} 
-                      />
-                    </div>
-                    <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
-                      <img src="/digitalcardus.png" className="w-4 h-4 mr-2 object-contain" alt="DC" />
-                      {userDigitalcardus} Digitalcardus
-                    </div>
-                    <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
-                  </div>
-
-                  <div className="relative">
-                    <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
-                    <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
-                  </div>
-                  <div className="ml-2 flex flex-col min-w-0">
-                    <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser.name}</span>
-                    <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center text-[#dbdee1]">
-                  <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
-                  <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
-                  <button onClick={() => setShowUserSettingsModal(true)} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
-                    <Settings size={18} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <ChannelSidebar 
+            activeServer={activeServer}
+            channels={allChannels}
+            activeChannelId={activeChannel?.id || ''} 
+            onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
+            currentUser={currentUser}
+            onOpenSettings={() => setShowSettingsModal(true)}
+            onLeaveServer={() => handleLeaveServer(activeServer!.id)}
+            onOpenUserSettings={() => setShowUserSettingsModal(true)}
+          />
         </div>
 
         {activeServerId !== 'home' && activeChannel ? (
