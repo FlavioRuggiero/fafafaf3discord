@@ -20,6 +20,29 @@ interface ChannelSidebarProps {
   onOpenUserSettings?: () => void;
 }
 
+const playTone = (frequency: number, duration: number) => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContext) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration / 1000);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration / 1000);
+  } catch (e) {
+    console.error("Web Audio API is not supported or failed.", e);
+  }
+};
+
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
@@ -118,7 +141,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         .eq('server_id', activeServer.id);
       
       if (data && isMounted) {
-        const typedData = data as ServerMemberWithProfile[];
+        const typedData = data.filter(d => d.profiles) as ServerMemberWithProfile[];
         setMembers(typedData);
         const currentUserMember = typedData.find(m => m.user_id === currentUser.id);
         if (currentUserMember) {
@@ -147,10 +170,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         } else if (payload.eventType === 'UPDATE') {
           setMembers(prev => prev.map(m => {
             if (m.user_id === payload.new.user_id) {
-              return { 
-                ...m, 
-                voice_channel_id: payload.new.voice_channel_id 
-              };
+              return { ...m, voice_channel_id: payload.new.voice_channel_id };
             }
             return m;
           }));
@@ -386,18 +406,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     const newVoiceChannelId = activeVoiceChannelId === channel.id ? null : channel.id;
     const oldVoiceChannelId = activeVoiceChannelId;
 
-    // Play sound based on action
     if (newVoiceChannelId) {
-      new Audio('/connect.mp3').play().catch(e => console.error("Error playing connect sound:", e));
+      playTone(880, 150);
     } else {
-      new Audio('/disconnect.mp3').play().catch(e => console.error("Error playing disconnect sound:", e));
+      playTone(440, 200);
     }
 
     setActiveVoiceChannelId(newVoiceChannelId);
-    setMembers(prev => prev.map(m => 
-      m.user_id === currentUser.id ? { ...m, voice_channel_id: newVoiceChannelId } : m
-    ));
-
+    
     const { error } = await supabase
       .from('server_members')
       .update({ voice_channel_id: newVoiceChannelId })
@@ -407,9 +423,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (error) {
       showError("Errore durante la connessione al canale vocale.");
       setActiveVoiceChannelId(oldVoiceChannelId);
-      setMembers(prev => prev.map(m => 
-        m.user_id === currentUser.id ? { ...m, voice_channel_id: oldVoiceChannelId } : m
-      ));
     }
   };
 
