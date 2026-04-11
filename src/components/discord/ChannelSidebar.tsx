@@ -324,6 +324,12 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       e.preventDefault();
       return;
     }
+    
+    // Nascondi l'immagine fantasma nativa del browser creandone una trasparente
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
     setDragItem({ id, type, category });
@@ -358,7 +364,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (!source || !target || !activeServer) return;
     if (source.id === target.id && source.type === target.type) return; 
 
-    const channelsCopy = [...localChannels];
+    // Copia profonda per evitare mutazioni di riferimento dello stato diretto
+    const channelsCopy = localChannels.map(c => ({...c}));
 
     // Spostamento di una Categoria
     if (source.type === 'category' && target.type === 'category') {
@@ -368,6 +375,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       if (sIdx === -1 || tIdx === -1) return;
 
       cats.splice(sIdx, 1);
+      
       const insertIdx = target.position === 'top' ? tIdx : tIdx + 1;
       cats.splice(insertIdx > sIdx ? insertIdx - 1 : insertIdx, 0, source.id);
 
@@ -409,17 +417,17 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
       catChannels.splice(iIdx, 0, sourceChannel);
 
-      sourceChannel.category = tCat;
       const targetCatPos = channelsCopy.find(c => c.category === tCat)?.category_position || 0;
-      sourceChannel.category_position = targetCatPos;
 
       const updates: {id: string, position: number, category: string, category_position: number}[] = [];
       catChannels.forEach((c, idx) => {
         c.position = idx;
+        c.category = tCat;
+        c.category_position = targetCatPos;
         updates.push({ id: c.id, position: idx, category: tCat, category_position: targetCatPos });
       });
       
-      setLocalChannels([...channelsCopy]);
+      setLocalChannels(channelsCopy);
       
       try {
         await Promise.all(updates.map(u => 
