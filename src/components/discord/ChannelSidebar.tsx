@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 
-type ServerMemberWithProfile = ServerMember & { profiles: Profile };
+type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
 interface ChannelSidebarProps {
   activeServer: Server;
@@ -148,9 +148,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         .select('*, profiles(*)')
         .eq('server_id', activeServer.id);
       
+      if (error) {
+        console.error("Error fetching server members:", error);
+        return;
+      }
+      
       if (data && isMounted) {
-        const typedData = data.filter(d => d.profiles) as ServerMemberWithProfile[];
-        setMembers(typedData);
+        setMembers(data as ServerMemberWithProfile[]);
       }
     };
 
