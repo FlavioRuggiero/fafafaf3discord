@@ -217,13 +217,16 @@ const Index = () => {
     loadInitialData();
   }, [user]);
 
+  // Caricamento Membri e Sottoscrizione Realtime
   useEffect(() => {
+    if (!activeServerId || activeServerId === 'home') {
+      setServerProfiles([]);
+      return;
+    }
+
+    let isMounted = true;
+
     const fetchServerMembers = async () => {
-      if (!activeServerId || activeServerId === 'home') {
-        setServerProfiles([]);
-        return;
-      }
-      
       const { data: membersData } = await supabase
         .from('server_members')
         .select('user_id')
@@ -231,19 +234,54 @@ const Index = () => {
         
       if (membersData && membersData.length > 0) {
         const userIds = membersData.map(m => m.user_id);
-        
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('*')
           .in('id', userIds);
           
-        if (profilesData) {
+        if (profilesData && isMounted) {
           setServerProfiles(profilesData);
         }
+      } else if (isMounted) {
+        setServerProfiles([]);
       }
     };
 
     fetchServerMembers();
+
+    // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
+    const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'server_members',
+        filter: `server_id=eq.${activeServerId}`
+      }, async (payload) => {
+        if (!isMounted) return;
+
+        if (payload.eventType === 'INSERT') {
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', payload.new.user_id)
+            .single();
+          if (newProfile) {
+            setServerProfiles(prev => {
+              if (prev.some(p => p.id === newProfile.id)) return prev;
+              return [...prev, newProfile];
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const deletedUserId = payload.old.user_id;
+          setServerProfiles(prev => prev.filter(p => p.id !== deletedUserId));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(memberSub);
+    };
   }, [activeServerId]);
 
   useEffect(() => {
@@ -405,7 +443,20 @@ const Index = () => {
     const { data: newChannels } = await supabase.from('channels').select('*').eq('server_id', server.id);
     
     setServers([...servers, server]);
-    if (newChannels) setAllChannels([...allChannels, ...newChannels]);
+    if (newChannels) {
+      setAllChannels([...allChannels, ...newChannels]);
+      
+      // Invia un messaggio di benvenuto nel primo canale testuale
+      const firstTextChannel = newChannels.find(c => c.type === 'text');
+      if (firstTextChannel) {
+        await supabase.from('messages').insert({
+          channel_id: firstTextChannel.id,
+          user_id: currentUser.id,
+          content: `🎉 Sono appena entrato nel server! Ciao a tutti! 👋`
+        });
+      }
+    }
+    
     setActiveServerId(server.id);
     showSuccess(`Ti sei unito a ${server.name}!`);
   };
