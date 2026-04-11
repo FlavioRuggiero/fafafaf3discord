@@ -3,10 +3,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X } from "lucide-react";
 import * as HoverCard from "@radix-ui/react-hover-card";
+import * as Popover from "@radix-ui/react-popover";
 import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
+import { showError } from "@/utils/toast";
 
 type LocalMessage = Message & { rawCreatedAt?: string };
+
+const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔", "👎", "💯", "✨", "💀"];
 
 const ProfileHoverCard = ({ user, children }: { user: User, children: React.ReactNode }) => {
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
@@ -80,6 +84,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [isLoading, setIsLoading] = useState(true);
   const [tableExists, setTableExists] = useState(true);
   
+  // Stati per Reazioni
+  const [reactionsByMessage, setReactionsByMessage] = useState<Record<string, { id: string, message_id: string, emoji: string, user_id: string }[]>>({});
+  const [reactionsEnabled, setReactionsEnabled] = useState(false);
+
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
@@ -87,6 +95,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
@@ -190,6 +199,31 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           };
         });
         setRealMessages(formatted);
+
+        // Fetch Reactions
+        if (data.length > 0) {
+          const msgIds = data.map((m: any) => m.id);
+          const { data: reactionsData, error: reactionsError } = await supabase
+            .from('message_reactions')
+            .select('id, message_id, emoji, user_id')
+            .in('message_id', msgIds);
+            
+          if (!reactionsError && reactionsData) {
+            setReactionsEnabled(true);
+            const grouped: Record<string, any[]> = {};
+            reactionsData.forEach(r => {
+              if (!grouped[r.message_id]) grouped[r.message_id] = [];
+              grouped[r.message_id].push(r);
+            });
+            setReactionsByMessage(grouped);
+          } else {
+            setReactionsEnabled(false);
+          }
+        } else {
+          // Check if table exists
+          const { error: checkError } = await supabase.from('message_reactions').select('id').limit(1);
+          if (!checkError) setReactionsEnabled(true);
+        }
       }
       setIsLoading(false);
     };
@@ -200,7 +234,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
-      .on('postgres_changes', {
+      .on('postgres_changes', { 
         event: '*', 
         schema: 'public',
         table: 'messages',
@@ -249,6 +283,23 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         else if (payload.eventType === 'DELETE') {
           setRealMessages(prev => prev.filter(m => m.id !== payload.old.id));
         }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (payload) => {
+        setReactionsByMessage(prev => {
+          const msgId = payload.new.message_id;
+          const existing = prev[msgId] || [];
+          if (existing.some(r => r.id === payload.new.id)) return prev;
+          return { ...prev, [msgId]: [...existing, payload.new] };
+        });
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' }, (payload) => {
+        setReactionsByMessage(prev => {
+          const newMap = { ...prev };
+          for (const msgId in newMap) {
+            newMap[msgId] = newMap[msgId].filter(r => r.id !== payload.old.id);
+          }
+          return newMap;
+        });
       })
       .subscribe();
 
@@ -387,7 +438,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
     let contentToEdit = replyMatch ? replyMatch[2] : msg.content;
     
-    // Fallback retrocompatibilità se ci sono vecchi formati
+    // Fallback retrocompatibilità
     if (contentToEdit.startsWith('**Risposta a')) {
       contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
     }
@@ -423,6 +474,53 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, msgId: string) => {
     if (e.key === 'Escape') cancelEditing();
     else if (e.key === 'Enter') saveEdit(msgId);
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!currentUser) return;
+    if (!reactionsEnabled) {
+      showError("Le reazioni non sono abilitate. Esegui il file add_reactions.sql nel database.");
+      return;
+    }
+    
+    const msgReactions = reactionsByMessage[messageId] || [];
+    const existingReaction = msgReactions.find(r => r.user_id === currentUser.id && r.emoji === emoji);
+    
+    if (existingReaction) {
+      // Delete ottimistico
+      setReactionsByMessage(prev => ({
+        ...prev,
+        [messageId]: (prev[messageId] || []).filter(r => r.id !== existingReaction.id)
+      }));
+      await supabase.from('message_reactions').delete().eq('id', existingReaction.id);
+    } else {
+      // Insert ottimistico
+      const tempId = `temp-${Date.now()}`;
+      const newReaction = { id: tempId, message_id: messageId, emoji, user_id: currentUser.id };
+      setReactionsByMessage(prev => ({
+        ...prev,
+        [messageId]: [...(prev[messageId] || []), newReaction]
+      }));
+      
+      const { data, error } = await supabase.from('message_reactions').insert({
+        message_id: messageId,
+        user_id: currentUser.id,
+        emoji
+      }).select().single();
+      
+      if (data) {
+        setReactionsByMessage(prev => ({
+          ...prev,
+          [messageId]: (prev[messageId] || []).map(r => r.id === tempId ? data : r)
+        }));
+      } else {
+        // Revert su errore
+        setReactionsByMessage(prev => ({
+          ...prev,
+          [messageId]: (prev[messageId] || []).filter(r => r.id !== tempId)
+        }));
+      }
+    }
   };
 
   const isWithin5Minutes = (rawDate?: string) => {
@@ -480,7 +578,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         )}
 
         {!isLoading && displayMessages.map((msg, idx) => {
-          // Parsing del tag <reply:...>
           const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
           const isReply = !!replyMatch;
           const replyToId = isReply ? replyMatch[1] : null;
@@ -494,27 +591,69 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             if (repliedMessage) {
               repliedMessageContent = repliedMessage.content;
               const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
-              if (nestedMatch) repliedMessageContent = nestedMatch[2]; // Pulisce se rispondi a una risposta
+              if (nestedMatch) repliedMessageContent = nestedMatch[2];
             } else {
               repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
             }
           }
 
-          // Raggruppamento si spezza se cambiamo utente O se il messaggio è una risposta
           const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id && !isReply;
           const isMyMessage = currentUser?.id === msg.user.id;
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt);
           const isEditing = editingMessageId === msg.id;
           
+          // Gestione Reazioni Rendering
+          const msgReactions = reactionsByMessage[msg.id] || [];
+          const reactionCounts: Record<string, { count: number, hasReacted: boolean }> = {};
+          msgReactions.forEach(r => {
+            if (!reactionCounts[r.emoji]) reactionCounts[r.emoji] = { count: 0, hasReacted: false };
+            reactionCounts[r.emoji].count++;
+            if (r.user_id === currentUser?.id) reactionCounts[r.emoji].hasReacted = true;
+          });
+
           return (
             <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col hover:bg-[#2e3035] -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'}`}>
               
               {!isEditing && (
                 <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all">
-                  <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Aggiungi reazione">
-                    <SmilePlus size={18} />
-                  </button>
-                  <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Rispondi" onClick={() => { setReplyingTo(msg); editInputRef.current?.focus(); }}>
+                  
+                  <Popover.Root>
+                    <Popover.Trigger asChild>
+                      <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Aggiungi reazione">
+                        <SmilePlus size={18} />
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content 
+                        side="top" 
+                        align="end" 
+                        sideOffset={5} 
+                        className="bg-[#2b2d31] border border-[#1e1f22] p-2 rounded-lg shadow-xl z-[99999] w-[200px]"
+                      >
+                        <div className="grid grid-cols-4 gap-1">
+                          {EMOJIS.map(emoji => (
+                            <Popover.Close asChild key={emoji}>
+                              <button 
+                                onClick={() => toggleReaction(msg.id, emoji)}
+                                className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-xl transition-colors"
+                              >
+                                {emoji}
+                              </button>
+                            </Popover.Close>
+                          ))}
+                        </div>
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+
+                  <button 
+                    className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" 
+                    title="Rispondi" 
+                    onClick={() => { 
+                      setReplyingTo(msg); 
+                      setTimeout(() => chatInputRef.current?.focus(), 10); 
+                    }}
+                  >
                     <ReplyIcon size={18} />
                   </button>
                   {canEdit && (
@@ -583,6 +722,23 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   ) : (
                     <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">{displayContent}</div>
                   )}
+
+                  {/* Rendering dei badge delle reazioni */}
+                  {Object.keys(reactionCounts).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5 mb-1">
+                      {Object.entries(reactionCounts).map(([emoji, { count, hasReacted }]) => (
+                        <button 
+                          key={emoji}
+                          onClick={() => toggleReaction(msg.id, emoji)}
+                          className={`flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${hasReacted ? 'bg-brand/20 border-brand text-brand' : 'bg-[#2b2d31] border-transparent text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'} transition-colors`}
+                        >
+                          <span className="mr-1.5 text-sm">{emoji}</span>
+                          <span>{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                 </div>
               </div>
             </div>
@@ -619,6 +775,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
         <div className={`bg-[#383a40] flex items-center px-4 py-2.5 min-w-0 z-20 relative ${replyingTo ? 'rounded-b-lg rounded-t-none border-x border-b border-[#1f2023]' : 'rounded-lg'}`}>
           <input
+            ref={chatInputRef}
             type="text"
             value={inputValue}
             onChange={handleInputChange}
