@@ -1,0 +1,2 @@
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0;
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS category_position INTEGER DEFAULT 0;

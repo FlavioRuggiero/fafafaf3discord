@@ -26,9 +26,12 @@ export type Channel = {
   id: string;
   server_id: string;
   name: string;
-  type: "text" | "voice";
+  type: "text" | "voice" | "minigame";
   category: string;
   unread?: boolean;
+  position?: number;
+  category_position?: number;
+  created_at?: string;
 };
 
 export type Message = {

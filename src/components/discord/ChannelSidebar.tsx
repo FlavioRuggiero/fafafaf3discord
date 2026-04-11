@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -28,7 +28,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice' | 'minigame'>('text');
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
 
-  // Stato per la creazione e modifica di una categoria
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   
@@ -38,11 +37,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Stato per la modifica
   const [channelToEdit, setChannelToEdit] = useState<Channel | null>(null);
   const [editChannelName, setEditChannelName] = useState("");
 
-  // Ripristina lo stato delle categorie salvato nel localStorage
+  // Drag & Drop States
+  const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel', category?: string } | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
+
   useEffect(() => {
     if (!activeServer?.id) return;
     const saved = localStorage.getItem(`collapsed-categories-${activeServer.id}`);
@@ -57,7 +58,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   }, [activeServer?.id]);
 
-  // Sottoscrizione realtime globale
   useEffect(() => {
     if (!activeServer?.id) return;
 
@@ -118,10 +118,18 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         return { ...lc, unread: parentChan.unread };
       }
       return lc;
-    }).filter(c => !deletedIds.has(c.id));
+    }).filter(c => !deletedIds.has(c.id)).sort((a, b) => {
+      // Ordinamento primario per categoria, secondario per posizione canale
+      const catA = a.category_position || 0;
+      const catB = b.category_position || 0;
+      if (catA !== catB) return catA - catB;
+      return (a.position || 0) - (b.position || 0);
+    });
   }, [localChannels, channels, activeServer?.id, deletedIds]);
 
   const serverChannels = displayChannels.filter(c => c.server_id === activeServer?.id);
+  
+  // Estrai categorie mantenendo l'ordine
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   if (categories.length === 0 && activeServer) categories.push("Generale");
   
@@ -154,7 +162,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     e.preventDefault();
     if (!newCategoryName.trim()) return;
     
-    // Imposta la nuova categoria e apri subito il modale per creare il primo canale
     setSelectedCategory(newCategoryName.trim());
     setNewChannelName("");
     setNewChannelType('text');
@@ -172,10 +179,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       return;
     }
 
-    // Aggiornamento ottimistico
     setLocalChannels(prev => prev.map(c => c.category === categoryToRename ? { ...c, category: newName } : c));
     
-    // Rinomina anche tra le categorie chiuse (se applicabile)
     if (collapsedCategories.has(categoryToRename)) {
       setCollapsedCategories(prev => {
         const next = new Set(prev);
@@ -196,10 +201,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         .eq('category', oldName);
       
       if (error) {
-        console.error("Errore rinomina categoria:", error);
         showError("Errore durante la rinomina della categoria.");
-      } else {
-        showSuccess("Categoria rinominata.");
       }
     } catch (e) {
       console.error(e);
@@ -210,6 +212,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     e.preventDefault();
     if (!newChannelName.trim() || !activeServer) return;
 
+    // Calcola la posizione corretta per il nuovo canale
+    const maxPos = localChannels
+      .filter(c => c.category === selectedCategory)
+      .reduce((max, c) => Math.max(max, c.position || 0), -1);
+      
+    const catPos = localChannels
+      .find(c => c.category === selectedCategory)?.category_position || 0;
+
     const tempId = `temp-${Date.now()}`;
     const newChannel: Channel = {
       id: tempId,
@@ -217,6 +227,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       name: newChannelName.trim().toLowerCase().replace(/\s+/g, '-'),
       type: newChannelType,
       category: selectedCategory,
+      position: maxPos + 1,
+      category_position: catPos,
       created_at: new Date().toISOString()
     };
     
@@ -233,12 +245,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         server_id: activeServer.id,
         name: newChannel.name,
         type: newChannel.type,
-        category: newChannel.category
+        category: newChannel.category,
+        position: newChannel.position,
+        category_position: newChannel.category_position
       }).select().single();
 
       if (error) {
-        console.error("Errore creazione canale:", error);
-        showError("Errore durante la creazione del canale.");
+        showError("Errore durante la creazione del canale. Hai eseguito il file SQL?");
         setLocalChannels(prev => prev.filter(c => c.id !== tempId));
         return;
       }
@@ -248,7 +261,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         showSuccess(`Canale ${data.name} creato con successo!`);
       }
     } catch (error) {
-      console.error("Errore aggiunta canale:", error);
+      console.error(error);
     }
   };
 
@@ -269,18 +282,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     try {
       const { error } = await supabase.from('channels').delete().eq('id', id);
       if (error) {
-        console.error("Errore eliminazione canale:", error);
         showError("Impossibile eliminare.");
         setDeletedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
           return next;
         });
-      } else {
-        showSuccess("Canale eliminato.");
       }
     } catch (error) {
-      console.error("Errore eliminazione canale:", error);
+      console.error(error);
     } finally {
       setIsDeleting(null);
     }
@@ -302,20 +312,140 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
     try {
       const { error } = await supabase.from('channels').update({ name: newName }).eq('id', channelId);
-      if (error) {
-        console.error("Errore modifica canale:", error);
-        showError("Errore durante la modifica del nome.");
-      } else {
-        showSuccess("Canale rinominato.");
-      }
+      if (error) showError("Errore durante la modifica del nome.");
     } catch (error) {
-      console.error("Errore modifica canale:", error);
+      console.error(error);
     }
+  };
+
+  // Drag & Drop Handlers
+  const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
+    if (!isOwner) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    setDragItem({ id, type, category });
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string, type: 'category' | 'channel') => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (!dragItem) return;
+    if (dragItem.type === 'category' && type === 'channel') return; // Impedisci drop categoria dentro canale
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const position = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
+
+    if (dragOverInfo?.id !== id || dragOverInfo?.position !== position) {
+      setDragOverInfo({ id, type, position });
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetId: string, targetType: 'category' | 'channel', targetCategoryStr?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const source = dragItem;
+    const target = dragOverInfo;
+    
+    setDragItem(null);
+    setDragOverInfo(null);
+
+    if (!source || !target || !activeServer) return;
+    if (source.id === target.id && source.type === target.type) return; 
+
+    const channelsCopy = [...localChannels];
+
+    // Spostamento di una Categoria
+    if (source.type === 'category' && target.type === 'category') {
+      const cats = Array.from(new Set(displayChannels.map(c => c.category)));
+      const sIdx = cats.indexOf(source.id);
+      const tIdx = cats.indexOf(target.id);
+      if (sIdx === -1 || tIdx === -1) return;
+
+      cats.splice(sIdx, 1);
+      const insertIdx = target.position === 'top' ? tIdx : tIdx + 1;
+      cats.splice(insertIdx > sIdx ? insertIdx - 1 : insertIdx, 0, source.id);
+
+      const updates: {id: string, category_position: number}[] = [];
+      cats.forEach((cat, idx) => {
+        channelsCopy.forEach(c => {
+          if (c.category === cat) {
+            c.category_position = idx;
+            updates.push({ id: c.id, category_position: idx });
+          }
+        });
+      });
+      
+      setLocalChannels(channelsCopy);
+      
+      try {
+        await Promise.all(updates.map(u => supabase.from('channels').update({ category_position: u.category_position }).eq('id', u.id)));
+      } catch(err) {
+        showError("Errore durante il salvataggio della posizione.");
+      }
+    } 
+    // Spostamento di un Canale
+    else if (source.type === 'channel') {
+      const tCat = targetType === 'category' ? target.id : targetCategoryStr!;
+      const sourceChannel = channelsCopy.find(c => c.id === source.id);
+      if (!sourceChannel) return;
+      
+      const catChannels = channelsCopy
+        .filter(c => c.category === tCat && c.id !== source.id)
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
+
+      let iIdx = catChannels.length;
+      if (targetType === 'channel') {
+        const cIdx = catChannels.findIndex(c => c.id === target.id);
+        if (cIdx !== -1) {
+           iIdx = target.position === 'top' ? cIdx : cIdx + 1;
+        }
+      }
+
+      catChannels.splice(iIdx, 0, sourceChannel);
+
+      sourceChannel.category = tCat;
+      const targetCatPos = channelsCopy.find(c => c.category === tCat)?.category_position || 0;
+      sourceChannel.category_position = targetCatPos;
+
+      const updates: {id: string, position: number, category: string, category_position: number}[] = [];
+      catChannels.forEach((c, idx) => {
+        c.position = idx;
+        updates.push({ id: c.id, position: idx, category: tCat, category_position: targetCatPos });
+      });
+      
+      setLocalChannels([...channelsCopy]);
+      
+      try {
+        await Promise.all(updates.map(u => 
+          supabase.from('channels').update({ 
+            position: u.position, 
+            category: u.category, 
+            category_position: u.category_position 
+          }).eq('id', u.id)
+        ));
+      } catch(err) {
+        showError("Errore durante il salvataggio della posizione.");
+      }
+    }
+  };
+
+  const getDropIndicator = (id: string, type: 'category' | 'channel') => {
+    if (dragOverInfo?.id === id && dragOverInfo?.type === type) {
+      return dragOverInfo.position === 'top' 
+        ? 'shadow-[0_-2px_0_#5865F2] z-20' 
+        : 'shadow-[0_2px_0_#5865F2] z-20';
+    }
+    return '';
   };
 
   if (!activeServer) return null;
 
-  // Variabili sicure per il profilo utente
   const userLevel = (currentUser as any)?.level || 1;
   const userXp = (currentUser as any)?.xp || 0;
   const userXpNeeded = userLevel * 5;
@@ -372,7 +502,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             const isCollapsed = collapsedCategories.has(category);
             
             return (
-              <div key={idx}>
+              <div 
+                key={category}
+                draggable={isOwner}
+                onDragStart={(e) => handleDragStart(e, category, 'category')}
+                onDragOver={(e) => handleDragOver(e, category, 'category')}
+                onDrop={(e) => handleDrop(e, category, 'category')}
+                onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
+                className={`relative ${getDropIndicator(category, 'category')} ${dragItem?.id === category ? 'opacity-40' : ''}`}
+              >
                 <div 
                   onClick={() => toggleCategory(category)}
                   className="flex items-center justify-between text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1 group/category"
@@ -402,7 +540,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 </div>
                 
                 {!isCollapsed && (
-                  <div className="space-y-[2px]">
+                  <div className="space-y-[2px] pb-2">
                     {categoryChannels.map(channel => {
                       const isActive = channel.id === activeChannelId;
                       const Icon = channel.type === 'text' ? Hash : channel.type === 'voice' ? Volume2 : Gamepad2;
@@ -411,12 +549,17 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                       return (
                         <div
                           key={channel.id}
+                          draggable={isOwner}
+                          onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
+                          onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
+                          onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
+                          onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
                           onClick={() => onChannelSelect(channel)}
-                          className={`flex items-center px-2 py-1.5 rounded cursor-pointer group ${
+                          className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${
                             isActive 
                               ? 'bg-[#404249] text-white' 
                               : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                          } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
+                          } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''} ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
                         >
                           <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
                           <span className="truncate flex-1">{channel.name}</span>
@@ -470,10 +613,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         )}
       </div>
 
+      {/* Area Utente con Tooltip Profilo */}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
         <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
           
-          {/* Tooltip Livello e Soldi (Appare in hover) */}
           <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
             <div className="flex justify-between items-center mb-2">
               <span className="text-white font-bold text-sm">Livello {userLevel}</span>
@@ -495,7 +638,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           </div>
 
           <div className="relative">
-            <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
+            <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
             <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
           </div>
           <div className="ml-2 flex flex-col min-w-0">
