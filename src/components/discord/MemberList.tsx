@@ -1,11 +1,7 @@
 import React from "react";
 import { User } from "@/types/discord";
 import { Crown } from "lucide-react";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+import * as HoverCard from "@radix-ui/react-hover-card";
 
 interface MemberListProps {
   users: User[];
@@ -42,22 +38,22 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
     const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
 
     return (
-      <HoverCard openDelay={250} closeDelay={150}>
-        <HoverCardTrigger asChild>
+      <HoverCard.Root openDelay={250} closeDelay={150}>
+        <HoverCard.Trigger asChild>
           <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
-            <div className="relative mr-3 mt-1.5">
+            <div className="relative mr-3 mt-1.5 flex-shrink-0">
               {isCreator && (
                 <div className="absolute -top-3.5 -right-1 z-10 text-yellow-400 rotate-[15deg] drop-shadow-md">
                   <Crown size={16} className="fill-yellow-400" />
                 </div>
               )}
-              <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
+              <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full object-cover ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
               
               {/* Pallino di stato con Tooltip (Visibile solo se non attiva l'HoverCard principale) */}
               <div className="absolute -bottom-0.5 -right-0.5 group/status">
                 <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
                 
-                {/* Tooltip */}
+                {/* Tooltip dello status */}
                 <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
                   {statusText[user.status]}
                   <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-[#111214]"></div>
@@ -71,7 +67,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
                   {user.name}
                 </span>
                 {isAdmin && (
-                  <span className="text-[9px] font-bold text-white border border-[#f23f43] rounded px-1 py-[2px] leading-none tracking-wide">
+                  <span className="text-[9px] font-bold text-white border border-[#f23f43] rounded px-1 py-[2px] leading-none tracking-wide flex-shrink-0">
                     ADMIN
                   </span>
                 )}
@@ -81,51 +77,55 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
               )}
             </div>
           </div>
-        </HoverCardTrigger>
+        </HoverCard.Trigger>
         
-        <HoverCardContent 
-          side="left" 
-          align="start" 
-          sideOffset={16} 
-          className="w-[300px] p-0 bg-[#111214] border-[#1e1f22] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[100]"
-        >
-          {/* Banner */}
-          <div className="h-[60px] bg-brand relative flex-shrink-0">
-            {/* Avatar container */}
-            <div className="absolute -bottom-10 left-4 rounded-full border-[6px] border-[#111214] bg-[#111214]">
-              <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full" />
-              {/* Stato più grande nell'anteprima */}
-              <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-[#111214] ${statusColors[user.status]}`} title={statusText[user.status]} />
+        {/* Usiamo esplicitamente Portal per evitare clip dai container con overflow-hidden */}
+        <HoverCard.Portal>
+          <HoverCard.Content 
+            side="left" 
+            align="start" 
+            sideOffset={16} 
+            collisionPadding={20}
+            className="w-[300px] p-0 bg-[#111214] border border-[#1e1f22] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          >
+            {/* Banner */}
+            <div className="h-[60px] bg-brand relative flex-shrink-0">
+              {/* Avatar container */}
+              <div className="absolute -bottom-10 left-4 rounded-full border-[6px] border-[#111214] bg-[#111214]">
+                <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+                {/* Stato più grande nell'anteprima */}
+                <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-[#111214] ${statusColors[user.status]}`} title={statusText[user.status]} />
+              </div>
             </div>
-          </div>
-          
-          <div className="p-4 pt-12 pb-5">
-            {/* Nickname & Ruoli */}
-            <div className="flex items-center flex-wrap gap-2 mb-1">
-              <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
-              {isAdmin && (
-                <span className="text-[10px] font-bold text-white border border-[#f23f43] rounded px-1.5 py-[2px] leading-none tracking-wide">
-                  ADMIN
-                </span>
-              )}
-            </div>
-
-            {user.customStatus && (
-              <div className="mt-2 text-[13px] text-[#dbdee1]">{user.customStatus}</div>
-            )}
             
-            {/* Sezione Biografia */}
-            <div className="mt-4 pt-4 border-t border-[#2b2d31]">
-              <h4 className="text-[11px] font-bold uppercase text-[#b5bac1] mb-2 tracking-wider">Su di me</h4>
-              {user.bio ? (
-                <p className="text-[13px] text-[#dbdee1] whitespace-pre-wrap leading-relaxed">{user.bio}</p>
-              ) : (
-                <p className="text-[13px] text-[#949ba4] italic">Nessuna biografia impostata.</p>
+            <div className="p-4 pt-12 pb-5">
+              {/* Nickname & Ruoli */}
+              <div className="flex items-center flex-wrap gap-2 mb-1">
+                <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
+                {isAdmin && (
+                  <span className="text-[10px] font-bold text-white border border-[#f23f43] rounded px-1.5 py-[2px] leading-none tracking-wide">
+                    ADMIN
+                  </span>
+                )}
+              </div>
+
+              {user.customStatus && (
+                <div className="mt-2 text-[13px] text-[#dbdee1]">{user.customStatus}</div>
               )}
+              
+              {/* Sezione Biografia */}
+              <div className="mt-4 pt-4 border-t border-[#2b2d31]">
+                <h4 className="text-[11px] font-bold uppercase text-[#b5bac1] mb-2 tracking-wider">Su di me</h4>
+                {user.bio ? (
+                  <p className="text-[13px] text-[#dbdee1] whitespace-pre-wrap leading-relaxed">{user.bio}</p>
+                ) : (
+                  <p className="text-[13px] text-[#949ba4] italic">Nessuna biografia impostata.</p>
+                )}
+              </div>
             </div>
-          </div>
-        </HoverCardContent>
-      </HoverCard>
+          </HoverCard.Content>
+        </HoverCard.Portal>
+      </HoverCard.Root>
     );
   };
 
