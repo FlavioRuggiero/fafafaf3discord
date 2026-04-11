@@ -25,7 +25,6 @@ interface ChannelSidebarProps {
 
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   
   const [isAddingChannel, setIsAddingChannel] = useState(false);
@@ -73,7 +72,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   }, [activeServer?.id]);
 
   useEffect(() => {
-    if (!activeServer?.id) return;
+    if (!activeServer?.id) {
+      setLocalChannels([]);
+      return;
+    }
 
     let isMounted = true;
 
@@ -81,7 +83,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       const { data, error } = await supabase.from('channels').select('*').eq('server_id', activeServer.id);
       if (data && isMounted) {
         setLocalChannels(data as Channel[]);
-        setDeletedIds(new Set());
       }
     };
     loadChannels();
@@ -105,7 +106,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           if (activeVoiceChannelId === deletedChannelId) {
             leaveVoiceChannel();
           }
-          setDeletedIds(prev => new Set(prev).add(deletedChannelId));
           setLocalChannels(prev => prev.filter(c => c.id !== deletedChannelId));
         } 
         else if (payload.eventType === 'UPDATE') {
@@ -229,15 +229,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   }, [members, activeVoiceChannelId, currentUser]);
 
   const displayChannels = useMemo(() => {
-    return localChannels
-      .filter(c => !deletedIds.has(c.id))
+    return [...localChannels]
       .sort((a, b) => {
         const catA = a.category_position || 0;
         const catB = b.category_position || 0;
         if (catA !== catB) return catA - catB;
         return (a.position || 0) - (b.position || 0);
       });
-  }, [localChannels, deletedIds]);
+  }, [localChannels]);
 
   const handleAddChannelClick = (category: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -356,6 +355,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const confirmDeleteChannel = async () => {
     if (!channelToDelete || !activeServer) return;
     const id = channelToDelete.id;
+    const originalChannel = { ...channelToDelete };
 
     if (activeVoiceChannelId === id) {
       leaveVoiceChannel();
@@ -369,21 +369,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       if (fallback) onChannelSelect(fallback);
     }
 
-    // Optimistic update for the user performing the action
-    setDeletedIds(prev => new Set(prev).add(id));
     setLocalChannels(prev => prev.filter(c => c.id !== id));
 
     try {
       const { error } = await supabase.from('channels').delete().eq('id', id);
       if (error) {
         showError("Impossibile eliminare.");
-        // Revert optimistic update on error
-        setDeletedIds(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        setLocalChannels(prev => [...prev, channelToDelete]);
+        setLocalChannels(prev => [...prev, originalChannel]);
       }
     } catch (error) {
       console.error(error);
