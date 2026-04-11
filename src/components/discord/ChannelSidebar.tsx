@@ -645,6 +645,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                             <span className="truncate flex-1">{channel.name}</span>
                             
                             <div className="flex items-center flex-shrink-0">
+                              {isVoiceChannel && connectedMembers.length > 0 && (
+                                <span className="text-[10px] font-bold bg-[#313338] text-[#b5bac1] px-1.5 py-0.5 rounded mr-1">
+                                  {connectedMembers.length}
+                                </span>
+                              )}
                               {channel.unread && !isActive && channel.type !== 'voice' && (
                                 <div className="w-2 h-2 rounded-full bg-white mr-1" />
                               )}
