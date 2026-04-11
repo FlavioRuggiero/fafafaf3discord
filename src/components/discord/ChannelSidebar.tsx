@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -28,9 +28,12 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice' | 'minigame'>('text');
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
 
-  // Stato per la creazione di una categoria
+  // Stato per la creazione e modifica di una categoria
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  
+  const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
   
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -159,6 +162,50 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setIsAddingChannel(true);
   };
 
+  const handleRenameCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCategoryName.trim() || !categoryToRename || !activeServer) return;
+
+    const newName = editCategoryName.trim();
+    if (newName === categoryToRename) {
+      setCategoryToRename(null);
+      return;
+    }
+
+    // Aggiornamento ottimistico
+    setLocalChannels(prev => prev.map(c => c.category === categoryToRename ? { ...c, category: newName } : c));
+    
+    // Rinomina anche tra le categorie chiuse (se applicabile)
+    if (collapsedCategories.has(categoryToRename)) {
+      setCollapsedCategories(prev => {
+        const next = new Set(prev);
+        next.delete(categoryToRename);
+        next.add(newName);
+        localStorage.setItem(`collapsed-categories-${activeServer.id}`, JSON.stringify(Array.from(next)));
+        return next;
+      });
+    }
+
+    const oldName = categoryToRename;
+    setCategoryToRename(null);
+
+    try {
+      const { error } = await supabase.from('channels')
+        .update({ category: newName })
+        .eq('server_id', activeServer.id)
+        .eq('category', oldName);
+      
+      if (error) {
+        console.error("Errore rinomina categoria:", error);
+        showError("Errore durante la rinomina della categoria.");
+      } else {
+        showSuccess("Categoria rinominata.");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleAddChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChannelName.trim() || !activeServer) return;
@@ -268,7 +315,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   if (!activeServer) return null;
 
-  // Variabili sicure per il profilo utente (fallback se mancano nel type)
+  // Variabili sicure per il profilo utente
   const userLevel = (currentUser as any)?.level || 1;
   const userXp = (currentUser as any)?.xp || 0;
   const userXpNeeded = userLevel * 5;
@@ -330,18 +377,27 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   onClick={() => toggleCategory(category)}
                   className="flex items-center justify-between text-[#949ba4] hover:text-[#dbdee1] cursor-pointer mb-1 px-1 group/category"
                 >
-                  <div className="flex items-center">
-                    <ChevronDown size={12} className={`mr-1 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
-                    <span className="text-xs font-semibold uppercase tracking-wider">{category}</span>
+                  <div className="flex items-center min-w-0">
+                    <ChevronDown size={12} className={`mr-1 flex-shrink-0 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                    <span className="text-xs font-semibold uppercase tracking-wider truncate">{category}</span>
                   </div>
                   {isOwner && (
-                    <button 
-                      onClick={(e) => handleAddChannelClick(category, e)}
-                      className="p-1 opacity-0 group-hover/category:opacity-100 transition-opacity text-[#dbdee1] hover:text-white"
-                      title="Crea Canale"
-                    >
-                      <Plus size={14} />
-                    </button>
+                    <div className="opacity-0 group-hover/category:opacity-100 flex items-center flex-shrink-0 transition-opacity">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setCategoryToRename(category); setEditCategoryName(category); }}
+                        className="p-1 text-[#dbdee1] hover:text-white"
+                        title="Rinomina Categoria"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => handleAddChannelClick(category, e)}
+                        className="p-1 text-[#dbdee1] hover:text-white"
+                        title="Crea Canale"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
                 
@@ -414,7 +470,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         )}
       </div>
 
-      {/* Area Utente con Tooltip Profilo */}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
         <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
           
@@ -433,7 +488,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               />
             </div>
             <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
-              <Wallet size={16} className="mr-2" />
+              <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 mr-2 object-contain" />
               {userDigitalcardus} Digitalcardus
             </div>
             <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
@@ -498,6 +553,51 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Avanti
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modale Rinomina Categoria */}
+      {categoryToRename && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setCategoryToRename(null)}>
+          <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[#1e1f22]">
+              <h2 className="text-xl font-bold text-white">Rinomina Categoria</h2>
+              <p className="text-sm text-[#b5bac1] mt-1">Stai modificando il nome della categoria.</p>
+            </div>
+            
+            <form onSubmit={handleRenameCategorySubmit} className="flex flex-col">
+              <div className="p-4">
+                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nuovo Nome Categoria</label>
+                <div className="relative flex items-center bg-[#1e1f22] rounded overflow-hidden p-1">
+                  <input 
+                    type="text" 
+                    value={editCategoryName}
+                    onChange={(e) => setEditCategoryName(e.target.value)}
+                    className="w-full bg-transparent text-white p-2 focus:outline-none placeholder-[#878a91] uppercase"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end items-center bg-[#2b2d31] p-4">
+                <button 
+                  type="button" 
+                  onClick={() => setCategoryToRename(null)} 
+                  className="text-white hover:underline text-sm px-6 py-2 mr-2"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!editCategoryName.trim() || editCategoryName === categoryToRename} 
+                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Salva Modifiche
                 </button>
               </div>
             </form>

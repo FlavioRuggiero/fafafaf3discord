@@ -526,6 +526,13 @@ const Index = () => {
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
+  // Variabili per il progresso dell'utente in home
+  const userLevel = currentUser.level || 1;
+  const userXp = currentUser.xp || 0;
+  const userXpNeeded = userLevel * 5;
+  const userDigitalcardus = currentUser.digitalcardus ?? 25;
+  const xpPercentage = Math.min(100, (userXp / userXpNeeded) * 100);
+
   return (
     <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
       
@@ -569,9 +576,31 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
-              <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
-                <div className="relative group/status cursor-default">
+            <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
+              <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
+                
+                {/* Tooltip Livello e Soldi (Appare in hover) */}
+                <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-white font-bold text-sm">Livello {userLevel}</span>
+                    <span className="text-[#b5bac1] text-xs font-medium">
+                      {userXp} / {userXpNeeded} XP
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#2b2d31] h-2.5 rounded-full overflow-hidden mb-3">
+                    <div 
+                      className="bg-gradient-to-r from-[#5865f2] to-[#eb459e] h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${xpPercentage}%` }} 
+                    />
+                  </div>
+                  <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
+                    <img src="/digitalcardus.png" className="w-4 h-4 mr-2 object-contain" alt="DC" />
+                    {userDigitalcardus} Digitalcardus
+                  </div>
+                  <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
+                </div>
+
+                <div className="relative">
                   <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
                   <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
                 </div>
