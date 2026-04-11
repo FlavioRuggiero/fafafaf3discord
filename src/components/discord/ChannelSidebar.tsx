@@ -188,7 +188,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(memberSub);
     };
-  }, [activeServer?.id, currentUser?.id, activeVoiceChannelId]);
+  }, [activeServer?.id, currentUser?.id]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
@@ -403,6 +403,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const handleVoiceChannelSelect = (channel: Channel) => {
     if (!currentUser || !activeServer) return;
+
+    // Optimistic UI Update
+    setMembers(prev => prev.map(m => {
+      if (m.user_id === currentUser.id) {
+        const newVoiceChannelId = activeVoiceChannelId === channel.id ? null : channel.id;
+        return { ...m, voice_channel_id: newVoiceChannelId };
+      }
+      return m;
+    }));
 
     if (activeVoiceChannelId === channel.id) {
       playTone(440, 200);
