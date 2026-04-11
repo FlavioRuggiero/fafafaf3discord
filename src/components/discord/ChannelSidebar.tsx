@@ -225,26 +225,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   }, [members, activeVoiceChannelId, currentUser]);
 
   const displayChannels = useMemo(() => {
-    const merged = [...localChannels];
-    channels.forEach(pc => {
-      if (pc.server_id === activeServer?.id && !merged.some(lc => lc.id === pc.id)) {
-        merged.push(pc);
-      }
-    });
-
-    return merged.map(lc => {
-      const parentChan = channels.find(pc => pc.id === lc.id);
-      if (parentChan && parentChan.unread !== undefined) {
-        return { ...lc, unread: parentChan.unread };
-      }
-      return lc;
-    }).filter(c => !deletedIds.has(c.id)).sort((a, b) => {
-      const catA = a.category_position || 0;
-      const catB = b.category_position || 0;
-      if (catA !== catB) return catA - catB;
-      return (a.position || 0) - (b.position || 0);
-    });
-  }, [localChannels, channels, activeServer?.id, deletedIds]);
+    return localChannels
+      .filter(c => !deletedIds.has(c.id))
+      .sort((a, b) => {
+        const catA = a.category_position || 0;
+        const catB = b.category_position || 0;
+        if (catA !== catB) return catA - catB;
+        return (a.position || 0) - (b.position || 0);
+      });
+  }, [localChannels, deletedIds]);
 
   const handleAddChannelClick = (category: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -363,6 +352,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const confirmDeleteChannel = async () => {
     if (!channelToDelete || !activeServer) return;
     const id = channelToDelete.id;
+
+    if (activeVoiceChannelId === id) {
+      leaveVoiceChannel();
+    }
+
     setIsDeleting(id);
     setChannelToDelete(null);
 
@@ -383,6 +377,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           next.delete(id);
           return next;
         });
+        setLocalChannels(prev => [...prev, channelToDelete]);
       }
     } catch (error) {
       console.error(error);
