@@ -26,6 +26,7 @@ interface VoiceChannelContextType {
   toggleDeafen: () => void;
   activeVoiceChannelId: string | null;
   memberStates: Record<string, Partial<VoiceState>>;
+  speakingStates: Record<string, boolean>;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -49,10 +50,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [isMuted, setIsMuted] = useState(true);
   const [isDeafened, setIsDeafened] = useState(false);
   const [memberStates, setMemberStates] = useState<Record<string, Partial<VoiceState>>>({});
+  const [speakingStates, setSpeakingStates] = useState<Record<string, boolean>>({});
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<PeerData[]>([]);
   const signalingChannelRef = useRef<any>(null);
+  const audioAnalysisRefs = useRef<Record<string, { cancel: () => void; close: () => void }>>({});
   const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
   const activeServerIdRef = useRef(activeServerId);
   const wasMutedBeforeDeafen = useRef(false);
@@ -206,6 +209,18 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     const audioEl = document.querySelector(`audio[data-user-id="${userId}"]`);
     if (audioEl) document.body.removeChild(audioEl);
     peersRef.current = peersRef.current.filter(p => p.userId !== userId);
+
+    const analysis = audioAnalysisRefs.current[userId];
+    if (analysis) {
+      analysis.cancel();
+      analysis.close();
+      delete audioAnalysisRefs.current[userId];
+    }
+    setSpeakingStates(prev => {
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
   };
 
   const createPeer = useCallback((userId: string, initiator: boolean, channel: any, receivedSignal?: any) => {
@@ -229,6 +244,36 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       audio.autoplay = true;
       audio.setAttribute('data-user-id', userId);
       document.body.appendChild(audio);
+
+      // Setup audio analysis for speaking indicator
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(remoteStream);
+      source.connect(analyser);
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      let animationFrameId: number;
+
+      const checkVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const avg = bufferLength > 0 ? sum / bufferLength : 0;
+        const isSpeaking = avg > 30; // Threshold for speaking
+
+        setSpeakingStates(prev => {
+          if (!!prev[userId] === isSpeaking) return prev;
+          return { ...prev, [userId]: isSpeaking };
+        });
+
+        animationFrameId = requestAnimationFrame(checkVolume);
+      };
+      checkVolume();
+
+      audioAnalysisRefs.current[userId] = {
+        cancel: () => cancelAnimationFrame(animationFrameId),
+        close: () => audioContext.state !== 'closed' && audioContext.close(),
+      };
     });
 
     peer.on('close', () => removePeer(userId));
@@ -259,11 +304,18 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     peersRef.current.forEach(({ peer }) => peer.destroy());
     peersRef.current = [];
 
+    Object.values(audioAnalysisRefs.current).forEach(analysis => {
+      analysis.cancel();
+      analysis.close();
+    });
+    audioAnalysisRefs.current = {};
+
     document.querySelectorAll('audio[data-user-id]').forEach(el => el.remove());
 
     setActiveVoiceChannelId(null);
     setActiveServerId(null);
     setMemberStates({});
+    setSpeakingStates({});
 
     await supabase
       .from('server_members')
@@ -408,6 +460,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     toggleDeafen,
     activeVoiceChannelId,
     memberStates,
+    speakingStates,
   };
 
   return (

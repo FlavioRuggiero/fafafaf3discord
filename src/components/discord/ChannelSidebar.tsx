@@ -53,7 +53,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const { 
     joinVoiceChannel, 
     leaveVoiceChannel, 
-    activeVoiceChannelId
+    activeVoiceChannelId,
+    speakingStates
   } = useVoiceChannel();
 
   const previousVoiceMembersRef = useRef<ServerMemberWithProfile[]>([]);
@@ -733,13 +734,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
                               {connectedMembers.map(member => {
-                                // Ora i dati muto/sordomuto vengono letti direttamente e in modo affidabile dal Database
                                 const memberIsMuted = member.is_muted ?? false;
                                 const memberIsDeafened = member.is_deafened ?? false;
+                                const isSpeaking = speakingStates[member.user_id] ?? false;
 
                                 return (
                                   <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
-                                    <div className="relative">
+                                    <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
                                       <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
                                       <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
                                     </div>
