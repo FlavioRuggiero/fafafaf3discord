@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2 } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,17 +18,51 @@ interface ChannelSidebarProps {
 }
 
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
+  const [localChannels, setLocalChannels] = useState<Channel[]>(channels);
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const serverChannels = channels.filter(c => c.server_id === activeServer.id);
+  // Sincronizza i canali locali con le props iniziali
+  useEffect(() => {
+    setLocalChannels(channels);
+  }, [channels]);
+
+  // Sottoscrizione realtime per aggiornamenti in diretta dei canali
+  useEffect(() => {
+    if (!activeServer?.id) return;
+
+    const channelSub = supabase.channel(`channels-${activeServer.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'channels',
+        filter: `server_id=eq.${activeServer.id}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setLocalChannels(prev => {
+            if (prev.some(c => c.id === payload.new.id)) return prev;
+            return [...prev, payload.new as Channel];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setLocalChannels(prev => prev.filter(c => c.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+          setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? payload.new as Channel : c));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channelSub);
+    };
+  }, [activeServer?.id]);
+
+  const serverChannels = localChannels.filter(c => c.server_id === activeServer?.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   if (categories.length === 0 && activeServer) categories.push("Generale");
   
-  // Controlla se l'utente corrente è il proprietario del server
   const isOwner = activeServer?.created_by === currentUser?.id;
 
   const handleAddChannelClick = (category: string, e: React.MouseEvent) => {
@@ -40,7 +75,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const handleAddChannel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChannelName.trim()) return;
+    if (!newChannelName.trim() || !activeServer) return;
 
     try {
       const { error } = await supabase.from('channels').insert({
@@ -52,7 +87,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
       if (error) {
         console.error("Errore creazione canale:", error);
-        alert("Errore durante la creazione del canale");
+        alert("Errore durante la creazione del canale: " + error.message);
         return;
       }
       
@@ -84,7 +119,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   if (!activeServer) return null;
 
   return (
-    <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative">
+    <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative h-full">
       <div 
         className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm cursor-pointer hover:bg-[#35373c] transition-colors group"
       >
@@ -204,8 +239,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         </div>
       </div>
 
-      {/* Modale Creazione Canale */}
-      {isAddingChannel && (
+      {/* Modale Creazione Canale Renderizzato tramite Portal */}
+      {isAddingChannel && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setIsAddingChannel(false)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-[#1e1f22]">
@@ -279,7 +314,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
