@@ -638,13 +638,16 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                         : [];
 
                       return (
-                        <React.Fragment key={channel.id}>
+                        <div
+                          key={channel.id}
+                          draggable={isOwner}
+                          onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
+                          onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
+                          onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
+                          onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
+                          className={`relative ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
+                        >
                           <div
-                            draggable={isOwner}
-                            onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
-                            onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
-                            onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
-                            onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
                             onClick={() => {
                               if (channel.type === 'text' || channel.type === 'minigame') {
                                 onChannelSelect(channel);
@@ -656,7 +659,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               isActive 
                                 ? 'bg-[#404249] text-white' 
                                 : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                            } ${channel.unread && !isActive && channel.type !== 'voice' ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''} ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
+                            } ${channel.unread && !isActive && channel.type !== 'voice' ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
                           >
                             <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
                             <span className="truncate flex-1">{channel.name}</span>
@@ -713,7 +716,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               ))}
                             </div>
                           )}
-                        </React.Fragment>
+                        </div>
                       );
                     })}
                   </div>
