@@ -49,6 +49,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
   
+  const [isDeafened, setIsDeafened] = useState(false);
+  const wasMutedBeforeDeafen = useRef(false);
+
   const { 
     joinVoiceChannel, 
     leaveVoiceChannel, 
@@ -58,6 +61,22 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   } = useVoiceChannel();
 
   const prevVoiceMembersRef = useRef<Map<string, string[]>>(new Map());
+
+  const toggleDeafen = () => {
+    const newDeafenState = !isDeafened;
+    setIsDeafened(newDeafenState);
+
+    if (newDeafenState) { // becoming deafened
+        wasMutedBeforeDeafen.current = isMuted;
+        if (!isMuted) {
+            toggleMute();
+        }
+    } else { // becoming un-deafened
+        if (!wasMutedBeforeDeafen.current && isMuted) {
+            toggleMute();
+        }
+    }
+  };
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -695,7 +714,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
                             } ${channel.unread && !isActive && channel.type !== 'voice' ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
                           >
-                            <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
+                            <Icon size={18} className={`mr-1.5 flex-shrink-0 ${isVoiceChannel && connectedMembers.length > 0 ? 'text-[#23a559]' : 'opacity-70'}`} />
                             <span className="truncate flex-1">{channel.name}</span>
                             
                             <div className="flex items-center flex-shrink-0">
@@ -828,10 +847,21 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         </div>
         
         <div className="flex items-center text-[#dbdee1] flex-shrink-0">
-          <button onClick={toggleMute} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors">
-            {isMuted ? <MicOff size={18} className="text-[#f23f43]" /> : <Mic size={18} />}
+          <button 
+            onClick={toggleMute} 
+            disabled={isDeafened} 
+            className="p-1.5 hover:bg-[#3f4147] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isDeafened ? "Devi togliere la modalità 'non sentire' per usare il microfono" : (isMuted ? "Riattiva microfono" : "Disattiva microfono")}
+          >
+            {(isMuted || isDeafened) ? <MicOff size={18} className="text-[#f23f43]" /> : <Mic size={18} />}
           </button>
-          <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
+          <button 
+            onClick={toggleDeafen} 
+            className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"
+            title={isDeafened ? "Attiva audio" : "Disattiva audio"}
+          >
+            {isDeafened ? <Headphones size={18} className="text-[#f23f43]" /> : <Headphones size={18} />}
+          </button>
           {onOpenUserSettings && (
             <button onClick={onOpenUserSettings} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
               <Settings size={18} />
