@@ -199,25 +199,47 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     let isMounted = true;
 
     const fetchVoiceMembers = async () => {
-      const { data: membersData } = await supabase
+      const { data: membersData, error } = await supabase
         .from('server_members')
-        .select('user_id, is_muted, is_deafened, joined_at, profiles(first_name, last_name, avatar_url)')
+        .select('user_id, is_muted, is_deafened, joined_at')
         .eq('voice_channel_id', channel.id)
         .order('joined_at', { ascending: true });
 
+      if (error) {
+        console.error("Errore fetch membri vocali:", error);
+        return;
+      }
+
       if (isMounted && membersData) {
-        setVoiceMembers(membersData);
+        if (membersData.length === 0) {
+          setVoiceMembers([]);
+          return;
+        }
+
+        const userIds = membersData.map((m: any) => m.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', userIds);
+
+        const combinedData = membersData.map((m: any) => ({
+          ...m,
+          profiles: profilesData?.find((p: any) => p.id === m.user_id) || null
+        }));
+
+        setVoiceMembers(combinedData);
       }
     };
 
     fetchVoiceMembers();
 
+    // Sottoscriviti all'intero server_members del server, per individuare quando si disconnettono (voice_channel_id diventa null)
     const sub = supabase.channel(`voice_area_${channel.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'server_members',
-        filter: `voice_channel_id=eq.${channel.id}`
+        filter: channel.server_id ? `server_id=eq.${channel.server_id}` : undefined
       }, () => {
         fetchVoiceMembers();
       })
@@ -227,7 +249,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       isMounted = false;
       supabase.removeChannel(sub);
     };
-  }, [channel?.id, channel?.type]);
+  }, [channel?.id, channel?.type, channel?.server_id]);
 
   // Gestione Messaggi Testuali
   useEffect(() => {
