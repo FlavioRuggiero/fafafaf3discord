@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2 } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones } from "lucide-react";
 import * as HoverCard from "@radix-ui/react-hover-card";
 import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
+import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
@@ -55,7 +56,6 @@ const ProfileHoverCard = ({ user, children }: { user: User, children: React.Reac
               )}
             </div>
 
-            {/* Statistiche Livello e Digitalcardus */}
             <div className="flex flex-col mt-3 bg-[#1e1f22] py-3 px-3 rounded-lg border border-[#2b2d31]">
               <div className="flex items-center justify-around mb-3">
                 <div className="flex flex-col items-center">
@@ -72,7 +72,6 @@ const ProfileHoverCard = ({ user, children }: { user: User, children: React.Reac
                 </div>
               </div>
               
-              {/* Barra XP */}
               <div className="px-1 border-t border-[#2b2d31] pt-3">
                 <div className="flex justify-between items-center text-[10px] text-[#b5bac1] uppercase tracking-wider mb-1.5 font-bold">
                   <span>Progresso XP</span>
@@ -118,7 +117,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [isLoading, setIsLoading] = useState(true);
   const [tableExists, setTableExists] = useState(true);
   
-  // Stati per Reazioni
   const [reactionsByMessage, setReactionsByMessage] = useState<Record<string, { id: string, message_id: string, emoji: string, user_id: string }[]>>({});
   const [reactionsEnabled, setReactionsEnabled] = useState(false);
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
@@ -127,11 +125,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [editContent, setEditContent] = useState("");
   const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
   
-  // Stato per Picker Emoji Chat
   const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
-
-  // Stato per Modale di Eliminazione
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+
+  // Stato per gli utenti connessi al canale vocale
+  const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
+  const { speakingStates } = useVoiceChannel();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -142,7 +141,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const lastTypingStatus = useRef(false);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (channel?.type !== 'voice') {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   const scrollToMessage = (msgId: string) => {
@@ -157,8 +158,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   useEffect(() => {
-    if (!isLoading && !editingMessageId) scrollToBottom();
-  }, [realMessages, propMessages, typingUsers, isLoading]);
+    if (!isLoading && !editingMessageId && channel?.type !== 'voice') scrollToBottom();
+  }, [realMessages, propMessages, typingUsers, isLoading, channel?.type]);
 
   useEffect(() => {
     if (editingMessageId && editInputRef.current) {
@@ -188,8 +189,47 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
+  // Fetch e Sottoscrizione Membri del Canale Vocale
   useEffect(() => {
-    if (!channel?.id) return;
+    if (channel?.type !== 'voice') return;
+
+    let isMounted = true;
+
+    const fetchVoiceMembers = async () => {
+      const { data: membersData } = await supabase
+        .from('server_members')
+        .select('user_id, is_muted, is_deafened, profiles(first_name, last_name, avatar_url)')
+        .eq('voice_channel_id', channel.id);
+
+      if (isMounted && membersData) {
+        setVoiceMembers(membersData);
+      }
+    };
+
+    fetchVoiceMembers();
+
+    const sub = supabase.channel(`voice_area_${channel.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'server_members'
+      }, () => {
+        fetchVoiceMembers();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(sub);
+    };
+  }, [channel?.id, channel?.type]);
+
+  // Gestione Messaggi Testuali
+  useEffect(() => {
+    if (!channel?.id || channel?.type === 'voice') {
+      setIsLoading(false);
+      return;
+    }
     
     setIsLoading(true);
     setRealMessages([]);
@@ -376,7 +416,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           return newMap;
         });
       })
-      // Sincronizzazione in Realtime dei profili (Aggiorna le hover card dei vecchi messaggi)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
         const updatedProfile = payload.new;
         
@@ -414,10 +453,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return () => {
       supabase.removeChannel(channelSubscription);
     };
-  }, [channel?.id, tableExists]);
+  }, [channel?.id, channel?.type, tableExists]);
 
   useEffect(() => {
-    if (!channel?.id || !currentUser?.id) return;
+    if (!channel?.id || !currentUser?.id || channel?.type === 'voice') return;
 
     const room = supabase.channel(`typing:${channel.id}`, {
       config: { presence: { key: currentUser.id } },
@@ -448,7 +487,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       lastTypingStatus.current = false;
       setTypingUsers({});
     };
-  }, [channel?.id, currentUser?.id]);
+  }, [channel?.id, currentUser?.id, channel?.type]);
 
   const setTypingStatus = async (isTyping: boolean) => {
     if (!typingChannelRef.current || !currentUser) return;
@@ -555,7 +594,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const msgId = messageToDelete;
     setMessageToDelete(null);
 
-    // Aggiornamento UI ottimistico
     const previousMessages = [...realMessages];
     setRealMessages(prev => prev.filter(m => m.id !== msgId));
 
@@ -564,7 +602,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (error) {
       console.error("Errore eliminazione messaggio:", error);
       showError("Impossibile eliminare il messaggio. Hai eseguito lo script SQL?");
-      setRealMessages(previousMessages); // Revert
+      setRealMessages(previousMessages);
     }
   };
 
@@ -666,6 +704,62 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return (now - msgTime) <= 5 * 60 * 1000;
   };
 
+  // VISTA CANALE VOCALE (Griglia Utenti, Niente chat testuale)
+  if (channel.type === 'voice') {
+    return (
+      <div className="flex-1 flex flex-col min-w-0 bg-[#000000] relative">
+        <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338]">
+          <div className="flex items-center min-w-0 flex-1">
+            <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
+              <Menu size={24} />
+            </button>
+            <Volume2 size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+            <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
+          </div>
+          <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
+            <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
+              <Users size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-[#000000] flex flex-col">
+          <div className="flex-1 flex items-center justify-center">
+            {voiceMembers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-[#949ba4] animate-in fade-in zoom-in-95 duration-300">
+                <Volume2 size={64} className="mb-4 opacity-50" />
+                <p className="text-xl font-medium text-white">Nessuno è connesso</p>
+                <p className="text-sm mt-2 text-[#949ba4]">Unisciti al canale cliccando nella barra laterale per iniziare a parlare.</p>
+              </div>
+            ) : (
+              <div className="w-full max-w-7xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
+                {voiceMembers.map(member => {
+                  const isSpeaking = speakingStates[member.user_id];
+                  return (
+                    <div key={member.user_id} className={`relative flex flex-col items-center justify-center bg-[#111214] rounded-xl aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
+                      <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
+                        <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                      </div>
+                      
+                      <div className="absolute bottom-3 left-3 flex items-center bg-black/60 backdrop-blur-md rounded-lg px-2.5 py-1.5 shadow-lg">
+                        {member.is_deafened && <Headphones size={16} className="text-[#f23f43] mr-1.5" />}
+                        {member.is_muted && !member.is_deafened && <MicOff size={16} className="text-[#f23f43] mr-1.5" />}
+                        <span className="text-white text-sm font-medium truncate max-w-[120px]">
+                          {member.profiles?.first_name || 'Utente'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // VISTA CANALE TESTUALE
   const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages as LocalMessage[]);
   const msgToDeleteData = messageToDelete ? displayMessages.find(m => m.id === messageToDelete) : null;
 
@@ -682,7 +776,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
             <Menu size={24} />
           </button>
-          {channel.type === 'text' ? <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" /> : <Volume2 size={24} className="text-[#80848e] mr-2 flex-shrink-0" />}
+          <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
           <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
         </div>
         <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
@@ -692,20 +786,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
       </div>
 
-      {channel.type === 'voice' && (
-        <div className="bg-[#23a559]/10 border-b border-[#23a559]/20 p-2 px-4 flex items-center text-[#23a559]">
-          <Volume2 size={16} className="mr-2" />
-          <span className="font-medium text-sm">Connesso alla chat vocale. Questa è anche la chat testuale del canale.</span>
-        </div>
-      )}
-
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
-            {channel.type === 'text' ? <Hash size={32} /> : <Volume2 size={32} />}
+            <Hash size={32} />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in {channel.type === 'text' ? '#' : ''}{channel.name}!</h1>
-          <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">{channel.type === 'text' ? '#' : ''}{channel.name}</span>.</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in #{channel.name}!</h1>
+          <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">#{channel.name}</span>.</p>
         </div>
 
         {isLoading && (
@@ -944,7 +1031,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in ${channel.type === 'text' ? '#' : ''}${channel.name}`}
+            placeholder={replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
             className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e]"
           />
           <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
