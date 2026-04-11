@@ -210,7 +210,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       if (payload.to !== currentUser.id) return;
       const peerData = peersRef.current.find(p => p.userId === payload.from);
       if (peerData) {
-        peerData.peer.signal(payload.signal);
+        if (!peerData.peer.destroyed) {
+          peerData.peer.signal(payload.signal);
+        }
       } else {
         createPeer(payload.from, false, channel, payload.signal);
       }
