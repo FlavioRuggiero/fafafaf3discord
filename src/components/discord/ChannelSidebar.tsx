@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet, PhoneOff } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, MicOff, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet, PhoneOff } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile };
 
@@ -69,7 +70,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
-  const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
+  
+  const { 
+    joinVoiceChannel, 
+    leaveVoiceChannel, 
+    activeVoiceChannelId, 
+    isMuted, 
+    toggleMute 
+  } = useVoiceChannel();
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -143,10 +151,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       if (data && isMounted) {
         const typedData = data.filter(d => d.profiles) as ServerMemberWithProfile[];
         setMembers(typedData);
-        const currentUserMember = typedData.find(m => m.user_id === currentUser.id);
-        if (currentUserMember) {
-          setActiveVoiceChannelId(currentUserMember.voice_channel_id || null);
-        }
       }
     };
 
@@ -174,9 +178,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             }
             return m;
           }));
-          if (payload.new.user_id === currentUser.id) {
-            setActiveVoiceChannelId(payload.new.voice_channel_id || null);
-          }
         } else if (payload.eventType === 'DELETE') {
           setMembers(prev => prev.filter(m => m.user_id !== payload.old.user_id));
         }
@@ -400,29 +401,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
-  const handleVoiceChannelSelect = async (channel: Channel) => {
+  const handleVoiceChannelSelect = (channel: Channel) => {
     if (!currentUser || !activeServer) return;
 
-    const newVoiceChannelId = activeVoiceChannelId === channel.id ? null : channel.id;
-    const oldVoiceChannelId = activeVoiceChannelId;
-
-    if (newVoiceChannelId) {
-      playTone(880, 150);
-    } else {
+    if (activeVoiceChannelId === channel.id) {
       playTone(440, 200);
-    }
-
-    setActiveVoiceChannelId(newVoiceChannelId);
-    
-    const { error } = await supabase
-      .from('server_members')
-      .update({ voice_channel_id: newVoiceChannelId })
-      .eq('server_id', activeServer.id)
-      .eq('user_id', currentUser.id);
-
-    if (error) {
-      showError("Errore durante la connessione al canale vocale.");
-      setActiveVoiceChannelId(oldVoiceChannelId);
+      leaveVoiceChannel();
+    } else {
+      playTone(880, 150);
+      joinVoiceChannel(channel.id, activeServer.id);
     }
   };
 
@@ -786,7 +773,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         </div>
         
         <div className="flex items-center text-[#dbdee1] flex-shrink-0">
-          <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Mic size={18} /></button>
+          <button onClick={toggleMute} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors">
+            {isMuted ? <MicOff size={18} className="text-[#f23f43]" /> : <Mic size={18} />}
+          </button>
           <button className="p-1.5 hover:bg-[#3f4147] rounded transition-colors"><Headphones size={18} /></button>
           {onOpenUserSettings && (
             <button onClick={onOpenUserSettings} className="p-1.5 hover:bg-[#3f4147] rounded transition-colors" title="Impostazioni Utente">
