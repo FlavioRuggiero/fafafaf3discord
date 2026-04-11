@@ -18,7 +18,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [inputValue, setInputValue] = useState("");
   const [realMessages, setRealMessages] = useState<Message[]>([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
-  const [typingChannel, setTypingChannel] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,23 +25,26 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Utilizziamo le Ref per evitare re-render o lag sullo stato "sta scrivendo"
+  const typingChannelRef = useRef<any>(null);
+  const lastTypingStatus = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [realMessages, propMessages, typingUsers]);
+    if (!isLoading) scrollToBottom();
+  }, [realMessages, propMessages, typingUsers, isLoading]);
 
-  // Pulizia del timer per l'indicatore di digitazione
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
 
-  // Recupero dell'utente corrente e profilo
+  // Recupero dell'utente corrente e del suo profilo
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -59,11 +61,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
-  // Recupero storico messaggi e iscrizione Realtime
+  // Recupero messaggi iniziali e ascolto dei nuovi
   useEffect(() => {
     if (!channel?.id) return;
     
     setIsLoading(true);
+    setRealMessages([]); // Reset immediato al cambio di canale per evitare residui
 
     const fetchMessages = async () => {
       const { data, error } = await supabase
@@ -79,7 +82,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.warn("Tabella messages non trovata. Utilizzo i messaggi di fallback.");
+        console.warn("Tabella messages non trovata. Utilizzo messaggi di fallback.");
         setTableExists(false);
         setIsLoading(false);
         return;
@@ -106,7 +109,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
-    // Sottoscrizione messaggi in tempo reale
+    // Sottoscrizione realtime
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', {
@@ -133,7 +136,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         };
         
         setRealMessages(prev => {
-          // Preveniamo duplicati tra update ottimistici e Realtime
           const isTemp = prev.some(m => m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id);
           if (isTemp) {
             return prev.map(m => (m.id.startsWith('temp-') && m.content === newMsg.content && m.user.id === newMsg.user.id) ? newMsg : m);
@@ -149,16 +151,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, tableExists]);
 
-  // Gestione dell'indicatore di digitazione tramite Presence
+  // Ascolto status digitazione (Presence)
   useEffect(() => {
     if (!channel?.id || !currentUser?.id) return;
 
     const room = supabase.channel(`typing:${channel.id}`, {
-      config: {
-        presence: {
-          key: currentUser.id,
-        },
-      },
+      config: { presence: { key: currentUser.id } },
     });
 
     room
@@ -174,39 +172,48 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         }
         setTypingUsers(typing);
       })
-      .subscribe(async (status) => {
+      .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          setTypingChannel(room);
+          typingChannelRef.current = room;
         }
       });
 
     return () => {
       supabase.removeChannel(room);
-      setTypingChannel(null);
+      typingChannelRef.current = null;
+      lastTypingStatus.current = false;
       setTypingUsers({});
     };
   }, [channel?.id, currentUser?.id]);
+
+  // Funzione sicura per aggiornare e inviare lo status di "sto scrivendo"
+  const setTypingStatus = (isTyping: boolean) => {
+    if (!typingChannelRef.current || !currentUser) return;
+    
+    // Evitiamo spam sul websocket mandando messaggi solo se lo status è variato
+    if (lastTypingStatus.current === isTyping) return;
+    
+    lastTypingStatus.current = isTyping;
+    const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
+    
+    typingChannelRef.current.track({ isTyping, userName }).catch(console.error);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputValue(value);
     
-    if (typingChannel && currentUserProfile) {
-      const userName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente';
+    if (value.length > 0) {
+      setTypingStatus(true);
       
-      if (value.length > 0) {
-        typingChannel.track({ isTyping: true, userName });
-        
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        
-        // Rimuove la scritta automaticamente dopo 3 secondi in cui non si premono tasti
-        typingTimeoutRef.current = setTimeout(() => {
-          typingChannel.track({ isTyping: false, userName });
-        }, 3000);
-      } else {
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingChannel.track({ isTyping: false, userName });
-      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      // Timeout che toglie automaticamente la scritta se smetti di scrivere per 3 secondi
+      typingTimeoutRef.current = setTimeout(() => {
+        setTypingStatus(false);
+      }, 3000);
+    } else {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      setTypingStatus(false);
     }
   };
 
@@ -216,14 +223,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setInputValue("");
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      
-      if (typingChannel && currentUserProfile) {
-        const userName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente';
-        typingChannel.track({ isTyping: false, userName });
-      }
+      setTypingStatus(false); // Reset istantaneo all'invio
 
       if (currentUser && channel && tableExists) {
-        // AGGIORNAMENTO OTTIMISTICO: mostra il messaggio subito per chi lo invia
+        // Messaggio ottimistico (compare istantaneamente)
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
         const avatar = currentUserProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`;
@@ -237,7 +240,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         setRealMessages(prev => [...prev, optimisticMsg]);
 
-        // Salvataggio effettivo nel database
         const { data, error } = await supabase.from('messages').insert({
           channel_id: channel.id,
           user_id: currentUser.id,
@@ -246,10 +248,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         if (error) {
           console.error("Errore durante l'invio:", error);
-          // Rimuove il messaggio ottimistico se c'è un errore
           setRealMessages(prev => prev.filter(m => m.id !== tempId));
         } else if (data) {
-          // Aggiorna l'ID temporaneo con quello vero
           setRealMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id } : m));
         }
       } else {
@@ -258,7 +258,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const displayMessages = tableExists && !isLoading ? realMessages : propMessages;
+  // Se isLoading è attivo mostra un array vuoto così non fa il flash dei vecchi messaggi
+  const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages);
 
   const typingNames = Object.values(typingUsers);
   let typingText = "";
@@ -297,7 +298,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
       </div>
 
-      {/* Voice Connection Banner */}
       {channel.type === 'voice' && (
         <div className="bg-[#23a559]/10 border-b border-[#23a559]/20 p-2 px-4 flex items-center text-[#23a559]">
           <Volume2 size={16} className="mr-2" />
@@ -306,8 +306,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-w-0 flex flex-col">
-        {/* Welcome Section */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-w-0 flex flex-col relative">
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
             {channel.type === 'text' ? <Hash size={32} /> : <Volume2 size={32} />}
@@ -316,13 +315,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">{channel.type === 'text' ? '#' : ''}{channel.name}</span>.</p>
         </div>
 
-        {displayMessages.map((msg, idx) => {
+        {/* Loader visivo mentre scarica la chat */}
+        {isLoading && (
+          <div className="flex justify-center my-4">
+            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin opacity-70"></div>
+          </div>
+        )}
+
+        {!isLoading && displayMessages.map((msg, idx) => {
           const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id;
           
           return (
             <div key={msg.id} className="group flex items-start hover:bg-[#2e3035] -mx-4 px-4 py-1 rounded">
               {!isSameUserAsPrevious ? (
-                <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0" />
+                <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
               ) : (
                 <div className="w-10 mr-4 text-xs text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
                   {msg.timestamp?.split(' ')[2] || msg.timestamp}
@@ -346,7 +352,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
       {/* Input Area */}
       <div className="p-4 pt-0 flex-shrink-0 flex flex-col">
-        {/* Indicatore di digitazione */}
         <div className="h-6 flex items-center mb-1 text-xs font-medium text-[#b5bac1] overflow-hidden truncate px-1">
           {typingText && (
             <span className="flex items-center">
