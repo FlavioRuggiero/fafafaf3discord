@@ -195,12 +195,30 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   };
   
   useEffect(() => {
+    // Aggiunto per evitare connessioni fantasma in caso l'utente chiuda in modo brusco la finestra
+    const handleBeforeUnload = () => {
+      const channelToLeave = activeVoiceChannelIdRef.current;
+      const serverToLeave = activeServerIdRef.current;
+      if (currentUser && channelToLeave && serverToLeave) {
+        // Fallback di disconnessione d'emergenza DB
+        supabase
+          .from('server_members')
+          .update({ voice_channel_id: null })
+          .eq('server_id', serverToLeave)
+          .eq('user_id', currentUser.id)
+          .then(() => {});
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (activeVoiceChannelIdRef.current) {
         leaveVoiceChannel();
       }
     };
-  }, [leaveVoiceChannel]);
+  }, [leaveVoiceChannel, currentUser]);
 
   const value = {
     joinVoiceChannel,

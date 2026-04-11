@@ -104,17 +104,15 @@ const Index = () => {
     };
   }, [user]);
 
-  // Listener Realtime per la tabella Profiles (Sync digitalcardus, XP, livello, etc.)
+  // Listener Realtime per la tabella Profiles
   useEffect(() => {
     const profileSubscription = supabase
       .channel('public:profiles_index')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
         const updatedProfile = payload.new;
 
-        // Aggiorna la lista membri del server
         setServerProfiles(prev => prev.map(p => p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p));
 
-        // Aggiorna l'utente corrente se corrisponde
         setCurrentUser(prev => {
           if (!prev || prev.id !== updatedProfile.id) return prev;
           const isVerifiedUser = (updatedProfile.first_name || "").toLowerCase() === 'faf3tto';
@@ -144,7 +142,11 @@ const Index = () => {
     const loadInitialData = async () => {
       if (!user) return;
       
+      // 1. Aggiorna data ultimo accesso
       await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
+      
+      // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
+      await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
       
       // Controllo del premio giornaliero
       const { data: rewardData } = await supabase.rpc('claim_daily_reward', { user_id_param: user.id });
@@ -177,7 +179,6 @@ const Index = () => {
       
       setCurrentUser(loadedUser);
 
-      // Recuperiamo i server dell'utente in ordine di posizione
       const { data: memberData } = await supabase
         .from('server_members')
         .select('server_id, position')
@@ -189,7 +190,6 @@ const Index = () => {
       if (joinedServerIds.length > 0) {
         const { data: serversData } = await supabase.from('servers').select('*').in('id', joinedServerIds);
         if (serversData) {
-          // Ricostruisce la lista di server usando l'ordine fornito da memberData (position)
           const sortedServers = memberData
             .map(m => serversData.find(s => s.id === m.server_id))
             .filter(Boolean) as Server[];
@@ -498,7 +498,7 @@ const Index = () => {
 
     if (bannerFile !== undefined) {
       if (bannerFile === null) {
-        banner_url = undefined; // eliminato
+        banner_url = undefined;
       } else {
         const fileExt = bannerFile.name.split('.').pop();
         const filePath = `banners/${currentUser.id}_${Math.random()}.${fileExt}`;
@@ -550,7 +550,6 @@ const Index = () => {
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
-  // Variabili per il progresso dell'utente in home
   const userLevel = currentUser.level || 1;
   const userXp = currentUser.xp || 0;
   const userXpNeeded = userLevel * 5;
@@ -605,7 +604,6 @@ const Index = () => {
               <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
                 <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
                   
-                  {/* Tooltip Livello e Soldi (Appare in hover) */}
                   <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-white font-bold text-sm">Livello {userLevel}</span>
