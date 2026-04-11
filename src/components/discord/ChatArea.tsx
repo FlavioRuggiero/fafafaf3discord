@@ -44,6 +44,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
+  // Stato per gli utenti connessi al canale vocale
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   const { speakingStates } = useVoiceChannel();
 
@@ -54,8 +55,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
-
-  const channelColumn = channel.type === 'dm' ? 'dm_channel_id' : 'channel_id';
 
   const scrollToBottom = () => {
     if (channel?.type !== 'voice') {
@@ -106,6 +105,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
+  // Fetch e Sottoscrizione Membri del Canale Vocale
   useEffect(() => {
     if (channel?.type !== 'voice') {
       setVoiceMembers([]);
@@ -149,6 +149,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     fetchVoiceMembers();
 
+    // Sottoscriviti all'intero server_members del server, per individuare quando si disconnettono (voice_channel_id diventa null)
     const sub = supabase.channel(`voice_area_${channel.id}`)
       .on('postgres_changes', {
         event: '*',
@@ -166,6 +167,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, channel?.type, channel?.server_id]);
 
+  // Gestione Messaggi Testuali
   useEffect(() => {
     if (!channel?.id || channel?.type === 'voice') {
       setIsLoading(false);
@@ -188,7 +190,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           user_id,
           profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp)
         `)
-        .eq(channelColumn, channel.id)
+        .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
 
       if (error && error.message.includes('updated_at')) {
@@ -201,7 +203,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             user_id,
             profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp)
           `)
-          .eq(channelColumn, channel.id)
+          .eq('channel_id', channel.id)
           .order('created_at', { ascending: true });
         data = fallback.data;
         error = fallback.error;
@@ -243,6 +245,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         });
         setRealMessages(formatted);
 
+        // Fetch Reactions
         if (data.length > 0) {
           const msgIds = data.map((m: any) => m.id);
           const { data: reactionsData, error: reactionsError } = await supabase
@@ -279,7 +282,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         event: 'INSERT', 
         schema: 'public',
         table: 'messages',
-        filter: `${channelColumn}=eq.${channel.id}`
+        filter: `channel_id=eq.${channel.id}`
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
@@ -324,7 +327,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         event: 'UPDATE', 
         schema: 'public',
         table: 'messages',
-        filter: `${channelColumn}=eq.${channel.id}`
+        filter: `channel_id=eq.${channel.id}`
       }, (payload) => {
         setRealMessages(prev => prev.map(m => m.id === payload.new.id ? { 
           ...m, 
@@ -393,7 +396,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return () => {
       supabase.removeChannel(channelSubscription);
     };
-  }, [channel?.id, channel?.type, tableExists, channelColumn]);
+  }, [channel?.id, channel?.type, tableExists]);
 
   useEffect(() => {
     if (!channel?.id || !currentUser?.id || channel?.type === 'voice') return;
@@ -510,18 +513,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setRealMessages(prev => [...prev, optimisticMsg]);
         setReplyingTo(null);
 
-        const payload: any = {
+        const { data, error } = await supabase.from('messages').insert({
+          channel_id: channel.id,
           user_id: currentUser.id,
           content: finalContent
-        };
-        
-        if (channel.type === 'dm') {
-          payload.dm_channel_id = channel.id;
-        } else {
-          payload.channel_id = channel.id;
-        }
-
-        const { data, error } = await supabase.from('messages').insert(payload).select().single();
+        }).select().single();
         
         if (error) {
           console.error("Errore durante l'invio:", error);
@@ -548,7 +544,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     
     if (error) {
       console.error("Errore eliminazione messaggio:", error);
-      showError("Impossibile eliminare il messaggio.");
+      showError("Impossibile eliminare il messaggio. Hai eseguito lo script SQL?");
       setRealMessages(previousMessages);
     }
   };
@@ -651,6 +647,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return (now - msgTime) <= 5 * 60 * 1000;
   };
 
+  // VISTA CANALE VOCALE (Griglia Utenti, Niente chat testuale)
   if (channel.type === 'voice') {
     return (
       <div className="flex-1 flex flex-col min-w-0 bg-[#000000] relative">
@@ -705,6 +702,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     );
   }
 
+  // VISTA CANALE TESTUALE
   const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages as LocalMessage[]);
   const msgToDeleteData = messageToDelete ? displayMessages.find(m => m.id === messageToDelete) : null;
 
@@ -721,44 +719,23 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
             <Menu size={24} />
           </button>
-          {channel.type === 'dm' ? (
-            <>
-              <img src={channel.recipient?.avatar} alt="" className="w-6 h-6 rounded-full mr-2 object-cover bg-[#1e1f22]" />
-              <h2 className="font-semibold text-white truncate min-w-0">{channel.recipient?.name}</h2>
-            </>
-          ) : (
-            <>
-              <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
-              <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
-            </>
-          )}
+          <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+          <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
         </div>
         <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
-          {channel.type !== 'dm' && (
-            <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
-              <Users size={24} />
-            </button>
-          )}
+          <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
+            <Users size={24} />
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
         <div className="mb-8 mt-4">
-          {channel.type === 'dm' ? (
-            <>
-              <img src={channel.recipient?.avatar} className="w-20 h-20 rounded-full mb-4 object-cover bg-[#1e1f22]" />
-              <h1 className="text-3xl font-bold text-white mb-2">{channel.recipient?.name}</h1>
-              <p className="text-[#b5bac1]">Questo è l'inizio della tua cronologia di messaggi diretti con <span className="font-medium text-[#dbdee1]">@{channel.recipient?.name}</span>.</p>
-            </>
-          ) : (
-            <>
-              <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
-                <Hash size={32} />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in #{channel.name}!</h1>
-              <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">#{channel.name}</span>.</p>
-            </>
-          )}
+          <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
+            <Hash size={32} />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in #{channel.name}!</h1>
+          <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">#{channel.name}</span>.</p>
         </div>
 
         {isLoading && (
@@ -997,7 +974,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio ${channel.type === 'dm' ? 'a @' + channel.recipient?.name : 'in #' + channel.name}`}
+            placeholder={replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
             className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e]"
           />
           <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
