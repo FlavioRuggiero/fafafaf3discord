@@ -315,18 +315,21 @@ const Index = () => {
   const handleLeaveServer = async (serverId: string) => {
     if (!currentUser) return;
 
-    const { error } = await supabase
+    // Utilizziamo .select() per forzare il controllo che l'eliminazione sia realmente avvenuta
+    const { data, error } = await supabase
       .from('server_members')
       .delete()
       .eq('server_id', serverId)
-      .eq('user_id', currentUser.id);
+      .eq('user_id', currentUser.id)
+      .select();
 
-    if (error) {
-      showError("Impossibile uscire dal server. Controlla i permessi.");
+    if (error || !data || data.length === 0) {
+      showError("Impossibile uscire dal server. Assicurati di aver eseguito lo script SQL.");
       return;
     }
 
     setServers(servers.filter(s => s.id !== serverId));
+    setAllChannels(allChannels.filter(c => c.server_id !== serverId));
     setActiveServerId('home');
     showSuccess("Sei uscito dal server.");
   };
@@ -392,12 +395,14 @@ const Index = () => {
   };
 
   const handleDeleteServer = async (id: string) => {
-    const { error } = await supabase.from('servers').delete().eq('id', id);
-    if (error) {
+    // Usiamo .select() per accertarci dell'avvenuta cancellazione
+    const { data, error } = await supabase.from('servers').delete().eq('id', id).select();
+    if (error || !data || data.length === 0) {
       showError("Impossibile eliminare il server");
       return;
     }
     setServers(servers.filter(s => s.id !== id));
+    setAllChannels(allChannels.filter(c => c.server_id !== id));
     setActiveServerId('home');
     setShowSettingsModal(false);
     showSuccess("Server eliminato!");
