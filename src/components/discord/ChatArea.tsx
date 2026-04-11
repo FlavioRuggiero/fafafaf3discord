@@ -87,6 +87,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   // Stati per Reazioni
   const [reactionsByMessage, setReactionsByMessage] = useState<Record<string, { id: string, message_id: string, emoji: string, user_id: string }[]>>({});
   const [reactionsEnabled, setReactionsEnabled] = useState(false);
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -487,14 +488,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const existingReaction = msgReactions.find(r => r.user_id === currentUser.id && r.emoji === emoji);
     
     if (existingReaction) {
-      // Delete ottimistico
       setReactionsByMessage(prev => ({
         ...prev,
         [messageId]: (prev[messageId] || []).filter(r => r.id !== existingReaction.id)
       }));
       await supabase.from('message_reactions').delete().eq('id', existingReaction.id);
     } else {
-      // Insert ottimistico
       const tempId = `temp-${Date.now()}`;
       const newReaction = { id: tempId, message_id: messageId, emoji, user_id: currentUser.id };
       setReactionsByMessage(prev => ({
@@ -514,7 +513,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           [messageId]: (prev[messageId] || []).map(r => r.id === tempId ? data : r)
         }));
       } else {
-        // Revert su errore
         setReactionsByMessage(prev => ({
           ...prev,
           [messageId]: (prev[messageId] || []).filter(r => r.id !== tempId)
@@ -601,8 +599,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const isMyMessage = currentUser?.id === msg.user.id;
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt);
           const isEditing = editingMessageId === msg.id;
+          const isPopoverOpen = openPopoverId === msg.id;
           
-          // Gestione Reazioni Rendering
           const msgReactions = reactionsByMessage[msg.id] || [];
           const reactionCounts: Record<string, { count: number, hasReacted: boolean }> = {};
           msgReactions.forEach(r => {
@@ -615,11 +613,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col hover:bg-[#2e3035] -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'}`}>
               
               {!isEditing && (
-                <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all">
+                <div className={`absolute right-4 -top-3 ${isPopoverOpen ? 'flex' : 'hidden group-hover:flex'} items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all`}>
                   
-                  <Popover.Root>
+                  <Popover.Root 
+                    open={isPopoverOpen} 
+                    onOpenChange={(isOpen) => setOpenPopoverId(isOpen ? msg.id : null)}
+                  >
                     <Popover.Trigger asChild>
-                      <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Aggiungi reazione">
+                      <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors focus:outline-none" title="Aggiungi reazione">
                         <SmilePlus size={18} />
                       </button>
                     </Popover.Trigger>
@@ -629,17 +630,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                         align="end" 
                         sideOffset={5} 
                         className="bg-[#2b2d31] border border-[#1e1f22] p-2 rounded-lg shadow-xl z-[99999] w-[200px]"
+                        onInteractOutside={() => setOpenPopoverId(null)}
                       >
                         <div className="grid grid-cols-4 gap-1">
                           {EMOJIS.map(emoji => (
-                            <Popover.Close asChild key={emoji}>
-                              <button 
-                                onClick={() => toggleReaction(msg.id, emoji)}
-                                className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-xl transition-colors"
-                              >
-                                {emoji}
-                              </button>
-                            </Popover.Close>
+                            <button 
+                              key={emoji}
+                              onClick={() => {
+                                toggleReaction(msg.id, emoji);
+                                setOpenPopoverId(null);
+                              }}
+                              className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-xl transition-colors focus:outline-none"
+                            >
+                              {emoji}
+                            </button>
                           ))}
                         </div>
                       </Popover.Content>
