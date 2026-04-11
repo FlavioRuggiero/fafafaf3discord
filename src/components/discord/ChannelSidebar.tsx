@@ -31,6 +31,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
+  // Reset dello stato delle categorie quando si cambia server
+  useEffect(() => {
+    setCollapsedCategories(new Set());
+  }, [activeServer?.id]);
+
   // Sottoscrizione realtime globale senza filtri server per assicurare la ricezione
   useEffect(() => {
     if (!activeServer?.id) return;
