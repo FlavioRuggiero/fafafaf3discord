@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Peer from 'simple-peer';
 import { User } from '@/types/discord';
 import { playSound } from '@/utils/sounds';
+import { showError } from '@/utils/toast';
 
 interface PeerData {
   peer: Peer.Instance;
@@ -37,44 +38,91 @@ interface VoiceChannelProviderProps {
 export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ children, currentUser }) => {
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [peers, setPeers] = useState<PeerData[]>([]);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   
+  const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<PeerData[]>([]);
   const signalingChannelRef = useRef<any>(null);
   const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
   const activeServerIdRef = useRef(activeServerId);
 
   useEffect(() => {
-    peersRef.current = peers;
-  }, [peers]);
-
-  useEffect(() => {
     activeVoiceChannelIdRef.current = activeVoiceChannelId;
     activeServerIdRef.current = activeServerId;
   }, [activeVoiceChannelId, activeServerId]);
 
+  const requestMicrophone = useCallback(async (playSounds = true) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      localStreamRef.current = stream;
+      
+      setIsMuted(false);
+      if (playSounds) playSound('/unmute.mp3');
+      
+      return stream;
+    } catch (err) {
+      console.error('Failed to get user media', err);
+      showError("Accesso al microfono negato. Controlla le impostazioni del browser.");
+      setIsMuted(true);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-      .then(stream => setLocalStream(stream))
-      .catch(err => console.error('Failed to get user media', err));
+    const initializeMedia = async () => {
+      if (navigator.permissions) {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          if (permissionStatus.state === 'granted') {
+            await requestMicrophone(false);
+          }
+        } catch (e) {
+          console.warn("Permission query for microphone not supported.", e);
+        }
+      }
+    };
+    initializeMedia();
 
     return () => {
-      localStream?.getTracks().forEach(track => track.stop());
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
     };
+  }, [requestMicrophone]);
+
+  const toggleMute = useCallback(async () => {
+    let stream = localStreamRef.current;
+
+    if (!stream) {
+      await requestMicrophone();
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length > 0) {
+      const isCurrentlyEnabled = audioTracks[0].enabled;
+      audioTracks.forEach(track => {
+        track.enabled = !isCurrentlyEnabled;
+      });
+      setIsMuted(isCurrentlyEnabled);
+      
+      if (isCurrentlyEnabled) {
+        playSound('/mute.mp3');
+      } else {
+        playSound('/unmute.mp3');
+      }
+    }
   }, []);
 
   const removePeer = (userId: string) => {
     const audioEl = document.querySelector(`audio[data-user-id="${userId}"]`);
     if (audioEl) document.body.removeChild(audioEl);
-    setPeers(prev => prev.filter(p => p.userId !== userId));
+    peersRef.current = peersRef.current.filter(p => p.userId !== userId);
   };
 
   const createPeer = useCallback((userId: string, initiator: boolean, channel: any, receivedSignal?: any) => {
-    if (!localStream || !currentUser) return;
+    const stream = localStreamRef.current;
+    if (!stream || !currentUser) return;
 
-    const peer = new Peer({ initiator, trickle: true, stream: localStream });
+    const peer = new Peer({ initiator, trickle: true, stream });
 
     peer.on('signal', signal => {
       channel.send({
@@ -101,8 +149,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     if (receivedSignal) peer.signal(receivedSignal);
 
-    setPeers(prev => [...prev.filter(p => p.userId !== userId), { peer, userId }]);
-  }, [localStream, currentUser]);
+    peersRef.current = [...peersRef.current.filter(p => p.userId !== userId), { peer, userId }];
+  }, [currentUser]);
 
   const leaveVoiceChannel = useCallback(async () => {
     const channelToLeave = activeVoiceChannelIdRef.current;
@@ -119,14 +167,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
 
     peersRef.current.forEach(({ peer }) => peer.destroy());
-    setPeers([]);
+    peersRef.current = [];
 
     document.querySelectorAll('audio[data-user-id]').forEach(el => el.remove());
 
     setActiveVoiceChannelId(null);
     setActiveServerId(null);
 
-    // Aggiorniamo il database per notificare a tutti gli altri membri che l'utente è uscito
     await supabase
       .from('server_members')
       .update({ voice_channel_id: null })
@@ -136,10 +183,19 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   }, [currentUser]);
 
   const joinVoiceChannel = useCallback(async (channelId: string, serverId: string) => {
-    if (!currentUser || !localStream) return;
+    if (!currentUser) return;
     
     if (activeVoiceChannelIdRef.current) {
       await leaveVoiceChannel();
+    }
+    
+    let stream = localStreamRef.current;
+    if (!stream) {
+      stream = await requestMicrophone();
+      if (!stream) {
+        showError("Impossibile entrare nel canale vocale senza accesso al microfono.");
+        return;
+      }
     }
     
     playSound('/enter.mp3');
@@ -147,7 +203,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     setActiveVoiceChannelId(channelId);
     setActiveServerId(serverId);
 
-    // Aggiorniamo il database per notificare a tutti gli altri membri che l'utente è entrato
     await supabase
       .from('server_members')
       .update({ voice_channel_id: channelId })
@@ -192,29 +247,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     });
 
     signalingChannelRef.current = channel;
-  }, [currentUser, localStream, createPeer, leaveVoiceChannel]);
+  }, [currentUser, createPeer, leaveVoiceChannel, requestMicrophone]);
 
-  const toggleMute = () => {
-    if (localStream) {
-      const isCurrentlyMuted = !localStream.getAudioTracks()[0].enabled;
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = isCurrentlyMuted;
-      });
-      setIsMuted(!isCurrentlyMuted);
-    }
-  };
-  
   useEffect(() => {
     const handleBeforeUnload = () => {
-      const channelToLeave = activeVoiceChannelIdRef.current;
-      const serverToLeave = activeServerIdRef.current;
-      if (currentUser && channelToLeave && serverToLeave) {
-        supabase
-          .from('server_members')
-          .update({ voice_channel_id: null })
-          .eq('server_id', serverToLeave)
-          .eq('user_id', currentUser.id)
-          .then(() => {});
+      if (activeVoiceChannelIdRef.current) {
+        leaveVoiceChannel();
       }
     };
 
@@ -222,11 +260,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (activeVoiceChannelIdRef.current) {
-        leaveVoiceChannel();
-      }
     };
-  }, [leaveVoiceChannel, currentUser]);
+  }, [leaveVoiceChannel]);
 
   const value = {
     joinVoiceChannel,

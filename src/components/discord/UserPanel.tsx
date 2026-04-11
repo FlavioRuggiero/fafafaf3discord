@@ -4,7 +4,6 @@ import React, { useState, useRef } from "react";
 import { Mic, MicOff, Headphones, Settings } from "lucide-react";
 import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
-import { playSound } from "@/utils/sounds";
 
 interface UserPanelProps {
   currentUser: User;
@@ -17,11 +16,6 @@ export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) =
   const wasMutedBeforeDeafen = useRef(false);
 
   const handleToggleMute = () => {
-    if (isMuted) {
-      playSound('/unmute.mp3');
-    } else {
-      playSound('/mute.mp3');
-    }
     toggleMute();
   };
 
