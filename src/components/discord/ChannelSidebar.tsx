@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2 } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
@@ -18,39 +18,57 @@ interface ChannelSidebarProps {
 }
 
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
-  const [localChannels, setLocalChannels] = useState<Channel[]>(channels);
+  const [localChannels, setLocalChannels] = useState<Channel[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
+  
+  const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Sincronizza i canali locali con le props iniziali
-  useEffect(() => {
-    setLocalChannels(channels);
-  }, [channels]);
-
-  // Sottoscrizione realtime per aggiornamenti in diretta dei canali
+  // Sottoscrizione realtime robusta
   useEffect(() => {
     if (!activeServer?.id) return;
 
-    const channelSub = supabase.channel(`channels-${activeServer.id}`)
+    // Caricamento iniziale sicuro dal DB
+    const loadChannels = async () => {
+      const { data } = await supabase.from('channels').select('*').eq('server_id', activeServer.id);
+      if (data) {
+        setLocalChannels(data as Channel[]);
+      }
+    };
+    loadChannels();
+
+    const channelSub = supabase.channel(`sidebar-channels-${activeServer.id}`)
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'channels',
         filter: `server_id=eq.${activeServer.id}`
       }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setLocalChannels(prev => {
-            if (prev.some(c => c.id === payload.new.id)) return prev;
-            return [...prev, payload.new as Channel];
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setLocalChannels(prev => prev.filter(c => c.id !== payload.old.id));
-        } else if (payload.eventType === 'UPDATE') {
-          setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? payload.new as Channel : c));
-        }
+        setLocalChannels(prev => {
+          if (prev.some(c => c.id === payload.new.id)) return prev;
+          return [...prev, payload.new as Channel];
+        });
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'channels'
+        // NESSUN FILTRO QUI: Supabase restituisce solo l'ID nelle delete
+      }, (payload) => {
+        setDeletedIds(prev => new Set(prev).add(payload.old.id));
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'channels',
+        filter: `server_id=eq.${activeServer.id}`
+      }, (payload) => {
+        setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
       })
       .subscribe();
 
@@ -59,7 +77,27 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
-  const serverChannels = localChannels.filter(c => c.server_id === activeServer?.id);
+  // Unisce i canali locali in tempo reale con lo stato "unread" delle props
+  const displayChannels = useMemo(() => {
+    const merged = [...localChannels];
+    
+    // Aggiunge eventuali canali dalle props che non abbiamo in locale
+    channels.forEach(pc => {
+      if (pc.server_id === activeServer?.id && !merged.some(lc => lc.id === pc.id)) {
+        merged.push(pc);
+      }
+    });
+
+    return merged.map(lc => {
+      const parentChan = channels.find(pc => pc.id === lc.id);
+      if (parentChan && parentChan.unread !== undefined) {
+        return { ...lc, unread: parentChan.unread };
+      }
+      return lc;
+    }).filter(c => !deletedIds.has(c.id));
+  }, [localChannels, channels, activeServer?.id, deletedIds]);
+
+  const serverChannels = displayChannels.filter(c => c.server_id === activeServer?.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   if (categories.length === 0 && activeServer) categories.push("Generale");
   
@@ -77,42 +115,80 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     e.preventDefault();
     if (!newChannelName.trim() || !activeServer) return;
 
+    // Aggiornamento ottimistico
+    const tempId = `temp-${Date.now()}`;
+    const newChannel: Channel = {
+      id: tempId,
+      server_id: activeServer.id,
+      name: newChannelName.trim().toLowerCase().replace(/\s+/g, '-'),
+      type: newChannelType,
+      category: selectedCategory,
+      created_at: new Date().toISOString()
+    };
+    
+    setLocalChannels(prev => [...prev, newChannel]);
+    setIsAddingChannel(false);
+    setNewChannelName("");
+
     try {
-      const { error } = await supabase.from('channels').insert({
+      const { data, error } = await supabase.from('channels').insert({
         server_id: activeServer.id,
-        name: newChannelName.trim().toLowerCase().replace(/\s+/g, '-'),
-        type: newChannelType,
-        category: selectedCategory
-      });
+        name: newChannel.name,
+        type: newChannel.type,
+        category: newChannel.category
+      }).select().single();
 
       if (error) {
         console.error("Errore creazione canale:", error);
         alert("Errore durante la creazione del canale: " + error.message);
+        setLocalChannels(prev => prev.filter(c => c.id !== tempId));
         return;
       }
       
-      setIsAddingChannel(false);
-      setNewChannelName("");
+      if (data) {
+        setLocalChannels(prev => prev.map(c => c.id === tempId ? data as Channel : c));
+      }
     } catch (error) {
       console.error("Errore aggiunta canale:", error);
     }
   };
 
-  const handleDeleteChannel = async (e: React.MouseEvent, channelId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, channel: Channel) => {
     e.stopPropagation();
-    if (confirm("Sei sicuro di voler eliminare questo canale? Questa azione è irreversibile.")) {
-      try {
-        setIsDeleting(channelId);
-        const { error } = await supabase.from('channels').delete().eq('id', channelId);
-        if (error) {
-          console.error("Errore eliminazione canale:", error);
-          alert("Errore durante l'eliminazione del canale");
-        }
-      } catch (error) {
+    setChannelToDelete(channel);
+  };
+
+  const confirmDeleteChannel = async () => {
+    if (!channelToDelete) return;
+    const id = channelToDelete.id;
+    setIsDeleting(id);
+    setChannelToDelete(null);
+
+    // Se stiamo eliminando il canale che stiamo guardando, spostiamoci su un altro
+    if (activeChannelId === id) {
+      const fallback = displayChannels.find(c => c.id !== id && c.type === 'text') || displayChannels.find(c => c.id !== id);
+      if (fallback) onChannelSelect(fallback);
+    }
+
+    // Aggiornamento ottimistico
+    setDeletedIds(prev => new Set(prev).add(id));
+
+    try {
+      const { error } = await supabase.from('channels').delete().eq('id', id);
+      if (error) {
         console.error("Errore eliminazione canale:", error);
-      } finally {
-        setIsDeleting(null);
+        alert("Errore durante l'eliminazione del canale");
+        // Annulla aggiornamento ottimistico in caso di errore
+        setDeletedIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
+    } catch (error) {
+      console.error("Errore eliminazione canale:", error);
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -198,7 +274,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           )}
                           {isOwner && (
                             <button
-                              onClick={(e) => handleDeleteChannel(e, channel.id)}
+                              onClick={(e) => handleDeleteClick(e, channel)}
                               className="opacity-0 group-hover:opacity-100 hover:text-[#f23f43] transition-all ml-1 p-0.5"
                               title="Elimina Canale"
                             >
@@ -313,6 +389,40 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modale Eliminazione Canale Renderizzato tramite Portal */}
+      {channelToDelete && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setChannelToDelete(null)}>
+          <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[#1e1f22]">
+              <h2 className="text-xl font-bold text-white">Elimina Canale</h2>
+            </div>
+            
+            <div className="p-4">
+              <p className="text-[#dbdee1] text-[15px]">
+                Sei sicuro di voler eliminare <strong>{channelToDelete.type === 'text' ? '#' : ''}{channelToDelete.name}</strong>? Questa azione non può essere annullata.
+              </p>
+            </div>
+
+            <div className="flex justify-end items-center bg-[#2b2d31] p-4">
+              <button 
+                type="button" 
+                onClick={() => setChannelToDelete(null)} 
+                className="text-white hover:underline text-sm px-6 py-2 mr-2"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={confirmDeleteChannel} 
+                className="bg-[#da373c] text-white rounded text-sm px-6 py-2 hover:bg-[#a12828] transition-colors"
+              >
+                Elimina Canale
+              </button>
+            </div>
           </div>
         </div>,
         document.body
