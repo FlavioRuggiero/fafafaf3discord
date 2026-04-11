@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Compass } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -636,11 +636,12 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           <button 
             onClick={() => onChannelSelect({ id: 'welcome', name: 'Home', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-[2px] transition-colors ${activeChannelId === 'welcome' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-0.5 transition-colors ${activeChannelId === 'welcome' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
           >
-            <Compass size={20} className="mr-3 flex-shrink-0" />
-            <span className="font-medium">Esplora</span>
+            <Home size={20} className="mr-3 flex-shrink-0" />
+            <span className="font-medium">Home</span>
           </button>
+          
           <button 
             onClick={() => onChannelSelect({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null })}
             className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'friends' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
