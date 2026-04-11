@@ -13,10 +13,10 @@ export default defineConfig(() => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       stream: "stream-browserify",
+      events: "events",
     },
   },
   define: {
     global: 'window',
-    'process.env': {},
   }
 }));
