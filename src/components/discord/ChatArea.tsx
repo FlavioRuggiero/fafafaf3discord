@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { Message, Channel, User } from "@/types/discord";
@@ -53,6 +53,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   
   const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
 
   // Stato per gli utenti connessi al canale vocale
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
@@ -824,6 +825,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
            >
              {localScreenStream ? <MonitorOff size={24} /> : <MonitorUp size={24} />}
            </button>
+
+           <button 
+             onClick={() => setShowActivitiesModal(true)}
+             className="w-14 h-14 rounded-full flex items-center justify-center bg-[#313338] hover:bg-[#23a559] text-[#dbdee1] hover:text-white transition-all duration-300"
+             title="Avvia un'attività"
+           >
+             <Rocket size={24} />
+           </button>
         </div>
       </div>
     );
@@ -1166,6 +1175,69 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               >
                 Elimina
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showActivitiesModal && (
+        <div 
+          className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4" 
+          onClick={(e) => e.target === e.currentTarget && setShowActivitiesModal(false)}
+        >
+          <div className="bg-[#313338] w-full max-w-[600px] rounded-lg shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 relative border-b border-[#1e1f22]">
+              <button 
+                onClick={() => setShowActivitiesModal(false)} 
+                className="absolute top-6 right-6 text-[#b5bac1] hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+              <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                <Rocket className="text-[#23a559]" /> Attività
+              </h2>
+              <p className="text-[#b5bac1]">Scegli un'attività per divertirti con i tuoi amici nel canale vocale.</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scrollbar max-h-[60vh] bg-[#2b2d31]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {[
+                  { id: 'yt', name: 'YouTube Together', desc: 'Guarda video', color: 'from-red-500 to-red-700', icon: '▶️' },
+                  { id: 'poker', name: 'Poker Night', desc: 'Texas Hold\'em', color: 'from-green-600 to-green-800', icon: '🃏' },
+                  { id: 'draw', name: 'Sketch Heads', desc: 'Disegna e indovina', color: 'from-blue-500 to-purple-600', icon: '🎨' },
+                  { id: 'chess', name: 'Scacchi nel Parco', desc: 'Metti alla prova la mente', color: 'from-gray-600 to-gray-800', icon: '♟️' },
+                  { id: 'golf', name: 'Putt Party', desc: 'Minigolf multigiocatore', color: 'from-yellow-500 to-orange-600', icon: '⛳' },
+                  { id: 'checkers', name: 'Dama', desc: 'Classico da tavolo', color: 'from-red-800 to-black', icon: '🔴' }
+                ].map(activity => (
+                  <div 
+                    key={activity.id} 
+                    onClick={() => {
+                      showError(`Avvio attività: ${activity.name} non ancora implementato nel server.`);
+                      setShowActivitiesModal(false);
+                    }}
+                    className="bg-[#1e1f22] rounded-xl overflow-hidden border border-[#1e1f22] hover:border-[#5865F2] hover:shadow-[0_0_15px_rgba(88,101,242,0.2)] transition-all cursor-pointer group flex flex-col"
+                  >
+                    <div className={`h-24 bg-gradient-to-br ${activity.color} flex items-center justify-center text-4xl relative overflow-hidden`}>
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                      <span className="relative z-10 transform group-hover:scale-110 transition-transform">{activity.icon}</span>
+                      
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                         <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center pl-1 shadow-lg">
+                           <Play size={20} fill="currentColor" />
+                         </div>
+                      </div>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h3 className="font-bold text-white text-sm truncate">{activity.name}</h3>
+                      <p className="text-[11px] text-[#b5bac1] mt-0.5 truncate">{activity.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="p-4 bg-[#2b2d31] flex justify-between items-center text-xs text-[#949ba4] mt-auto">
+               <span>Alcune attività richiedono un abbonamento.</span>
             </div>
           </div>
         </div>
