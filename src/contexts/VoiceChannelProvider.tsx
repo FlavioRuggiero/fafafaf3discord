@@ -304,9 +304,10 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     try {
       let stream: MediaStream | null = null;
+      let lastError: any = null;
       
-      // Se abbiamo un sourceId e ci troviamo in un ambiente compatibile con Electron
-      if (sourceId && navigator.userAgent.toLowerCase().indexOf(' electron/') > -1) {
+      // 1. API Electron/Desktop Nativa (se abbiamo una sourceId valida)
+      if (sourceId && !sourceId.startsWith('native-')) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: false,
@@ -318,17 +319,48 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
             } as any
           });
         } catch (e) {
-          console.warn("Desktop capturer fallito, fallback sul selettore standard", e);
+          console.warn("Desktop capturer fallito", e);
+          lastError = e;
         }
       }
       
-      // Fallback API standard
-      if (!stream) {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).catch(() => null);
+      // 2. API Web Standard (Web / PWA / WebView2 su Windows)
+      // Disabilitiamo l'audio nativo dello schermo per massimizzare la compatibilità (su Mac spesso blocca)
+      if (!stream && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({ 
+            video: true, 
+            audio: false 
+          });
+        } catch (e: any) {
+          console.warn("getDisplayMedia fallito", e);
+          lastError = e;
+        }
+      }
+
+      // 3. Fallback Estremo (Vecchi browser o implementazioni Desktop Chromium generiche)
+      if (!stream && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop'
+              }
+            } as any
+          });
+        } catch (e: any) {
+          console.warn("Ultimo fallback getUserMedia desktop fallito", e);
+          lastError = e;
+        }
       }
 
       if (!stream) {
-        // L'utente ha annullato o il browser non supporta l'API
+        // Ignora l'errore se l'utente ha semplicemente chiuso la finestra di selezione (NotAllowedError)
+        if (lastError && (lastError.name === 'NotAllowedError' || lastError.message?.includes('Permission denied'))) {
+          return;
+        }
+        showError("Il tuo dispositivo o applicazione non supporta la condivisione schermo o mancano i permessi.");
         return;
       }
       
@@ -340,16 +372,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       setLocalScreenStream(stream);
       
       peersRef.current.forEach(({ peer }) => {
-        try { peer.addStream(stream); } catch (e) { console.error(e) }
+        try { peer.addStream(stream!); } catch (e) { console.error(e) }
       });
     } catch (err: any) {
-      console.error("Errore condivisione schermo:", err);
-      if (err.name === 'NotAllowedError') {
-        showError("Permesso per condividere lo schermo negato.");
-      } else {
-        showError("Impossibile avviare la condivisione. Il tuo ambiente non supporta l'API.");
-      }
-      throw err;
+      console.error("Errore imprevisto condivisione schermo:", err);
+      showError("Si è verificato un errore durante l'avvio della condivisione.");
     }
   }, [currentUser, stopScreenShare]);
 
