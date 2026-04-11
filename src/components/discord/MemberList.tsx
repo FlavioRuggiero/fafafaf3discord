@@ -32,6 +32,9 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
     const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
+    const xpNeeded = (user.level || 1) * 5;
+    const currentXp = user.xp || 0;
+    const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
 
     return (
       <HoverCard.Root openDelay={250} closeDelay={150}>
@@ -110,17 +113,30 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
               )}
 
               {/* Statistiche Livello e Digitalcardus */}
-              <div className="flex items-center justify-around mt-3 bg-[#1e1f22] py-2 px-3 rounded-lg border border-[#2b2d31]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Livello</span>
-                  <span className="font-bold text-white">{user.level || 1}</span>
+              <div className="flex flex-col mt-3 bg-[#1e1f22] py-3 px-3 rounded-lg border border-[#2b2d31]">
+                <div className="flex items-center justify-around mb-3">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Livello</span>
+                    <span className="font-bold text-white">{user.level || 1}</span>
+                  </div>
+                  <div className="w-[1px] h-8 bg-[#2b2d31]"></div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Digitalcardus</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-white">{user.digitalcardus ?? 25}</span>
+                      <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 object-contain" />
+                    </div>
+                  </div>
                 </div>
-                <div className="w-[1px] h-8 bg-[#2b2d31]"></div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Digitalcardus</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-white">{user.digitalcardus ?? 25}</span>
-                    <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 object-contain" />
+                
+                {/* Barra XP */}
+                <div className="px-1 border-t border-[#2b2d31] pt-3">
+                  <div className="flex justify-between items-center text-[10px] text-[#b5bac1] uppercase tracking-wider mb-1.5 font-bold">
+                    <span>Progresso XP</span>
+                    <span className="text-white">{currentXp} / {xpNeeded}</span>
+                  </div>
+                  <div className="h-1.5 bg-[#111214] rounded-full overflow-hidden">
+                    <div className="h-full bg-brand transition-all duration-500 ease-out" style={{ width: `${xpPercent}%` }} />
                   </div>
                 </div>
               </div>

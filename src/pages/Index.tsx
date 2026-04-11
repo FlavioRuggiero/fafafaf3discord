@@ -59,7 +59,8 @@ const Index = () => {
       banner_color: p.banner_color || "#5865F2",
       banner_url: p.banner_url || undefined,
       level: p.level || 1,
-      digitalcardus: p.digitalcardus ?? 25
+      digitalcardus: p.digitalcardus ?? 25,
+      xp: p.xp || 0
     };
   });
 
@@ -88,7 +89,6 @@ const Index = () => {
         }
       });
 
-    // Funzione per forzare l'uscita dalla presence quando si chiude la pagina
     const handleBeforeUnload = () => {
       channel.untrack();
       supabase.removeChannel(channel);
@@ -103,12 +103,22 @@ const Index = () => {
     };
   }, [user]);
 
-  // Caricamento dati iniziali
+  // Caricamento dati iniziali e premi giornalieri
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
       await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
+      
+      // Controllo del premio giornaliero
+      const { data: rewardData } = await supabase.rpc('claim_daily_reward', { user_id_param: user.id });
+      
+      if (rewardData && rewardData.rewarded) {
+        showSuccess('Accesso giornaliero: +5 XP, +3 Digitalcardus!');
+        if (rewardData.leveled_up) {
+          setTimeout(() => showSuccess(`🎉 Sei salito al livello ${rewardData.new_level}!`), 1500);
+        }
+      }
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
@@ -125,7 +135,8 @@ const Index = () => {
         banner_color: profile?.banner_color || "#5865F2",
         banner_url: profile?.banner_url || undefined,
         level: profile?.level || 1,
-        digitalcardus: profile?.digitalcardus ?? 25
+        digitalcardus: profile?.digitalcardus ?? 25,
+        xp: profile?.xp || 0
       };
       
       setCurrentUser(loadedUser);

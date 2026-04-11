@@ -10,6 +10,7 @@ export type User = {
   banner_url?: string;
   level?: number;
   digitalcardus?: number;
+  xp?: number;
 };
 
 export type Server = {

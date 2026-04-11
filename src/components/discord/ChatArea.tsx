@@ -14,6 +14,9 @@ const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔"
 
 const ProfileHoverCard = ({ user, children }: { user: User, children: React.ReactNode }) => {
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
+  const xpNeeded = (user.level || 1) * 5;
+  const currentXp = user.xp || 0;
+  const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
   
   return (
     <HoverCard.Root openDelay={250} closeDelay={150}>
@@ -52,17 +55,30 @@ const ProfileHoverCard = ({ user, children }: { user: User, children: React.Reac
             </div>
 
             {/* Statistiche Livello e Digitalcardus */}
-            <div className="flex items-center justify-around mt-3 bg-[#1e1f22] py-2 px-3 rounded-lg border border-[#2b2d31]">
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Livello</span>
-                <span className="font-bold text-white">{user.level || 1}</span>
+            <div className="flex flex-col mt-3 bg-[#1e1f22] py-3 px-3 rounded-lg border border-[#2b2d31]">
+              <div className="flex items-center justify-around mb-3">
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Livello</span>
+                  <span className="font-bold text-white">{user.level || 1}</span>
+                </div>
+                <div className="w-[1px] h-8 bg-[#2b2d31]"></div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Digitalcardus</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-white">{user.digitalcardus ?? 25}</span>
+                    <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 object-contain" />
+                  </div>
+                </div>
               </div>
-              <div className="w-[1px] h-8 bg-[#2b2d31]"></div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Digitalcardus</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white">{user.digitalcardus ?? 25}</span>
-                  <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 object-contain" />
+              
+              {/* Barra XP */}
+              <div className="px-1 border-t border-[#2b2d31] pt-3">
+                <div className="flex justify-between items-center text-[10px] text-[#b5bac1] uppercase tracking-wider mb-1.5 font-bold">
+                  <span>Progresso XP</span>
+                  <span className="text-white">{currentXp} / {xpNeeded}</span>
+                </div>
+                <div className="h-1.5 bg-[#111214] rounded-full overflow-hidden">
+                  <div className="h-full bg-brand transition-all duration-500 ease-out" style={{ width: `${xpPercent}%` }} />
                 </div>
               </div>
             </div>
@@ -159,7 +175,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setCurrentUser(session.user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus')
+          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp')
           .eq('id', session.user.id)
           .single();
         setCurrentUserProfile(profile);
@@ -185,7 +201,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           created_at,
           updated_at,
           user_id,
-          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus)
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
@@ -198,7 +214,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             content,
             created_at,
             user_id,
-            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus)
+            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp)
           `)
           .eq('channel_id', channel.id)
           .order('created_at', { ascending: true });
@@ -234,6 +250,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               banner_url: m.profiles?.banner_url || undefined,
               level: m.profiles?.level || 1,
               digitalcardus: m.profiles?.digitalcardus ?? 25,
+              xp: m.profiles?.xp || 0,
               global_role: isVerified ? "CREATOR" : "USER",
               status: "online" as const
             }
@@ -282,7 +299,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp')
           .eq('id', payload.new.user_id)
           .single();
           
@@ -304,6 +321,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             banner_url: profileData?.banner_url || undefined,
             level: profileData?.level || 1,
             digitalcardus: profileData?.digitalcardus ?? 25,
+            xp: profileData?.xp || 0,
             global_role: isVerified ? "CREATOR" : "USER",
             status: "online"
           }
@@ -461,6 +479,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             banner_url: currentUserProfile?.banner_url || undefined,
             level: currentUserProfile?.level || 1,
             digitalcardus: currentUserProfile?.digitalcardus ?? 25,
+            xp: currentUserProfile?.xp || 0,
             global_role: isVerified ? "CREATOR" : "USER",
             status: "online"
           }
