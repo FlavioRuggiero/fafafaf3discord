@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { Message, Channel, User } from "@/types/discord";
@@ -23,6 +23,108 @@ const StreamPlayer = ({ stream, isLocal, className }: { stream: MediaStream; isL
     }
   }, [stream]);
   return <video ref={videoRef} autoPlay muted={isLocal} className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
+};
+
+// Componente modale per l'interfaccia di selezione schermo
+const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onClose: () => void, onSelect: (id?: string) => void }) => {
+  const [activeTab, setActiveTab] = useState<'screens' | 'apps'>('screens');
+  const [sources, setSources] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsLoading(true);
+
+    const loadSources = async () => {
+      // Tentativo di usare un'API nativa (es. in ambiente Electron protetto)
+      if ((window as any).electronAPI?.getDesktopSources) {
+        try {
+          const res = await (window as any).electronAPI.getDesktopSources();
+          setSources(res);
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        // Fallback per il Web - mockiamo l'interfaccia ma delegando l'API nativa del browser
+        setSources([
+          { id: 'native-screen', name: 'Schermo Completo', type: 'screen' },
+          { id: 'native-window', name: 'Finestra dell\'Applicazione', type: 'window' },
+          { id: 'native-tab', name: 'Scheda del Browser', type: 'window' }
+        ]);
+      }
+      setIsLoading(false);
+    };
+
+    loadSources();
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const currentSources = sources.filter(s => activeTab === 'screens' ? s.type === 'screen' : s.type === 'window');
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-[#313338] w-full max-w-[600px] rounded-lg shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-6 pb-4 relative border-b border-[#1e1f22]">
+          <button onClick={onClose} className="absolute top-6 right-6 text-[#b5bac1] hover:text-white transition-colors">
+            <X size={24} />
+          </button>
+          <h2 className="text-2xl font-bold text-white mb-4">Condividi lo schermo</h2>
+          <div className="flex gap-6 border-b border-[#1f2023]">
+            <button 
+              onClick={() => setActiveTab('screens')}
+              className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'screens' ? 'text-white border-brand' : 'text-[#b5bac1] border-transparent hover:text-[#dbdee1]'}`}
+            >
+              Schermi
+            </button>
+            <button 
+              onClick={() => setActiveTab('apps')}
+              className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'apps' ? 'text-white border-brand' : 'text-[#b5bac1] border-transparent hover:text-[#dbdee1]'}`}
+            >
+              Applicazioni
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 bg-[#2b2d31] min-h-[300px] overflow-y-auto custom-scrollbar flex-1">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-full mt-20">
+              <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {currentSources.map(source => (
+                <div 
+                  key={source.id}
+                  onClick={() => onSelect(source.id)}
+                  className="flex flex-col gap-2 cursor-pointer group"
+                >
+                  <div className="aspect-video bg-[#1e1f22] rounded-lg border-2 border-transparent group-hover:border-brand overflow-hidden flex items-center justify-center relative transition-colors">
+                    {source.thumbnail ? (
+                      <img src={source.thumbnail} alt={source.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Monitor size={32} className="text-[#4e5058] group-hover:text-brand transition-colors" />
+                    )}
+                    <div className="absolute inset-0 bg-brand/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </div>
+                  <span className="text-sm font-medium text-white truncate text-center px-1 group-hover:text-brand transition-colors">
+                    {source.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 bg-[#313338] border-t border-[#1e1f22] flex justify-between items-center text-xs text-[#949ba4]">
+          <span>Seleziona una sorgente per avviare la condivisione.</span>
+          {sources.some(s => s.id.startsWith('native-')) && (
+            <span className="italic text-[#f0b232]">Verrà usato il selettore del sistema.</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 interface ChatAreaProps {
@@ -55,6 +157,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [showScreenSelectModal, setShowScreenSelectModal] = useState(false);
   const [activeActivity, setActiveActivity] = useState<string | null>(null);
 
   // Stato per gli utenti connessi al canale vocale
@@ -65,7 +168,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     speakingStates, 
     localScreenStream, 
     remoteScreenStreams, 
-    toggleScreenShare 
+    startScreenShare,
+    stopScreenShare
   } = useVoiceChannel();
 
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
@@ -828,7 +932,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
         <div className="h-[72px] bg-[#1e1f22] border-t border-[#111214] flex items-center justify-center gap-4 flex-shrink-0 z-20">
            <button 
-             onClick={toggleScreenShare}
+             onClick={() => {
+               if (localScreenStream) {
+                 stopScreenShare();
+               } else {
+                 setShowScreenSelectModal(true);
+               }
+             }}
              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${localScreenStream ? 'bg-[#da373c] hover:bg-[#a12828] text-white shadow-[0_0_20px_rgba(218,55,60,0.3)]' : 'bg-[#313338] hover:bg-[#3f4147] text-[#dbdee1]'}`}
              title={localScreenStream ? "Interrompi condivisione" : "Condividi schermo"}
            >
@@ -843,6 +953,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
              <Rocket size={24} />
            </button>
         </div>
+
+        {showScreenSelectModal && (
+          <ScreenSelectionModal 
+            isOpen={showScreenSelectModal}
+            onClose={() => setShowScreenSelectModal(false)}
+            onSelect={(sourceId) => {
+              setShowScreenSelectModal(false);
+              startScreenShare(sourceId);
+            }}
+          />
+        )}
 
         {showActivitiesModal && (
           <div 

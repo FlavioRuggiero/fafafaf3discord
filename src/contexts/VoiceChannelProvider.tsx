@@ -29,7 +29,8 @@ interface VoiceChannelContextType {
   speakingStates: Record<string, boolean>;
   localScreenStream: MediaStream | null;
   remoteScreenStreams: Record<string, MediaStream>;
-  toggleScreenShare: () => Promise<void>;
+  startScreenShare: (sourceId?: string) => Promise<void>;
+  stopScreenShare: () => void;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -79,7 +80,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     activeServerIdRef.current = activeServerId;
   }, [activeVoiceChannelId, activeServerId]);
 
-  // Recupero il token di sessione in background per il fetch di disconnessione (keepalive)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       sessionTokenRef.current = data.session?.access_token || null;
@@ -277,56 +277,81 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
   }, [currentUser, isDeafened, isMuted]);
 
-  const toggleScreenShare = useCallback(async () => {
-    if (!currentUser) return;
-
-    if (localScreenStreamRef.current) {
-      localScreenStreamRef.current.getTracks().forEach(t => t.stop());
-      peersRef.current.forEach(({ peer }) => {
-        try { peer.removeStream(localScreenStreamRef.current!); } catch (e) { console.error(e) }
+  const stopScreenShare = useCallback(() => {
+    if (!currentUser || !localScreenStreamRef.current) return;
+    localScreenStreamRef.current.getTracks().forEach(t => t.stop());
+    peersRef.current.forEach(({ peer }) => {
+      try { peer.removeStream(localScreenStreamRef.current!); } catch (e) { console.error(e) }
+    });
+    localScreenStreamRef.current = null;
+    setLocalScreenStream(null);
+    
+    if (signalingChannelRef.current) {
+      signalingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'screen-stop',
+        payload: { userId: currentUser.id }
       });
-      localScreenStreamRef.current = null;
-      setLocalScreenStream(null);
-      
-      if (signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: 'broadcast',
-          event: 'screen-stop',
-          payload: { userId: currentUser.id }
-        });
-      }
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).catch(() => null);
-        if (!stream) return; 
-        
-        stream.getVideoTracks()[0].onended = () => {
-          peersRef.current.forEach(({ peer }) => {
-            try { peer.removeStream(stream); } catch (e) { console.error(e) }
-          });
-          localScreenStreamRef.current = null;
-          setLocalScreenStream(null);
-          
-          if (signalingChannelRef.current && currentUser) {
-            signalingChannelRef.current.send({
-              type: 'broadcast',
-              event: 'screen-stop',
-              payload: { userId: currentUser.id }
-            });
-          }
-        };
-        
-        localScreenStreamRef.current = stream;
-        setLocalScreenStream(stream);
-        
-        peersRef.current.forEach(({ peer }) => {
-          try { peer.addStream(stream); } catch (e) { console.error(e) }
-        });
-      } catch (err) {
-        console.error("Errore condivisione schermo:", err);
-      }
     }
   }, [currentUser]);
+
+  const startScreenShare = useCallback(async (sourceId?: string) => {
+    if (!currentUser) return;
+    
+    if (localScreenStreamRef.current) {
+      stopScreenShare();
+    }
+
+    try {
+      let stream: MediaStream | null = null;
+      
+      // Se abbiamo un sourceId e ci troviamo in un ambiente compatibile con Electron
+      if (sourceId && navigator.userAgent.toLowerCase().indexOf(' electron/') > -1) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceId
+              }
+            } as any
+          });
+        } catch (e) {
+          console.warn("Desktop capturer fallito, fallback sul selettore standard", e);
+        }
+      }
+      
+      // Fallback API standard
+      if (!stream) {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).catch(() => null);
+      }
+
+      if (!stream) {
+        // L'utente ha annullato o il browser non supporta l'API
+        return;
+      }
+      
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+      
+      localScreenStreamRef.current = stream;
+      setLocalScreenStream(stream);
+      
+      peersRef.current.forEach(({ peer }) => {
+        try { peer.addStream(stream); } catch (e) { console.error(e) }
+      });
+    } catch (err: any) {
+      console.error("Errore condivisione schermo:", err);
+      if (err.name === 'NotAllowedError') {
+        showError("Permesso per condividere lo schermo negato.");
+      } else {
+        showError("Impossibile avviare la condivisione. Il tuo ambiente non supporta l'API.");
+      }
+      throw err;
+    }
+  }, [currentUser, stopScreenShare]);
 
   const removePeer = (userId: string) => {
     const audioEl = document.querySelector(`audio[data-user-id="${userId}"]`);
@@ -357,7 +382,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     const peer = new Peer({ initiator, trickle: true, stream });
 
-    // Se stiamo già condividendo lo schermo, inviamolo immediatamente
     if (localScreenStreamRef.current) {
       peer.addStream(localScreenStreamRef.current);
     }
@@ -440,7 +464,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     
     playSound('/exit.mp3');
 
-    // Interrompi lo screen sharing se attivo
     if (localScreenStreamRef.current) {
       localScreenStreamRef.current.getTracks().forEach(t => t.stop());
       localScreenStreamRef.current = null;
@@ -603,7 +626,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     signalingChannelRef.current = channel;
   }, [currentUser, createPeer, leaveVoiceChannel, requestMicrophone, isMuted, isDeafened]);
 
-  // Gestione robusta della chiusura del tab/finestra (Keepalive)
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (activeVoiceChannelIdRef.current && activeServerIdRef.current && currentUser && sessionTokenRef.current) {
@@ -642,7 +664,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     speakingStates,
     localScreenStream,
     remoteScreenStreams,
-    toggleScreenShare,
+    startScreenShare,
+    stopScreenShare,
   };
 
   return (
