@@ -255,9 +255,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
-    // Supabase di default non invia la riga completa quando elimini un record (invia solo l'ID).
-    // Questo significa che se filtriamo le notifiche per `channel_id`, le eliminazioni vengono bloccate!
-    // Soluzione: Ascoltiamo le eliminazioni di TUTTI i messaggi globalmente, e filtriamo internamente lo stato.
+    // Gestione separata degli eventi in tempo reale
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', { 
@@ -311,7 +309,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setRealMessages(prev => prev.map(m => m.id === payload.new.id ? { 
           ...m, 
           content: payload.new.content,
-          updatedAt: payload.new.updated_at
+          updatedAt: payload.new.updated_at 
         } : m));
       })
       .on('postgres_changes', { 
@@ -319,7 +317,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         schema: 'public',
         table: 'messages'
       }, (payload) => {
-        // Nessun filtro channel_id per i DELETE per garantire l'arrivo della notifica
+        // Nessun filtro channel_id per i DELETE, così da garantire la ricezione del payload
         setRealMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (payload) => {
@@ -521,9 +519,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
 
     const now = new Date().toISOString();
+    
+    // Aggiornamento ottimistico dell'UI
     setRealMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent, updatedAt: now } : m));
     setEditingMessageId(null);
 
+    // Aggiornamento su Supabase
     const { error } = await supabase.from('messages').update({ content: finalContent, updated_at: now }).eq('id', msgId);
     if (error) {
       console.error("Errore salvataggio modifica:", error);
