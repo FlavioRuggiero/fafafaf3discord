@@ -57,6 +57,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const activeServerIdRef = useRef(activeServerId);
   const wasMutedBeforeDeafen = useRef(false);
 
+  const isMutedRef = useRef(isMuted);
+  const isDeafenedRef = useRef(isDeafened);
+  useEffect(() => { isMutedRef.current = isMuted }, [isMuted]);
+  useEffect(() => { isDeafenedRef.current = isDeafened }, [isDeafened]);
+
   useEffect(() => {
     activeVoiceChannelIdRef.current = activeVoiceChannelId;
     activeServerIdRef.current = activeServerId;
@@ -304,6 +309,17 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     channel.on('presence', { event: 'join' }, ({ key }) => {
       if (key !== currentUser?.id) {
         playSound('/enter.mp3');
+        // When someone else joins, I send them my current state.
+        if (currentUser) {
+          channel.send({
+            type: 'broadcast',
+            event: 'state-update',
+            payload: {
+              userId: currentUser.id,
+              state: { isMuted: isMutedRef.current, isDeafened: isDeafenedRef.current },
+            },
+          });
+        }
       }
     });
     
