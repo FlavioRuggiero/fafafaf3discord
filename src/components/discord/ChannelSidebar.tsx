@@ -188,7 +188,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(memberSub);
     };
-  }, [activeServer?.id, currentUser?.id]);
+  }, [activeServer?.id, currentUser?.id, activeVoiceChannelId]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
