@@ -40,3 +40,26 @@ export type Message = {
   content: string;
   timestamp: string;
 };
+
+export type Profile = {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  updated_at?: string | null;
+  bio?: string | null;
+  digitalcardus?: number | null;
+  banner_color?: string | null;
+  banner_url?: string | null;
+  level?: number | null;
+  xp?: number | null;
+  last_reward_date?: string | null;
+};
+
+export type ServerMember = {
+  server_id: string;
+  user_id: string;
+  joined_at?: string;
+  position?: number;
+  voice_channel_id?: string | null;
+};
