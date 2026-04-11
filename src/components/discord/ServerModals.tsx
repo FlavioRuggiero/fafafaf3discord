@@ -214,7 +214,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                   ) : (
                     <>
                       <Upload size={24} className="mb-1" />
-                      <div className="font-bold text-[10px] uppercase">Upload</div>
+                      <div className="font-bold text-[10px] uppercase text-center leading-tight">Upload<br/>(IMG/GIF)</div>
                     </>
                   )}
                 </div>
@@ -466,7 +466,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                 ) : (
                   <>
                     <Upload size={24} className="mb-1" />
-                    <div className="font-bold text-[10px] uppercase">Upload</div>
+                    <div className="font-bold text-[10px] uppercase text-center leading-tight">Upload<br/>(IMG/GIF)</div>
                   </>
                 )}
               </div>
