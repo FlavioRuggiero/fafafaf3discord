@@ -56,7 +56,11 @@ const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElemen
 
 const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void, serverId?: string, audioUrl?: string }) => {
   const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [staticImage, setStaticImage] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const isGif = image?.toLowerCase().includes('.gif');
 
   // Recupera il numero di membri per il server specificato
   useEffect(() => {
@@ -72,11 +76,35 @@ const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }
     }
   }, [serverId]);
 
+  // Se è una GIF, crea un frame statico usando il canvas
+  useEffect(() => {
+    if (isGif && image) {
+      const img = new Image();
+      img.crossOrigin = "anonymous"; // Necessario per non incappare in errori CORS con il canvas
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            setStaticImage(canvas.toDataURL("image/png"));
+          }
+        } catch (e) {
+          console.warn("Impossibile generare il frame statico della GIF:", e);
+        }
+      };
+      img.src = image;
+    }
+  }, [image, isGif]);
+
   const subtext = serverId && serverId !== 'home' && memberCount !== null 
     ? `${memberCount} ${memberCount === 1 ? 'membro' : 'membri'}` 
     : undefined;
 
   const handleMouseEnter = () => {
+    setIsHovered(true);
     if (audioUrl && audioRef.current) {
       audioRef.current.volume = 0.5; // Dimezza il volume
       audioRef.current.currentTime = 0;
@@ -85,11 +113,17 @@ const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }
   };
 
   const handleMouseLeave = () => {
+    setIsHovered(false);
     if (audioUrl && audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
   };
+
+  // Determina quale immagine mostrare:
+  // Se è una GIF e NON siamo in hover e abbiamo generato l'immagine statica, mostra l'immagine statica.
+  // Altrimenti mostra l'immagine originale (che sarà animata nel caso delle GIF)
+  const displayImage = (isGif && !isHovered && staticImage) ? staticImage : image;
 
   return (
     <HoverTooltip text={name} subtext={subtext}>
@@ -104,7 +138,7 @@ const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }
         
         <div className={`w-12 h-12 flex items-center justify-center overflow-hidden transition-all duration-300 ${active ? 'rounded-2xl bg-brand' : 'rounded-[24px] group-hover:rounded-2xl bg-[#313338] group-hover:bg-brand text-[#dbdee1] group-hover:text-white'}`}>
           {image ? (
-            <img src={image} alt={name || "Server"} className="w-full h-full object-cover" />
+            <img src={displayImage} alt={name || "Server"} className="w-full h-full object-cover" />
           ) : (
             <span className="font-medium text-lg">{name?.substring(0, 2).toUpperCase()}</span>
           )}
