@@ -412,13 +412,12 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const handleVoiceChannelSelect = (channel: Channel) => {
     if (!currentUser || !activeServer) return;
 
-    if (activeVoiceChannelId === channel.id) {
-      playTone(440, 200);
-      leaveVoiceChannel();
-    } else {
+    // Se si clicca su un canale vocale diverso da quello attivo, entra
+    if (activeVoiceChannelId !== channel.id) {
       playTone(880, 150);
       joinVoiceChannel(channel.id, activeServer.id);
     }
+    // Se si clicca sullo stesso canale vocale, non fare nulla per evitare la disconnessione
   };
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
@@ -740,10 +739,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               {localChannels.find(c => c.id === activeVoiceChannelId)?.name}
             </span>
             <button 
-              onClick={() => {
-                const voiceChannel = localChannels.find(c => c.id === activeVoiceChannelId);
-                if (voiceChannel) handleVoiceChannelSelect(voiceChannel);
-              }}
+              onClick={() => leaveVoiceChannel()}
               className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
               title="Disconnetti"
             >
