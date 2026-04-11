@@ -86,7 +86,17 @@ const Index = () => {
         }
       });
 
+    // Funzione per forzare l'uscita dalla presence quando si chiude la pagina
+    const handleBeforeUnload = () => {
+      channel.untrack();
+      supabase.removeChannel(channel);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      channel.untrack();
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -452,6 +462,8 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
+    // Rimuoviamo l'utente dalla presence prima del logout
+    supabase.channel('global_presence').untrack();
     await supabase.auth.signOut();
   };
 
