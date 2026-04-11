@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2 } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet } from "lucide-react";
 import { Channel, Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -27,6 +27,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice' | 'minigame'>('text');
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
+
+  // Stato per la creazione di una categoria
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -50,30 +54,27 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   }, [activeServer?.id]);
 
-  // Sottoscrizione realtime globale senza filtri server per assicurare la ricezione
+  // Sottoscrizione realtime globale
   useEffect(() => {
     if (!activeServer?.id) return;
 
     let mounted = true;
 
-    // Caricamento iniziale sicuro dal DB
     const loadChannels = async () => {
       const { data, error } = await supabase.from('channels').select('*').eq('server_id', activeServer.id);
       if (data && mounted) {
         setLocalChannels(data as Channel[]);
-        setDeletedIds(new Set()); // Reset dei canali eliminati al ricaricamento
+        setDeletedIds(new Set());
       }
     };
     loadChannels();
 
-    // Sottoscrizione a TUTTI gli eventi dei canali e filtraggio locale (molto più affidabile)
     const channelSub = supabase.channel(`public:channels:${activeServer.id}-${Date.now()}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'channels'
       }, (payload) => {
-        
         if (payload.eventType === 'INSERT') {
           if (payload.new.server_id === activeServer.id) {
             setLocalChannels(prev => {
@@ -84,7 +85,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         } 
         else if (payload.eventType === 'DELETE') {
           setDeletedIds(prev => new Set(prev).add(payload.old.id));
-          // Rimuovi anche localmente in modo diretto
           setLocalChannels(prev => prev.filter(c => c.id !== payload.old.id));
         } 
         else if (payload.eventType === 'UPDATE') {
@@ -101,11 +101,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
-  // Unisce i canali locali in tempo reale con lo stato "unread" delle props
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
-    
-    // Aggiunge eventuali canali dalle props che non abbiamo in locale
     channels.forEach(pc => {
       if (pc.server_id === activeServer?.id && !merged.some(lc => lc.id === pc.id)) {
         merged.push(pc);
@@ -135,7 +132,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       } else {
         next.add(category);
       }
-      // Salva nel localStorage
       if (activeServer?.id) {
         localStorage.setItem(`collapsed-categories-${activeServer.id}`, JSON.stringify(Array.from(next)));
       }
@@ -151,11 +147,22 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setIsAddingChannel(true);
   };
 
+  const handleCreateCategorySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    
+    // Imposta la nuova categoria e apri subito il modale per creare il primo canale
+    setSelectedCategory(newCategoryName.trim());
+    setNewChannelName("");
+    setNewChannelType('text');
+    setIsAddingCategory(false);
+    setIsAddingChannel(true);
+  };
+
   const handleAddChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChannelName.trim() || !activeServer) return;
 
-    // Aggiornamento ottimistico
     const tempId = `temp-${Date.now()}`;
     const newChannel: Channel = {
       id: tempId,
@@ -170,7 +177,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setIsAddingChannel(false);
     setNewChannelName("");
     
-    // Se la categoria era chiusa, aprila per far vedere il nuovo canale
     if (collapsedCategories.has(selectedCategory)) {
       toggleCategory(selectedCategory);
     }
@@ -205,13 +211,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setIsDeleting(id);
     setChannelToDelete(null);
 
-    // Se stiamo eliminando il canale che stiamo guardando, spostiamoci su un altro
     if (activeChannelId === id) {
       const fallback = displayChannels.find(c => c.id !== id && c.type === 'text') || displayChannels.find(c => c.id !== id);
       if (fallback) onChannelSelect(fallback);
     }
 
-    // Aggiornamento ottimistico
     setDeletedIds(prev => new Set(prev).add(id));
     setLocalChannels(prev => prev.filter(c => c.id !== id));
 
@@ -219,8 +223,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       const { error } = await supabase.from('channels').delete().eq('id', id);
       if (error) {
         console.error("Errore eliminazione canale:", error);
-        showError("Impossibile eliminare. Assicurati di aver eseguito lo script SQL 'fix_channels_rls.sql' su Supabase.");
-        // Annulla aggiornamento ottimistico in caso di errore
+        showError("Impossibile eliminare.");
         setDeletedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
@@ -246,7 +249,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       return;
     }
 
-    // Aggiornamento ottimistico
     setLocalChannels(prev => prev.map(c => c.id === channelToEdit.id ? { ...c, name: newName } : c));
     const channelId = channelToEdit.id;
     setChannelToEdit(null);
@@ -266,6 +268,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   if (!activeServer) return null;
 
+  // Variabili sicure per il profilo utente (fallback se mancano nel type)
+  const userLevel = (currentUser as any)?.level || 1;
+  const userXp = (currentUser as any)?.xp || 0;
+  const userXpNeeded = userLevel * 5;
+  const userDigitalcardus = (currentUser as any)?.digitalcardus ?? 25;
+  const xpPercentage = Math.min(100, (userXp / userXpNeeded) * 100);
+
   return (
     <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative h-full">
       <div 
@@ -274,15 +283,24 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         <h1 className="font-semibold text-white truncate pr-2">{activeServer.name}</h1>
         <div className="flex items-center flex-shrink-0">
           {isOwner ? (
-            onOpenSettings && (
+            <>
               <button 
-                onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+                onClick={(e) => { e.stopPropagation(); setIsAddingCategory(true); setNewCategoryName(""); }}
                 className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
-                title="Impostazioni Server"
+                title="Crea Categoria"
               >
-                <Settings size={16} />
+                <FolderPlus size={16} />
               </button>
-            )
+              {onOpenSettings && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+                  className="p-1 text-[#dbdee1] hover:text-white transition-opacity ml-1"
+                  title="Impostazioni Server"
+                >
+                  <Settings size={16} />
+                </button>
+              )}
+            </>
           ) : (
             onLeaveServer && (
               <button 
@@ -331,7 +349,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   <div className="space-y-[2px]">
                     {categoryChannels.map(channel => {
                       const isActive = channel.id === activeChannelId;
-                      // Selezione dinamica dell'icona
                       const Icon = channel.type === 'text' ? Hash : channel.type === 'voice' ? Volume2 : Gamepad2;
                       const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
                       
@@ -397,8 +414,31 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         )}
       </div>
 
-      <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0">
-        <div className="flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1">
+      {/* Area Utente con Tooltip Profilo */}
+      <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
+        <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
+          
+          {/* Tooltip Livello e Soldi (Appare in hover) */}
+          <div className="absolute bottom-[110%] left-0 w-56 bg-[#111214] border border-[#1e1f22] rounded-lg shadow-xl p-3 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-[100] translate-y-1 group-hover/profile:translate-y-0 pointer-events-none">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-bold text-sm">Livello {userLevel}</span>
+              <span className="text-[#b5bac1] text-xs font-medium">
+                {userXp} / {userXpNeeded} XP
+              </span>
+            </div>
+            <div className="w-full bg-[#2b2d31] h-2.5 rounded-full overflow-hidden mb-3">
+              <div 
+                className="bg-gradient-to-r from-[#5865f2] to-[#eb459e] h-full rounded-full transition-all duration-500" 
+                style={{ width: `${xpPercentage}%` }} 
+              />
+            </div>
+            <div className="flex items-center text-[#23a559] text-sm font-bold bg-[#1e1f22] p-2 rounded-md">
+              <Wallet size={16} className="mr-2" />
+              {userDigitalcardus} Digitalcardus
+            </div>
+            <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#111214] border-b border-r border-[#1e1f22] rotate-45"></div>
+          </div>
+
           <div className="relative">
             <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22]" />
             <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
@@ -419,6 +459,52 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           )}
         </div>
       </div>
+
+      {/* Modale Creazione Categoria */}
+      {isAddingCategory && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setIsAddingCategory(false)}>
+          <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[#1e1f22]">
+              <h2 className="text-xl font-bold text-white">Crea Categoria</h2>
+              <p className="text-sm text-[#b5bac1] mt-1">Le categorie ti aiutano a organizzare i canali.</p>
+            </div>
+            
+            <form onSubmit={handleCreateCategorySubmit} className="flex flex-col">
+              <div className="p-4">
+                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome Categoria</label>
+                <div className="relative flex items-center bg-[#1e1f22] rounded overflow-hidden p-1">
+                  <input 
+                    type="text" 
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="NUOVA CATEGORIA"
+                    className="w-full bg-transparent text-white p-2 focus:outline-none placeholder-[#878a91] uppercase"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end items-center bg-[#2b2d31] p-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddingCategory(false)} 
+                  className="text-white hover:underline text-sm px-6 py-2 mr-2"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!newCategoryName.trim()} 
+                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Avanti
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Modale Creazione Canale */}
       {isAddingChannel && typeof document !== 'undefined' && createPortal(
