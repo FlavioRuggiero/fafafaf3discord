@@ -147,7 +147,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         } else if (payload.eventType === 'UPDATE') {
           setMembers(prev => prev.map(m => {
             if (m.user_id === payload.new.user_id) {
-              return { ...m, ...payload.new };
+              return { 
+                ...m, 
+                voice_channel_id: payload.new.voice_channel_id 
+              };
             }
             return m;
           }));
@@ -693,10 +696,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               {connectedMembers.map(member => (
                                 <div key={member.user_id} className="flex items-center group/member">
                                   <div className="relative">
-                                    <img src={member.profiles.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
+                                    <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
                                     <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
                                   </div>
-                                  <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles.first_name}</span>
+                                  <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>
                                 </div>
                               ))}
                             </div>
