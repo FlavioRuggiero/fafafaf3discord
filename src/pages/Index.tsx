@@ -6,13 +6,15 @@ import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { INITIAL_MESSAGES } from "@/data/mockData";
-import { Message, User, Server, Channel } from "@/types/discord";
+import { Message, User, Server, Channel, Profile, ServerMember } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { Menu, Home, MessageSquare, Compass, Plus } from "lucide-react";
 import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
+
+type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
 const Index = () => {
   const { user } = useAuth();
@@ -32,7 +34,7 @@ const Index = () => {
   
   // State per gestire la Presence in tempo reale e i profili
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-  const [serverProfiles, setServerProfiles] = useState<any[]>([]);
+  const [serverMembers, setServerMembers] = useState<ServerMemberWithProfile[]>([]);
 
   // States per UI
   const [showMembers, setShowMembers] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -46,23 +48,23 @@ const Index = () => {
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
   // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
-  const serverMembersList: User[] = serverProfiles.map(p => {
-    const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
-    const name = p.first_name || "Utente";
+  const serverMembersList: User[] = serverMembers.map(p => {
+    const isOnline = onlineUserIds.has(p.user_id) || p.user_id === currentUser?.id;
+    const name = p.profiles?.first_name || "Utente";
     const isVerifiedUser = name.toLowerCase() === 'faf3tto';
 
     return {
-      id: p.id,
+      id: p.user_id,
       name: name,
-      avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+      avatar: p.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.user_id}`,
       status: isOnline ? "online" : "offline",
       global_role: isVerifiedUser ? "CREATOR" : "USER",
-      bio: p.bio || "",
-      banner_color: p.banner_color || "#5865F2",
-      banner_url: p.banner_url || undefined,
-      level: p.level || 1,
-      digitalcardus: p.digitalcardus ?? 25,
-      xp: p.xp || 0
+      bio: p.profiles?.bio || "",
+      banner_color: p.profiles?.banner_color || "#5865F2",
+      banner_url: p.profiles?.banner_url || undefined,
+      level: p.profiles?.level || 1,
+      digitalcardus: p.profiles?.digitalcardus ?? 25,
+      xp: p.profiles?.xp || 0
     };
   });
 
@@ -110,9 +112,9 @@ const Index = () => {
     const profileSubscription = supabase
       .channel('public:profiles_index')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
-        const updatedProfile = payload.new;
+        const updatedProfile = payload.new as Profile;
 
-        setServerProfiles(prev => prev.map(p => p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p));
+        setServerMembers(prev => prev.map(m => m.user_id === updatedProfile.id ? { ...m, profiles: updatedProfile } : m));
 
         setCurrentUser(prev => {
           if (!prev || prev.id !== updatedProfile.id) return prev;
@@ -205,33 +207,70 @@ const Index = () => {
     loadInitialData();
   }, [user]);
 
+  // Gestione Membri Server per Chat Vocali e Stato
   useEffect(() => {
-    const fetchServerMembers = async () => {
-      if (!activeServerId || activeServerId === 'home') {
-        setServerProfiles([]);
+    if (!activeServerId || activeServerId === 'home') {
+      setServerMembers([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchInitialMembers = async () => {
+      const { data: membersData, error: membersError } = await supabase
+        .from('server_members')
+        .select('*, profiles(*)')
+        .eq('server_id', activeServerId);
+      
+      if (membersError) {
+        console.error("Error fetching server members:", membersError);
+        if (isMounted) setServerMembers([]);
         return;
       }
       
-      const { data: membersData } = await supabase
-        .from('server_members')
-        .select('user_id')
-        .eq('server_id', activeServerId);
-        
-      if (membersData && membersData.length > 0) {
-        const userIds = membersData.map(m => m.user_id);
-        
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
-          
-        if (profilesData) {
-          setServerProfiles(profilesData);
-        }
+      if (isMounted && membersData) {
+        setServerMembers(membersData as ServerMemberWithProfile[]);
       }
     };
 
-    fetchServerMembers();
+    fetchInitialMembers();
+
+    const memberSub = supabase.channel(`realtime:server_members:${activeServerId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'server_members',
+        filter: `server_id=eq.${activeServerId}`
+      }, async (payload) => {
+        if (!isMounted) return;
+
+        if (payload.eventType === 'UPDATE') {
+          const updatedMember = payload.new as ServerMember;
+          setServerMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
+        } else if (payload.eventType === 'INSERT') {
+          const newMember = payload.new as ServerMember;
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', newMember.user_id)
+            .single();
+          if (isMounted) {
+            setServerMembers(prev => {
+              if (prev.some(m => m.user_id === newMember.user_id)) return prev;
+              return [...prev, { ...newMember, profiles: profileData || null }];
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const deletedMember = payload.old as { user_id: string };
+          setServerMembers(prev => prev.filter(m => m.user_id !== deletedMember.user_id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(memberSub);
+    };
   }, [activeServerId]);
 
   useEffect(() => {
@@ -580,6 +619,7 @@ const Index = () => {
             onOpenSettings={() => setShowSettingsModal(true)}
             onLeaveServer={() => handleLeaveServer(activeServer!.id)}
             onOpenUserSettings={() => setShowUserSettingsModal(true)}
+            members={serverMembers}
           />
         </div>
 
