@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Search, Plus } from "lucide-react";
 import { ServerSidebar } from "@/components/discord/ServerSidebar";
 import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
 import { ChatArea } from "@/components/discord/ChatArea";
@@ -298,7 +297,7 @@ const Index = () => {
     } else {
       setActiveChannel(current => {
         if (current?.type === 'dm' || current?.id === 'friends') return current;
-        return { id: 'welcome', name: 'Home', type: 'text', category: '', server_id: null };
+        return { id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null };
       });
     }
   }, [activeServerId, allChannels]);
@@ -723,35 +722,7 @@ const Index = () => {
             </div>
           </>
         ) : activeServerId === 'home' ? (
-          activeChannel?.id === 'welcome' ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#313338] text-center">
-              <div className="w-24 h-24 bg-[#5865F2] rounded-full flex items-center justify-center mb-6 shadow-lg">
-                <Compass size={48} className="text-white" />
-              </div>
-              <h1 className="text-4xl font-bold text-white mb-4">Benvenuto su DyadCord!</h1>
-              <p className="text-[#b5bac1] text-lg max-w-md mb-8">
-                Inizia esplorando i server pubblici o creane uno nuovo per te e i tuoi amici.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button 
-                  onClick={handleOpenDiscover}
-                  className="flex items-center justify-center bg-[#5865F2] hover:bg-[#4752C4] text-white px-6 py-3 rounded text-lg font-medium transition-colors shadow-md"
-                >
-                  <Search className="mr-2" size={20} />
-                  Esplora Server
-                </button>
-                {(currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR') && (
-                  <button 
-                    onClick={() => setShowCreateModal(true)}
-                    className="flex items-center justify-center bg-[#2b2d31] hover:bg-[#35373c] text-white border border-[#1e1f22] px-6 py-3 rounded text-lg font-medium transition-colors shadow-md"
-                  >
-                    <Plus className="mr-2" size={20} />
-                    Crea Server
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : activeChannel?.id === 'friends' ? (
+          activeChannel?.id === 'friends' ? (
             <FriendsArea 
               currentUser={currentUser} 
               onStartDM={handleStartDM} 
