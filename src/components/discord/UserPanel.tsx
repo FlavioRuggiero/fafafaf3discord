@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React from "react";
 import { Mic, MicOff, Headphones, Settings } from "lucide-react";
 import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
@@ -11,29 +11,7 @@ interface UserPanelProps {
 }
 
 export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) => {
-  const { isMuted, toggleMute } = useVoiceChannel();
-  const [isDeafened, setIsDeafened] = useState(false);
-  const wasMutedBeforeDeafen = useRef(false);
-
-  const handleToggleMute = () => {
-    toggleMute();
-  };
-
-  const toggleDeafen = () => {
-    const newDeafenState = !isDeafened;
-    setIsDeafened(newDeafenState);
-
-    if (newDeafenState) { // becoming deafened
-      wasMutedBeforeDeafen.current = isMuted;
-      if (!isMuted) {
-        toggleMute();
-      }
-    } else { // becoming un-deafened
-      if (!wasMutedBeforeDeafen.current && isMuted) {
-        toggleMute();
-      }
-    }
-  };
+  const { isMuted, toggleMute, isDeafened, toggleDeafen } = useVoiceChannel();
 
   const userLevel = (currentUser as any)?.level || 1;
   const userXp = (currentUser as any)?.xp || 0;
@@ -77,7 +55,7 @@ export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) =
       
       <div className="flex items-center text-[#dbdee1] flex-shrink-0">
         <button 
-          onClick={handleToggleMute} 
+          onClick={toggleMute} 
           disabled={isDeafened} 
           className="p-1.5 hover:bg-[#3f4147] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={isDeafened ? "Devi togliere la modalità 'non sentire' per usare il microfono" : (isMuted ? "Riattiva microfono" : "Disattiva microfono")}

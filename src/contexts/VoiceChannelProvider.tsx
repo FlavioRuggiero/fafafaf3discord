@@ -12,12 +12,20 @@ interface PeerData {
   userId: string;
 }
 
+interface VoiceState {
+  isMuted: boolean;
+  isDeafened: boolean;
+}
+
 interface VoiceChannelContextType {
   joinVoiceChannel: (channelId: string, serverId: string) => void;
   leaveVoiceChannel: () => void;
   isMuted: boolean;
+  isDeafened: boolean;
   toggleMute: () => void;
+  toggleDeafen: () => void;
   activeVoiceChannelId: string | null;
+  memberStates: Record<string, Partial<VoiceState>>;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -39,12 +47,15 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [isDeafened, setIsDeafened] = useState(false);
+  const [memberStates, setMemberStates] = useState<Record<string, Partial<VoiceState>>>({});
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<PeerData[]>([]);
   const signalingChannelRef = useRef<any>(null);
   const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
   const activeServerIdRef = useRef(activeServerId);
+  const wasMutedBeforeDeafen = useRef(false);
 
   useEffect(() => {
     activeVoiceChannelIdRef.current = activeVoiceChannelId;
@@ -56,17 +67,25 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
       localStreamRef.current = stream;
       
-      setIsMuted(false);
-      if (playSounds) playSound('/unmute.mp3');
+      const muted = !stream.getAudioTracks()[0].enabled;
+      setIsMuted(muted);
+      if (currentUser) {
+        setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: muted } }));
+      }
+
+      if (!muted && playSounds) playSound('/unmute.mp3');
       
       return stream;
     } catch (err) {
       console.error('Failed to get user media', err);
       showError("Accesso al microfono negato. Controlla le impostazioni del browser.");
       setIsMuted(true);
+      if (currentUser) {
+        setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
+      }
       return null;
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     const initializeMedia = async () => {
@@ -75,6 +94,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
           const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
           if (permissionStatus.state === 'granted') {
             await requestMicrophone(false);
+          } else {
+            setIsMuted(true);
+            if (currentUser) {
+              setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
+            }
           }
         } catch (e) {
           console.warn("Permission query for microphone not supported.", e);
@@ -86,31 +110,79 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     return () => {
       localStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, [requestMicrophone]);
+  }, [requestMicrophone, currentUser]);
 
   const toggleMute = useCallback(async () => {
+    if (!currentUser) return;
     let stream = localStreamRef.current;
 
     if (!stream) {
-      await requestMicrophone();
+      stream = await requestMicrophone();
+      if (!stream) return;
       return;
     }
 
     const audioTracks = stream.getAudioTracks();
     if (audioTracks.length > 0) {
       const isCurrentlyEnabled = audioTracks[0].enabled;
-      audioTracks.forEach(track => {
-        track.enabled = !isCurrentlyEnabled;
-      });
-      setIsMuted(isCurrentlyEnabled);
+      audioTracks[0].enabled = !isCurrentlyEnabled;
+      const newMutedState = isCurrentlyEnabled;
+      setIsMuted(newMutedState);
       
-      if (isCurrentlyEnabled) {
-        playSound('/mute.mp3');
-      } else {
-        playSound('/unmute.mp3');
+      if (newMutedState) playSound('/mute.mp3');
+      else playSound('/unmute.mp3');
+
+      setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: newMutedState } }));
+      if (signalingChannelRef.current) {
+        signalingChannelRef.current.send({
+          type: 'broadcast',
+          event: 'state-update',
+          payload: { userId: currentUser.id, state: { isMuted: newMutedState } },
+        });
       }
     }
-  }, []);
+  }, [currentUser, requestMicrophone]);
+
+  const toggleDeafen = useCallback(() => {
+    if (!currentUser) return;
+
+    const newDeafenState = !isDeafened;
+    setIsDeafened(newDeafenState);
+    let finalMuteState = isMuted;
+
+    if (newDeafenState) {
+      playSound('/deafen.mp3');
+      wasMutedBeforeDeafen.current = isMuted;
+      if (!isMuted) {
+        const stream = localStreamRef.current;
+        if (stream?.getAudioTracks()[0]) {
+          stream.getAudioTracks()[0].enabled = false;
+          setIsMuted(true);
+          finalMuteState = true;
+        }
+      }
+    } else {
+      playSound('/undeafen.mp3');
+      if (!wasMutedBeforeDeafen.current && isMuted) {
+        const stream = localStreamRef.current;
+        if (stream?.getAudioTracks()[0]) {
+          stream.getAudioTracks()[0].enabled = true;
+          setIsMuted(false);
+          finalMuteState = false;
+        }
+      }
+    }
+    
+    setMemberStates(prev => ({ ...prev, [currentUser.id]: { isMuted: finalMuteState, isDeafened: newDeafenState } }));
+
+    if (signalingChannelRef.current) {
+      signalingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'state-update',
+        payload: { userId: currentUser.id, state: { isMuted: finalMuteState, isDeafened: newDeafenState } },
+      });
+    }
+  }, [currentUser, isDeafened, isMuted]);
 
   const removePeer = (userId: string) => {
     const audioEl = document.querySelector(`audio[data-user-id="${userId}"]`);
@@ -173,6 +245,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     setActiveVoiceChannelId(null);
     setActiveServerId(null);
+    setMemberStates({});
 
     await supabase
       .from('server_members')
@@ -228,6 +301,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         peerData.peer.destroy();
         removePeer(key);
       }
+      setMemberStates(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
     });
 
     channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
@@ -242,12 +320,31 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       }
     });
 
+    channel.on('broadcast', { event: 'state-update' }, ({ payload }) => {
+      setMemberStates(prev => ({
+        ...prev,
+        [payload.userId]: { ...prev[payload.userId], ...payload.state },
+      }));
+    });
+
     channel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') await channel.track({});
+      if (status === 'SUBSCRIBED') {
+        await channel.track({});
+        if (currentUser) {
+          channel.send({
+            type: 'broadcast',
+            event: 'state-update',
+            payload: {
+              userId: currentUser.id,
+              state: { isMuted, isDeafened },
+            },
+          });
+        }
+      }
     });
 
     signalingChannelRef.current = channel;
-  }, [currentUser, createPeer, leaveVoiceChannel, requestMicrophone]);
+  }, [currentUser, createPeer, leaveVoiceChannel, requestMicrophone, isMuted, isDeafened]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -267,8 +364,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     joinVoiceChannel,
     leaveVoiceChannel,
     isMuted,
+    isDeafened,
     toggleMute,
+    toggleDeafen,
     activeVoiceChannelId,
+    memberStates,
   };
 
   return (

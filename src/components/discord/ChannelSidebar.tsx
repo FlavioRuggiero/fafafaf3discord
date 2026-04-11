@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -54,6 +54,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     joinVoiceChannel, 
     leaveVoiceChannel, 
     activeVoiceChannelId, 
+    memberStates
   } = useVoiceChannel();
 
   const prevVoiceMembersRef = useRef<Map<string, string[]>>(new Map());
@@ -734,15 +735,25 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           
                           {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
-                              {connectedMembers.map(member => (
-                                <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
-                                  <div className="relative">
-                                    <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                              {connectedMembers.map(member => {
+                                const voiceState = memberStates[member.user_id];
+                                const memberIsMuted = voiceState?.isMuted ?? false;
+                                const memberIsDeafened = voiceState?.isDeafened ?? false;
+
+                                return (
+                                  <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
+                                    <div className="relative">
+                                      <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
+                                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                    </div>
+                                    <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate flex-1">{member.profiles?.first_name || 'Utente'}</span>
+                                    <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
+                                      {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
+                                      {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
+                                    </div>
                                   </div>
-                                  <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
