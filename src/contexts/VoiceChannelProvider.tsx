@@ -321,7 +321,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     channel.on('presence', { event: 'join' }, ({ key }) => {
       if (key !== currentUser?.id) {
-        playSound('/enter.mp3');
         if (currentUser) {
           channel.send({
             type: 'broadcast',
@@ -336,9 +335,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     });
     
     channel.on('presence', { event: 'leave' }, ({ key }) => {
-      if (key !== currentUser?.id) {
-        playSound('/exit.mp3');
-      }
       const peerData = peersRef.current.find(p => p.userId === key);
       if (peerData) {
         peerData.peer.destroy();

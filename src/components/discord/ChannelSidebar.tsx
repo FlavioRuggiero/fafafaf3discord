@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
+import { playSound } from "@/utils/sounds";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -54,6 +55,36 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     leaveVoiceChannel, 
     activeVoiceChannelId
   } = useVoiceChannel();
+
+  const previousVoiceMembersRef = useRef<ServerMemberWithProfile[]>([]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId) {
+      previousVoiceMembersRef.current = [];
+      return;
+    }
+
+    const currentVoiceMembers = members.filter(m => m.voice_channel_id === activeVoiceChannelId);
+    const previousVoiceMemberIds = new Set(previousVoiceMembersRef.current.map(m => m.user_id));
+    const currentVoiceMemberIds = new Set(currentVoiceMembers.map(m => m.user_id));
+
+    // Find who joined
+    currentVoiceMemberIds.forEach(id => {
+      if (!previousVoiceMemberIds.has(id) && id !== currentUser.id) {
+        playSound('/enter.mp3');
+      }
+    });
+
+    // Find who left
+    previousVoiceMemberIds.forEach(id => {
+      if (!currentVoiceMemberIds.has(id) && id !== currentUser.id) {
+        playSound('/exit.mp3');
+      }
+    });
+
+    previousVoiceMembersRef.current = currentVoiceMembers;
+
+  }, [members, activeVoiceChannelId, currentUser.id]);
 
   useEffect(() => {
     if (!activeServer?.id) return;
