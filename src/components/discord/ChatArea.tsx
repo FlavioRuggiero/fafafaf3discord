@@ -26,7 +26,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Utilizziamo le Ref per evitare re-render o lag sullo stato "sta scrivendo"
+  // Ref per lo stato di scrittura (evita loop e problemi di render)
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
 
@@ -66,7 +66,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (!channel?.id) return;
     
     setIsLoading(true);
-    setRealMessages([]); // Reset immediato al cambio di canale per evitare residui
+    setRealMessages([]);
 
     const fetchMessages = async () => {
       const { data, error } = await supabase
@@ -109,7 +109,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
-    // Sottoscrizione realtime
+    // Sottoscrizione realtime ai messaggi
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', {
@@ -151,7 +151,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, tableExists]);
 
-  // Ascolto status digitazione (Presence)
+  // Ascolto Presence (chi sta scrivendo)
   useEffect(() => {
     if (!channel?.id || !currentUser?.id) return;
 
@@ -186,17 +186,26 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, currentUser?.id]);
 
-  // Funzione sicura per aggiornare e inviare lo status di "sto scrivendo"
-  const setTypingStatus = (isTyping: boolean) => {
+  // Funzione infallibile per settare lo status di scrittura (usa untrack() al posto di isTyping: false)
+  const setTypingStatus = async (isTyping: boolean) => {
     if (!typingChannelRef.current || !currentUser) return;
     
-    // Evitiamo spam sul websocket mandando messaggi solo se lo status è variato
+    // Evitiamo spam sul websocket
     if (lastTypingStatus.current === isTyping) return;
     
     lastTypingStatus.current = isTyping;
-    const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
-    
-    typingChannelRef.current.track({ isTyping, userName }).catch(console.error);
+
+    try {
+      if (isTyping) {
+        const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
+        await typingChannelRef.current.track({ isTyping: true, userName });
+      } else {
+        // Untrack pulisce completamente l'utente dallo stato Presence
+        await typingChannelRef.current.untrack();
+      }
+    } catch (err) {
+      console.error("Errore aggiornamento typing presence:", err);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,7 +216,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setTypingStatus(true);
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      // Timeout che toglie automaticamente la scritta se smetti di scrivere per 3 secondi
+      // Timeout che rimuove lo stato se non scrivi per 3 secondi
       typingTimeoutRef.current = setTimeout(() => {
         setTypingStatus(false);
       }, 3000);
@@ -223,10 +232,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setInputValue("");
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      setTypingStatus(false); // Reset istantaneo all'invio
+      setTypingStatus(false); // Pulizia immediata dallo stato di scrittura all'invio
 
       if (currentUser && channel && tableExists) {
-        // Messaggio ottimistico (compare istantaneamente)
+        // Messaggio ottimistico
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
         const avatar = currentUserProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`;
@@ -258,7 +267,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  // Se isLoading è attivo mostra un array vuoto così non fa il flash dei vecchi messaggi
   const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages);
 
   const typingNames = Object.values(typingUsers);
