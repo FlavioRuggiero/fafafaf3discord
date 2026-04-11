@@ -2,8 +2,65 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Hash, Users, Menu, Volume2 } from "lucide-react";
-import { Message, Channel } from "@/types/discord";
+import * as HoverCard from "@radix-ui/react-hover-card";
+import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
+
+// Componente helper per mostrare la card del profilo al passaggio del mouse
+const ProfileHoverCard = ({ user, children }: { user: User, children: React.ReactNode }) => {
+  const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
+  
+  return (
+    <HoverCard.Root openDelay={250} closeDelay={150}>
+      <HoverCard.Trigger asChild>
+        {children}
+      </HoverCard.Trigger>
+      
+      <HoverCard.Portal>
+        <HoverCard.Content 
+          side="right" 
+          align="start" 
+          sideOffset={16} 
+          collisionPadding={20}
+          className="w-[300px] p-0 bg-[#111214] border border-[#1e1f22] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+        >
+          <div 
+            className="h-[60px] relative flex-shrink-0 bg-cover bg-center"
+            style={{ 
+              backgroundColor: user.banner_color || '#5865F2',
+              backgroundImage: user.banner_url ? `url(${user.banner_url})` : undefined
+            }}
+          >
+            <div className="absolute -bottom-10 left-4 rounded-full border-[6px] border-[#111214] bg-[#111214]">
+              <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+            </div>
+          </div>
+          
+          <div className="p-4 pt-12 pb-5">
+            <div className="flex items-center flex-wrap gap-2 mb-1">
+              <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
+              {isAdmin && (
+                <span className="text-[10px] font-bold text-white border border-[#f23f43] rounded px-1.5 py-[2px] leading-none tracking-wide">
+                  ADMIN
+                </span>
+              )}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-[#2b2d31]">
+              <h4 className="text-[11px] font-bold uppercase text-[#b5bac1] mb-2 tracking-wider">Su di me</h4>
+              {user.bio ? (
+                <p className="text-[13px] text-[#dbdee1] whitespace-pre-wrap leading-relaxed">{user.bio}</p>
+              ) : (
+                <p className="text-[13px] text-[#949ba4] italic">Nessuna biografia impostata.</p>
+              )}
+            </div>
+          </div>
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
+  );
+};
+
 
 interface ChatAreaProps {
   channel: Channel;
@@ -26,7 +83,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Ref per lo stato di scrittura (evita loop e problemi di render)
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
 
@@ -44,7 +100,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, []);
 
-  // Recupero dell'utente corrente e del suo profilo
+  // Recupero dell'utente corrente e del suo profilo esteso
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -52,7 +108,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setCurrentUser(session.user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url')
+          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url')
           .eq('id', session.user.id)
           .single();
         setCurrentUserProfile(profile);
@@ -61,7 +117,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
-  // Recupero messaggi iniziali e ascolto dei nuovi
+  // Recupero storico messaggi e iscrizione Realtime con profili estesi
   useEffect(() => {
     if (!channel?.id) return;
     
@@ -76,7 +132,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           content,
           created_at,
           user_id,
-          profiles(id, first_name, last_name, avatar_url)
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
@@ -90,16 +146,26 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
       setTableExists(true);
       if (data) {
-        const formatted = data.map((m: any) => ({
-          id: m.id,
-          content: m.content,
-          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          user: {
-            id: m.profiles?.id || m.user_id,
-            name: m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente',
-            avatar: m.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`
-          }
-        }));
+        const formatted = data.map((m: any) => {
+          const name = m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente';
+          const isVerified = name.toLowerCase() === 'faf3tto';
+          
+          return {
+            id: m.id,
+            content: m.content,
+            timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            user: {
+              id: m.profiles?.id || m.user_id,
+              name: name,
+              avatar: m.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`,
+              bio: m.profiles?.bio || "",
+              banner_color: m.profiles?.banner_color || "#5865F2",
+              banner_url: m.profiles?.banner_url || undefined,
+              global_role: isVerified ? "CREATOR" : "USER",
+              status: "online" as const
+            }
+          };
+        });
         setRealMessages(formatted);
       }
       setIsLoading(false);
@@ -120,18 +186,26 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url')
           .eq('id', payload.new.user_id)
           .single();
           
+        const name = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente';
+        const isVerified = name.toLowerCase() === 'faf3tto';
+
         const newMsg: Message = {
           id: payload.new.id,
           content: payload.new.content,
           timestamp: new Date(payload.new.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           user: {
             id: payload.new.user_id,
-            name: profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente',
-            avatar: profileData?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.new.user_id}`
+            name: name,
+            avatar: profileData?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.new.user_id}`,
+            bio: profileData?.bio || "",
+            banner_color: profileData?.banner_color || "#5865F2",
+            banner_url: profileData?.banner_url || undefined,
+            global_role: isVerified ? "CREATOR" : "USER",
+            status: "online"
           }
         };
         
@@ -186,11 +260,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, currentUser?.id]);
 
-  // Funzione infallibile per settare lo status di scrittura (usa untrack() al posto di isTyping: false)
   const setTypingStatus = async (isTyping: boolean) => {
     if (!typingChannelRef.current || !currentUser) return;
     
-    // Evitiamo spam sul websocket
     if (lastTypingStatus.current === isTyping) return;
     
     lastTypingStatus.current = isTyping;
@@ -200,7 +272,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
         await typingChannelRef.current.track({ isTyping: true, userName });
       } else {
-        // Untrack pulisce completamente l'utente dallo stato Presence
         await typingChannelRef.current.untrack();
       }
     } catch (err) {
@@ -216,7 +287,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setTypingStatus(true);
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      // Timeout che rimuove lo stato se non scrivi per 3 secondi
       typingTimeoutRef.current = setTimeout(() => {
         setTypingStatus(false);
       }, 3000);
@@ -232,19 +302,27 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setInputValue("");
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      setTypingStatus(false); // Pulizia immediata dallo stato di scrittura all'invio
+      setTypingStatus(false); 
 
       if (currentUser && channel && tableExists) {
-        // Messaggio ottimistico
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
-        const avatar = currentUserProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`;
+        const isVerified = userName.toLowerCase() === 'faf3tto';
         
         const optimisticMsg: Message = {
           id: tempId,
           content: content,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          user: { id: currentUser.id, name: userName, avatar }
+          user: { 
+            id: currentUser.id, 
+            name: userName, 
+            avatar: currentUserProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`,
+            bio: currentUserProfile?.bio || "",
+            banner_color: currentUserProfile?.banner_color || "#5865F2",
+            banner_url: currentUserProfile?.banner_url || undefined,
+            global_role: isVerified ? "CREATOR" : "USER",
+            status: "online"
+          }
         };
         
         setRealMessages(prev => [...prev, optimisticMsg]);
@@ -323,7 +401,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">{channel.type === 'text' ? '#' : ''}{channel.name}</span>.</p>
         </div>
 
-        {/* Loader visivo mentre scarica la chat */}
         {isLoading && (
           <div className="flex justify-center my-4">
             <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin opacity-70"></div>
@@ -336,7 +413,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           return (
             <div key={msg.id} className="group flex items-start hover:bg-[#2e3035] -mx-4 px-4 py-1 rounded">
               {!isSameUserAsPrevious ? (
-                <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
+                <ProfileHoverCard user={msg.user}>
+                  <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
+                </ProfileHoverCard>
               ) : (
                 <div className="w-10 mr-4 text-xs text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
                   {msg.timestamp?.split(' ')[2] || msg.timestamp}
@@ -346,7 +425,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <div className="flex-1 min-w-0">
                 {!isSameUserAsPrevious && (
                   <div className="flex items-baseline min-w-0">
-                    <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
+                    <ProfileHoverCard user={msg.user}>
+                      <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
+                    </ProfileHoverCard>
                     <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
                   </div>
                 )}
