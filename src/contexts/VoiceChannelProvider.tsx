@@ -293,9 +293,24 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
           createPeer(userId, true, channel);
         }
       });
+      peersRef.current.forEach(peerData => {
+        if (!userIds.includes(peerData.userId)) {
+          peerData.peer.destroy();
+          removePeer(peerData.userId);
+        }
+      });
+    });
+
+    channel.on('presence', { event: 'join' }, ({ key }) => {
+      if (key !== currentUser?.id) {
+        playSound('/enter.mp3');
+      }
     });
     
     channel.on('presence', { event: 'leave' }, ({ key }) => {
+      if (key !== currentUser?.id) {
+        playSound('/exit.mp3');
+      }
       const peerData = peersRef.current.find(p => p.userId === key);
       if (peerData) {
         peerData.peer.destroy();

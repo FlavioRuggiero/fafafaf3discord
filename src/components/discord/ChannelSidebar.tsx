@@ -7,7 +7,6 @@ import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
-import { playSound } from "@/utils/sounds";
 import { UserPanel } from "./UserPanel";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
@@ -56,8 +55,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     activeVoiceChannelId, 
     memberStates
   } = useVoiceChannel();
-
-  const prevVoiceMembersRef = useRef<Map<string, string[]>>(new Map());
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -195,38 +192,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       supabase.removeChannel(memberSub);
     };
   }, [activeServer?.id]);
-
-  // Effetto per la riproduzione sincronizzata dei suoni
-  useEffect(() => {
-    const currentVoiceMembers = new Map<string, string[]>();
-    members.forEach(member => {
-      if (member.voice_channel_id) {
-        if (!currentVoiceMembers.has(member.voice_channel_id)) {
-          currentVoiceMembers.set(member.voice_channel_id, []);
-        }
-        currentVoiceMembers.get(member.voice_channel_id)!.push(member.user_id);
-      }
-    });
-
-    if (activeVoiceChannelId) {
-      const prevUsers = prevVoiceMembersRef.current.get(activeVoiceChannelId) || [];
-      const currentUsers = currentVoiceMembers.get(activeVoiceChannelId) || [];
-
-      currentUsers.forEach(userId => {
-        if (!prevUsers.includes(userId) && userId !== currentUser.id) {
-          playSound('/enter.mp3');
-        }
-      });
-
-      prevUsers.forEach(userId => {
-        if (!currentUsers.includes(userId) && userId !== currentUser.id) {
-          playSound('/exit.mp3');
-        }
-      });
-    }
-
-    prevVoiceMembersRef.current = currentVoiceMembers;
-  }, [members, activeVoiceChannelId, currentUser.id]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
