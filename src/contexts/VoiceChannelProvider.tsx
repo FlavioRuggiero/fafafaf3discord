@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { supabase } from '@/integrations/supabase/client';
 import Peer from 'simple-peer';
 import { User } from '@/types/discord';
+import { playSound } from '@/utils/sounds';
 
 interface PeerData {
   peer: Peer.Instance;
@@ -26,16 +27,6 @@ export const useVoiceChannel = () => {
     throw new Error('useVoiceChannel must be used within a VoiceChannelProvider');
   }
   return context;
-};
-
-const playSound = (soundFile: string) => {
-  try {
-    const audio = new Audio(soundFile);
-    audio.volume = 0.3; // Riduciamo un po' il volume per non essere troppo invasivi
-    audio.play().catch(e => console.error("La riproduzione automatica dell'audio è fallita", e));
-  } catch (e) {
-    console.error("Impossibile riprodurre il suono", e);
-  }
 };
 
 interface VoiceChannelProviderProps {
@@ -176,16 +167,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       });
     });
     
-    channel.on('presence', { event: 'join' }, ({ key }) => {
-      if (key !== currentUser.id) {
-        playSound('/enter.mp3');
-      }
-    });
-
     channel.on('presence', { event: 'leave' }, ({ key }) => {
-      if (key !== currentUser.id) {
-        playSound('/exit.mp3');
-      }
       const peerData = peersRef.current.find(p => p.userId === key);
       if (peerData) {
         peerData.peer.destroy();
