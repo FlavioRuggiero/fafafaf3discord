@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Compass, LogOut } from "lucide-react";
 import { Server, User } from "@/types/discord";
+import { supabase } from "@/integrations/supabase/client";
 
 // Componente Tooltip che fluttua al di fuori della barra per non essere tagliato dall'overflow
 const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElement, text?: string, subtext?: React.ReactNode }) => {
@@ -53,18 +54,91 @@ const HoverTooltip = ({ children, text, subtext }: { children: React.ReactElemen
   );
 };
 
-const ServerIcon = ({ image, name, active, notify, onClick, isHome }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void, isHome?: boolean }) => {
+const ServerIcon = ({ image, name, active, notify, onClick, serverId, audioUrl }: { image?: string, name?: string, active?: boolean, notify?: boolean, onClick?: () => void, serverId?: string, audioUrl?: string }) => {
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [staticImage, setStaticImage] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const isGif = image?.toLowerCase().includes('.gif');
+
+  // Recupera il numero di membri per il server specificato
+  useEffect(() => {
+    if (serverId && serverId !== 'home') {
+      const fetchMembers = async () => {
+        const { count } = await supabase
+          .from('server_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('server_id', serverId);
+        if (count !== null) setMemberCount(count);
+      };
+      fetchMembers();
+    }
+  }, [serverId]);
+
+  // Se è una GIF, crea un frame statico usando il canvas
+  useEffect(() => {
+    if (isGif && image) {
+      const img = new Image();
+      img.crossOrigin = "anonymous"; // Necessario per non incappare in errori CORS con il canvas
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            setStaticImage(canvas.toDataURL("image/png"));
+          }
+        } catch (e) {
+          console.warn("Impossibile generare il frame statico della GIF:", e);
+        }
+      };
+      img.src = image;
+    }
+  }, [image, isGif]);
+
+  const subtext = serverId && serverId !== 'home' && memberCount !== null 
+    ? `${memberCount} ${memberCount === 1 ? 'membro' : 'membri'}` 
+    : undefined;
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (audioUrl && audioRef.current) {
+      audioRef.current.volume = 0.5; // Dimezza il volume
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => console.log('Autoplay audio bloccato', e));
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (audioUrl && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  // Determina quale immagine mostrare:
+  // Se è una GIF e NON siamo in hover e abbiamo generato l'immagine statica, mostra l'immagine statica.
+  // Altrimenti mostra l'immagine originale (che sarà animata nel caso delle GIF)
+  const displayImage = (isGif && !isHovered && staticImage) ? staticImage : image;
+
   return (
-    <HoverTooltip text={name}>
+    <HoverTooltip text={name} subtext={subtext}>
       <div 
-        className="relative group flex items-center justify-center cursor-pointer mb-2 w-full" 
+        className="relative group flex items-center justify-center cursor-pointer mb-2" 
         onClick={onClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
+        {audioUrl && <audio ref={audioRef} src={audioUrl} preload="none" className="hidden" />}
         <div className={`absolute left-0 w-1 bg-white rounded-r-lg transition-all duration-300 ${active ? 'h-10' : 'h-0 group-hover:h-5'} ${notify && !active ? 'h-2' : ''}`} />
         
         <div className={`w-12 h-12 flex items-center justify-center overflow-hidden transition-all duration-300 ${active ? 'rounded-2xl bg-brand' : 'rounded-[24px] group-hover:rounded-2xl bg-[#313338] group-hover:bg-brand text-[#dbdee1] group-hover:text-white'}`}>
           {image ? (
-            <img src={image} alt={name || "Server"} className="w-full h-full object-cover" />
+            <img src={displayImage} alt={name || "Server"} className="w-full h-full object-cover" />
           ) : (
             <span className="font-medium text-lg">{name?.substring(0, 2).toUpperCase()}</span>
           )}
@@ -76,7 +150,7 @@ const ServerIcon = ({ image, name, active, notify, onClick, isHome }: { image?: 
 
 const IconButton = ({ icon: Icon, label, colorClass = "text-[#23a559] group-hover:bg-[#23a559] group-hover:text-white", onClick }: { icon: any, label?: string, colorClass?: string, onClick?: () => void }) => (
   <HoverTooltip text={label}>
-    <div className="relative group flex items-center justify-center cursor-pointer mb-2 w-full" onClick={onClick}>
+    <div className="relative group flex items-center justify-center cursor-pointer mb-2" onClick={onClick}>
       <div className={`w-12 h-12 rounded-[24px] group-hover:rounded-2xl bg-[#313338] flex items-center justify-center transition-all duration-300 ${colorClass}`}>
         <Icon size={24} />
       </div>
@@ -92,102 +166,33 @@ interface ServerSidebarProps {
   onOpenDiscover: () => void;
   currentUser: User;
   onLogout: () => void;
-  onReorderServers: (reorderedIds: string[]) => void;
 }
 
-export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers }: ServerSidebarProps) => {
+export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout }: ServerSidebarProps) => {
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
-  
-  const [dragItem, setDragItem] = useState<string | null>(null);
-  const [dragOverInfo, setDragOverInfo] = useState<{ id: string, position: 'top' | 'bottom' } | null>(null);
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-    setDragItem(id);
-  };
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-
-    if (!dragItem || dragItem === id) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const position = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
-
-    if (dragOverInfo?.id !== id || dragOverInfo?.position !== position) {
-      setDragOverInfo({ id, position });
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!dragItem || !dragOverInfo) {
-      setDragItem(null);
-      setDragOverInfo(null);
-      return;
-    }
-
-    if (dragItem !== targetId) {
-      const currentIds = servers.map(s => s.id);
-      const draggedIdx = currentIds.indexOf(dragItem);
-      const targetIdx = currentIds.indexOf(targetId);
-
-      if (draggedIdx !== -1 && targetIdx !== -1) {
-        currentIds.splice(draggedIdx, 1);
-        const insertIdx = dragOverInfo.position === 'top' ? targetIdx : targetIdx + 1;
-        // Adjust for shift
-        currentIds.splice(insertIdx > draggedIdx ? insertIdx - 1 : insertIdx, 0, dragItem);
-        onReorderServers(currentIds);
-      }
-    }
-
-    setDragItem(null);
-    setDragOverInfo(null);
-  };
-
-  const getDropIndicator = (id: string) => {
-    if (dragOverInfo?.id === id) {
-      return dragOverInfo.position === 'top' 
-        ? 'shadow-[0_-4px_0_#5865F2] z-20 rounded-t-lg' 
-        : 'shadow-[0_4px_0_#5865F2] z-20 rounded-b-lg';
-    }
-    return '';
-  };
 
   return (
     <div className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 flex-shrink-0 z-20 overflow-y-auto custom-scrollbar relative">
       <ServerIcon 
         name="Discord Canary 2" 
+        serverId="home"
         image="/discord-canary-2.png" 
         active={activeServerId === 'home'} 
-        onClick={() => onServerSelect('home')}
-        isHome
+        onClick={() => onServerSelect('home')} 
       />
       
       <div className="w-8 h-[2px] bg-[#35363c] rounded-full my-2 flex-shrink-0" />
       
       {servers.map(server => (
-        <div 
-          key={server.id}
-          draggable
-          onDragStart={(e) => handleDragStart(e, server.id)}
-          onDragOver={(e) => handleDragOver(e, server.id)}
-          onDrop={(e) => handleDrop(e, server.id)}
-          onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
-          className={`w-full relative transition-all duration-200 ${getDropIndicator(server.id)} ${dragItem === server.id ? 'opacity-40' : ''}`}
-        >
-          <ServerIcon 
-            image={server.icon_url} 
-            name={server.name} 
-            active={activeServerId === server.id} 
-            onClick={() => onServerSelect(server.id)} 
-          />
-        </div>
+        <ServerIcon 
+          key={server.id} 
+          serverId={server.id}
+          image={server.icon_url} 
+          name={server.name} 
+          active={activeServerId === server.id} 
+          onClick={() => onServerSelect(server.id)} 
+          audioUrl={server.audio_url}
+        />
       ))}
       
       <div className="w-8 h-[2px] bg-[#35363c] rounded-full my-2 flex-shrink-0" />
@@ -202,7 +207,7 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
         onClick={onOpenDiscover} 
       />
       
-      <div className="mt-auto pt-2 w-full">
+      <div className="mt-auto pt-2">
         <IconButton 
           icon={LogOut} 
           label="Disconnetti"

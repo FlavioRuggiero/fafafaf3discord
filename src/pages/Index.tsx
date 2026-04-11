@@ -10,7 +10,7 @@ import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut, Settings, Wallet } from "lucide-react";
+import { Menu, Home, MessageSquare, Compass, Plus, Mic, Headphones, LogOut, Settings } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
@@ -103,15 +103,17 @@ const Index = () => {
     };
   }, [user]);
 
-  // Listener Realtime per la tabella Profiles
+  // Listener Realtime per la tabella Profiles (Sync digitalcardus, XP, livello, etc.)
   useEffect(() => {
     const profileSubscription = supabase
       .channel('public:profiles_index')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
         const updatedProfile = payload.new;
 
+        // Aggiorna la lista membri del server
         setServerProfiles(prev => prev.map(p => p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p));
 
+        // Aggiorna l'utente corrente se corrisponde
         setCurrentUser(prev => {
           if (!prev || prev.id !== updatedProfile.id) return prev;
           const isVerifiedUser = (updatedProfile.first_name || "").toLowerCase() === 'faf3tto';
@@ -174,21 +176,12 @@ const Index = () => {
       
       setCurrentUser(loadedUser);
 
-      // Recuperiamo i server con le loro posizioni
-      const { data: memberData } = await supabase.from('server_members').select('server_id, position').eq('user_id', user.id);
-      
-      if (memberData && memberData.length > 0) {
-        const joinedServerIds = memberData.map(m => m.server_id);
-        const serverPositions: Record<string, number> = {};
-        memberData.forEach(m => serverPositions[m.server_id] = m.position || 0);
+      const { data: memberData } = await supabase.from('server_members').select('server_id').eq('user_id', user.id);
+      const joinedServerIds = memberData?.map(m => m.server_id) || [];
 
+      if (joinedServerIds.length > 0) {
         const { data: serversData } = await supabase.from('servers').select('*').in('id', joinedServerIds);
-        
-        if (serversData) {
-          // Ordina i server in base alla posizione
-          const sortedServers = serversData.sort((a, b) => (serverPositions[a.id] || 0) - (serverPositions[b.id] || 0));
-          setServers(sortedServers);
-        }
+        if (serversData) setServers(serversData);
 
         const { data: channelsData } = await supabase.from('channels').select('*').in('server_id', joinedServerIds);
         if (channelsData) setAllChannels(channelsData);
@@ -229,14 +222,7 @@ const Index = () => {
 
   useEffect(() => {
     if (activeServerId !== 'home') {
-      // Quando cambi server, seleziona il primo canale in alto (ordinato correttamente)
-      const newServerChannels = allChannels
-        .filter(c => c.server_id === activeServerId)
-        .sort((a, b) => {
-          if ((a.category_position || 0) !== (b.category_position || 0)) return (a.category_position || 0) - (b.category_position || 0);
-          return (a.position || 0) - (b.position || 0);
-        });
-        
+      const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
       if (newServerChannels.length > 0) {
         setActiveChannel(newServerChannels[0]);
       } else {
@@ -337,12 +323,7 @@ const Index = () => {
       return;
     }
 
-    // Aggiungi utente con l'ultima posizione
-    await supabase.from('server_members').insert({ 
-      server_id: newServer.id, 
-      user_id: currentUser.id,
-      position: servers.length 
-    });
+    await supabase.from('server_members').insert({ server_id: newServer.id, user_id: currentUser.id });
 
     const { data: newChannel } = await supabase
       .from('channels')
@@ -367,12 +348,7 @@ const Index = () => {
   const handleJoinServer = async (server: Server) => {
     if (!currentUser) return;
 
-    const { error } = await supabase.from('server_members').insert({ 
-      server_id: server.id, 
-      user_id: currentUser.id,
-      position: servers.length 
-    });
-    
+    const { error } = await supabase.from('server_members').insert({ server_id: server.id, user_id: currentUser.id });
     if (error) {
       showError("Errore durante l'unione al server");
       return;
@@ -538,32 +514,6 @@ const Index = () => {
     setShowUserSettingsModal(false);
   };
 
-  const handleReorderServers = async (reorderedIds: string[]) => {
-    if (!currentUser) return;
-    
-    // Aggiornamento Ottimistico
-    const sortedServers = reorderedIds.map(id => servers.find(s => s.id === id)).filter(Boolean) as Server[];
-    setServers(sortedServers);
-
-    // Salva sul database per renderlo permanente
-    const updates = reorderedIds.map((id, index) => ({
-      server_id: id,
-      user_id: currentUser.id,
-      position: index
-    }));
-
-    try {
-      for (const update of updates) {
-        await supabase.from('server_members')
-          .update({ position: update.position })
-          .eq('server_id', update.server_id)
-          .eq('user_id', update.user_id);
-      }
-    } catch (e) {
-      console.error("Errore salvataggio posizione server", e);
-    }
-  };
-
   const handleLogout = async () => {
     supabase.channel('global_presence').untrack();
     await supabase.auth.signOut();
@@ -599,7 +549,6 @@ const Index = () => {
           onOpenDiscover={handleOpenDiscover}
           currentUser={currentUser}
           onLogout={handleLogout}
-          onReorderServers={handleReorderServers}
         />
         
         {activeServerId !== 'home' && activeServer ? (
