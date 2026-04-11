@@ -191,15 +191,19 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Fetch e Sottoscrizione Membri del Canale Vocale
   useEffect(() => {
-    if (channel?.type !== 'voice') return;
+    if (channel?.type !== 'voice') {
+      setVoiceMembers([]);
+      return;
+    }
 
     let isMounted = true;
 
     const fetchVoiceMembers = async () => {
       const { data: membersData } = await supabase
         .from('server_members')
-        .select('user_id, is_muted, is_deafened, profiles(first_name, last_name, avatar_url)')
-        .eq('voice_channel_id', channel.id);
+        .select('user_id, is_muted, is_deafened, joined_at, profiles(first_name, last_name, avatar_url)')
+        .eq('voice_channel_id', channel.id)
+        .order('joined_at', { ascending: true });
 
       if (isMounted && membersData) {
         setVoiceMembers(membersData);
@@ -212,7 +216,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'server_members'
+        table: 'server_members',
+        filter: `voice_channel_id=eq.${channel.id}`
       }, () => {
         fetchVoiceMembers();
       })
@@ -724,9 +729,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-[#000000] flex flex-col">
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-start justify-center pt-8">
             {voiceMembers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-[#949ba4] animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex flex-col items-center justify-center text-[#949ba4] animate-in fade-in zoom-in-95 duration-300 mt-20">
                 <Volume2 size={64} className="mb-4 opacity-50" />
                 <p className="text-xl font-medium text-white">Nessuno è connesso</p>
                 <p className="text-sm mt-2 text-[#949ba4]">Unisciti al canale cliccando nella barra laterale per iniziare a parlare.</p>
