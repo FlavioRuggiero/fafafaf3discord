@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Compass, LogOut } from "lucide-react";
 import { Server, User } from "@/types/discord";
@@ -140,7 +140,6 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
       if (draggedIdx !== -1 && targetIdx !== -1) {
         currentIds.splice(draggedIdx, 1);
         const insertIdx = dragOverInfo.position === 'top' ? targetIdx : targetIdx + 1;
-        // Adjust for shift
         currentIds.splice(insertIdx > draggedIdx ? insertIdx - 1 : insertIdx, 0, dragItem);
         onReorderServers(currentIds);
       }
@@ -148,15 +147,6 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
 
     setDragItem(null);
     setDragOverInfo(null);
-  };
-
-  const getDropIndicator = (id: string) => {
-    if (dragOverInfo?.id === id) {
-      return dragOverInfo.position === 'top' 
-        ? 'shadow-[0_-4px_0_#5865F2] z-20 rounded-t-lg' 
-        : 'shadow-[0_4px_0_#5865F2] z-20 rounded-b-lg';
-    }
-    return '';
   };
 
   return (
@@ -179,8 +169,12 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
           onDragOver={(e) => handleDragOver(e, server.id)}
           onDrop={(e) => handleDrop(e, server.id)}
           onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
-          className={`w-full relative transition-all duration-200 ${getDropIndicator(server.id)} ${dragItem === server.id ? 'opacity-40' : ''}`}
+          className={`w-full relative transition-opacity duration-200 ${dragItem === server.id ? 'opacity-40' : ''}`}
         >
+          {/* Linea indicatore posizionamento con absolute (non sposta/ridimensiona l'immagine del server!) */}
+          {dragOverInfo?.id === server.id && (
+            <div className={`absolute left-3 right-3 h-[3px] bg-brand z-50 rounded-full pointer-events-none ${dragOverInfo.position === 'top' ? '-top-[3px]' : '-bottom-[3px]'}`} />
+          )}
           <ServerIcon 
             image={server.icon_url} 
             name={server.name} 
