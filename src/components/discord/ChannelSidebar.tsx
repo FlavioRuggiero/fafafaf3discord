@@ -138,7 +138,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   }, [activeServer?.id]);
 
   useEffect(() => {
-    if (!activeServer?.id || !currentUser?.id) return;
+    if (!activeServer?.id) return;
 
     let isMounted = true;
 
@@ -156,30 +156,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
     fetchMembers();
 
-    const memberSub = supabase.channel(`public:server_members:server=${activeServer.id}`)
+    const memberSub = supabase.channel(`realtime:server_members:${activeServer.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'server_members',
         filter: `server_id=eq.${activeServer.id}`
-      }, async (payload) => {
-        if (!isMounted) return;
-
-        if (payload.eventType === 'INSERT') {
-          const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
-          if (profileData) {
-            const newMember = { ...payload.new, profiles: profileData } as ServerMemberWithProfile;
-            setMembers(prev => [...prev.filter(m => m.user_id !== newMember.user_id), newMember]);
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          setMembers(prev => prev.map(m => {
-            if (m.user_id === payload.new.user_id) {
-              return { ...m, ...payload.new };
-            }
-            return m;
-          }));
-        } else if (payload.eventType === 'DELETE') {
-          setMembers(prev => prev.filter(m => m.user_id !== payload.old.user_id));
+      }, (payload) => {
+        if (isMounted) {
+          fetchMembers();
         }
       })
       .subscribe();
@@ -188,7 +173,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(memberSub);
     };
-  }, [activeServer?.id, currentUser?.id]);
+  }, [activeServer?.id]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
