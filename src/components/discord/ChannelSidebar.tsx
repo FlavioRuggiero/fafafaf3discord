@@ -9,7 +9,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
 
-type ServerMemberWithProfile = ServerMember & { profiles: Profile | null; };
+type ServerMemberWithProfile = ServerMember & { profiles: Profile | null; is_muted?: boolean; is_deafened?: boolean; };
 
 interface ChannelSidebarProps {
   activeServer: Server | null;
@@ -151,29 +151,19 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         if (!isMounted) return;
 
         if (payload.eventType === 'UPDATE') {
-          const updatedMemberData = payload.new as ServerMember;
-          setMembers(prev => prev.map(m => {
-            if (m.user_id === updatedMemberData.user_id) {
-              // Correttamente unisce i nuovi dati senza perdere il profilo
-              return { ...m, ...updatedMemberData };
-            }
-            return m;
-          }));
+          const updatedMember = payload.new as ServerMemberWithProfile;
+          setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
         } else if (payload.eventType === 'INSERT') {
-          const newMemberData = payload.new as ServerMember;
+          const newMember = payload.new as ServerMemberWithProfile;
           const { data: profileData } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', newMemberData.user_id)
+            .eq('id', newMember.user_id)
             .single();
           if (isMounted) {
             setMembers(prev => {
-              if (prev.some(m => m.user_id === newMemberData.user_id)) return prev;
-              const newMemberWithProfile: ServerMemberWithProfile = {
-                ...newMemberData,
-                profiles: profileData || null
-              };
-              return [...prev, newMemberWithProfile];
+              if (prev.some(m => m.user_id === newMember.user_id)) return prev;
+              return [...prev, { ...newMember, profiles: profileData || null }];
             });
           }
         } else if (payload.eventType === 'DELETE') {
