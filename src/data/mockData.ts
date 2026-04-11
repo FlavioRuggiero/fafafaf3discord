@@ -5,13 +5,15 @@ export const CURRENT_USER: User = {
   name: "DyadUser",
   avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dyad",
   status: "online",
-  global_role: "CREATOR" // Default to CREATOR to allow testing server creation
+  global_role: "CREATOR", // Default to CREATOR to allow testing server creation
+  level: 10,
+  digitalcardus: 250
 };
 
 export const MOCK_USERS: User[] = [
   CURRENT_USER,
-  { id: "u2", name: "Mario", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mario", status: "online", customStatus: "Sto programmando..." },
-  { id: "u3", name: "Luigi", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Luigi", status: "idle" },
+  { id: "u2", name: "Mario", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mario", status: "online", customStatus: "Sto programmando...", level: 5, digitalcardus: 100 },
+  { id: "u3", name: "Luigi", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Luigi", status: "idle", level: 2, digitalcardus: 25 },
 ];
 
 export const MOCK_SERVERS: Server[] = [

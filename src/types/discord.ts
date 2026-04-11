@@ -8,6 +8,8 @@ export type User = {
   bio?: string;
   banner_color?: string;
   banner_url?: string;
+  level?: number;
+  digitalcardus?: number;
 };
 
 export type Server = {

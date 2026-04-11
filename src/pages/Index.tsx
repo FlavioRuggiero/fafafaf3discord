@@ -57,7 +57,9 @@ const Index = () => {
       global_role: isVerifiedUser ? "CREATOR" : "USER",
       bio: p.bio || "",
       banner_color: p.banner_color || "#5865F2",
-      banner_url: p.banner_url || undefined
+      banner_url: p.banner_url || undefined,
+      level: p.level || 1,
+      digitalcardus: p.digitalcardus ?? 25
     };
   });
 
@@ -121,7 +123,9 @@ const Index = () => {
         global_role: isVerifiedUser ? "CREATOR" : "USER",
         bio: profile?.bio || "",
         banner_color: profile?.banner_color || "#5865F2",
-        banner_url: profile?.banner_url || undefined
+        banner_url: profile?.banner_url || undefined,
+        level: profile?.level || 1,
+        digitalcardus: profile?.digitalcardus ?? 25
       };
       
       setCurrentUser(loadedUser);
@@ -315,7 +319,6 @@ const Index = () => {
   const handleLeaveServer = async (serverId: string) => {
     if (!currentUser) return;
 
-    // Utilizziamo .select() per forzare il controllo che l'eliminazione sia realmente avvenuta
     const { data, error } = await supabase
       .from('server_members')
       .delete()
@@ -395,7 +398,6 @@ const Index = () => {
   };
 
   const handleDeleteServer = async (id: string) => {
-    // Usiamo .select() per accertarci dell'avvenuta cancellazione
     const { data, error } = await supabase.from('servers').delete().eq('id', id).select();
     if (error || !data || data.length === 0) {
       showError("Impossibile eliminare il server");
@@ -450,7 +452,7 @@ const Index = () => {
       .eq('id', currentUser.id);
 
     if (error) {
-      showError("Impossibile aggiornare il profilo. Ricordati di eseguire lo script SQL per il banner!");
+      showError("Impossibile aggiornare il profilo.");
       return;
     }
 
@@ -467,7 +469,6 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
-    // Rimuoviamo l'utente dalla presence prima del logout
     supabase.channel('global_presence').untrack();
     await supabase.auth.signOut();
   };

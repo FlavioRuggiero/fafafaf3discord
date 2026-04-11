@@ -50,6 +50,22 @@ const ProfileHoverCard = ({ user, children }: { user: User, children: React.Reac
                 </span>
               )}
             </div>
+
+            {/* Statistiche Livello e Digitalcardus */}
+            <div className="flex items-center justify-around mt-3 bg-[#1e1f22] py-2 px-3 rounded-lg border border-[#2b2d31]">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Livello</span>
+                <span className="font-bold text-white">{user.level || 1}</span>
+              </div>
+              <div className="w-[1px] h-8 bg-[#2b2d31]"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider mb-0.5">Digitalcardus</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-white">{user.digitalcardus ?? 25}</span>
+                  <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 object-contain" />
+                </div>
+              </div>
+            </div>
             
             <div className="mt-4 pt-4 border-t border-[#2b2d31]">
               <h4 className="text-[11px] font-bold uppercase text-[#b5bac1] mb-2 tracking-wider">Su di me</h4>
@@ -143,7 +159,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setCurrentUser(session.user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url')
+          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus')
           .eq('id', session.user.id)
           .single();
         setCurrentUserProfile(profile);
@@ -169,12 +185,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           created_at,
           updated_at,
           user_id,
-          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url)
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
 
-      // Fallback nel caso in cui lo script SQL per la colonna updated_at non sia stato eseguito
       if (error && error.message.includes('updated_at')) {
         const fallback = await supabase
           .from('messages')
@@ -183,7 +198,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             content,
             created_at,
             user_id,
-            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url)
+            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus)
           `)
           .eq('channel_id', channel.id)
           .order('created_at', { ascending: true });
@@ -217,6 +232,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               bio: m.profiles?.bio || "",
               banner_color: m.profiles?.banner_color || "#5865F2",
               banner_url: m.profiles?.banner_url || undefined,
+              level: m.profiles?.level || 1,
+              digitalcardus: m.profiles?.digitalcardus ?? 25,
               global_role: isVerified ? "CREATOR" : "USER",
               status: "online" as const
             }
@@ -255,7 +272,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
-    // Gestione separata degli eventi in tempo reale
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', { 
@@ -266,7 +282,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus')
           .eq('id', payload.new.user_id)
           .single();
           
@@ -286,6 +302,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             bio: profileData?.bio || "",
             banner_color: profileData?.banner_color || "#5865F2",
             banner_url: profileData?.banner_url || undefined,
+            level: profileData?.level || 1,
+            digitalcardus: profileData?.digitalcardus ?? 25,
             global_role: isVerified ? "CREATOR" : "USER",
             status: "online"
           }
@@ -317,7 +335,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         schema: 'public',
         table: 'messages'
       }, (payload) => {
-        // Nessun filtro channel_id per i DELETE, così da garantire la ricezione del payload
         setRealMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (payload) => {
@@ -442,6 +459,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             bio: currentUserProfile?.bio || "",
             banner_color: currentUserProfile?.banner_color || "#5865F2",
             banner_url: currentUserProfile?.banner_url || undefined,
+            level: currentUserProfile?.level || 1,
+            digitalcardus: currentUserProfile?.digitalcardus ?? 25,
             global_role: isVerified ? "CREATOR" : "USER",
             status: "online"
           }
@@ -492,7 +511,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
     let contentToEdit = replyMatch ? replyMatch[2] : msg.content;
     
-    // Fallback retrocompatibilità
     if (contentToEdit.startsWith('**Risposta a')) {
       contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
     }
@@ -520,11 +538,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     const now = new Date().toISOString();
     
-    // Aggiornamento ottimistico dell'UI
     setRealMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent, updatedAt: now } : m));
     setEditingMessageId(null);
 
-    // Aggiornamento su Supabase
     const { error } = await supabase.from('messages').update({ content: finalContent, updated_at: now }).eq('id', msgId);
     if (error) {
       console.error("Errore salvataggio modifica:", error);
@@ -540,7 +556,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const toggleReaction = async (messageId: string, emoji: string) => {
     if (!currentUser) return;
     if (!reactionsEnabled) {
-      showError("Le reazioni non sono abilitate. Esegui il file add_reactions.sql nel database.");
+      showError("Le reazioni non sono abilitate.");
       return;
     }
     
@@ -742,7 +758,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 </div>
               )}
 
-              {/* Anteprima Risposta */}
               {isReply && (
                 <div className="relative flex items-center pl-[72px] mb-1 cursor-pointer group/reply select-none" onClick={() => replyToId && scrollToMessage(replyToId)}>
                   <div className="absolute left-[36px] top-1/2 w-[32px] h-[14px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md -translate-y-[2px]"></div>
@@ -811,7 +826,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     </div>
                   )}
 
-                  {/* Rendering dei badge delle reazioni */}
                   {Object.keys(reactionCounts).length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5 mb-1">
                       {Object.entries(reactionCounts).map(([emoji, { count, hasReacted }]) => (
@@ -874,7 +888,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
       </div>
 
-      {/* Modale Eliminazione Messaggio */}
       {messageToDelete && msgToDeleteData && (
         <div 
           className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4" 
