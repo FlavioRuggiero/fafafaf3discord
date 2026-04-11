@@ -25,7 +25,7 @@ interface VoiceChannelContextType {
   toggleMute: () => void;
   toggleDeafen: () => void;
   activeVoiceChannelId: string | null;
-  memberStates: Record<string, Partial<VoiceState>>;
+  memberStates: Record<string, Partial<VoiceState>>; // This is now only for local user's immediate state
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -48,7 +48,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isDeafened, setIsDeafened] = useState(false);
-  const [memberStates, setMemberStates] = useState<Record<string, Partial<VoiceState>>>({});
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<PeerData[]>([]);
@@ -56,11 +55,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
   const activeServerIdRef = useRef(activeServerId);
   const wasMutedBeforeDeafen = useRef(false);
-
-  const isMutedRef = useRef(isMuted);
-  const isDeafenedRef = useRef(isDeafened);
-  useEffect(() => { isMutedRef.current = isMuted }, [isMuted]);
-  useEffect(() => { isDeafenedRef.current = isDeafened }, [isDeafened]);
 
   useEffect(() => {
     activeVoiceChannelIdRef.current = activeVoiceChannelId;
@@ -74,9 +68,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       
       const muted = !stream.getAudioTracks()[0].enabled;
       setIsMuted(muted);
-      if (currentUser) {
-        setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: muted } }));
-      }
 
       if (!muted && playSounds) playSound('/unmute.mp3');
       
@@ -85,12 +76,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       console.error('Failed to get user media', err);
       showError("Accesso al microfono negato. Controlla le impostazioni del browser.");
       setIsMuted(true);
-      if (currentUser) {
-        setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
-      }
       return null;
     }
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     const initializeMedia = async () => {
@@ -101,9 +89,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
             await requestMicrophone(false);
           } else {
             setIsMuted(true);
-            if (currentUser) {
-              setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: true } }));
-            }
           }
         } catch (e) {
           console.warn("Permission query for microphone not supported.", e);
@@ -115,7 +100,16 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     return () => {
       localStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, [requestMicrophone, currentUser]);
+  }, [requestMicrophone]);
+
+  const updateDbVoiceState = async (state: Partial<VoiceState>) => {
+    if (!currentUser || !activeServerIdRef.current) return;
+    await supabase
+      .from('server_members')
+      .update(state)
+      .eq('user_id', currentUser.id)
+      .eq('server_id', activeServerIdRef.current);
+  };
 
   const toggleMute = useCallback(async () => {
     if (!currentUser) return;
@@ -137,18 +131,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       if (newMutedState) playSound('/mute.mp3');
       else playSound('/unmute.mp3');
 
-      setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: newMutedState } }));
-      if (signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: 'broadcast',
-          event: 'state-update',
-          payload: { userId: currentUser.id, state: { isMuted: newMutedState } },
-        });
-      }
+      await updateDbVoiceState({ is_muted: newMutedState });
     }
   }, [currentUser, requestMicrophone]);
 
-  const toggleDeafen = useCallback(() => {
+  const toggleDeafen = useCallback(async () => {
     if (!currentUser) return;
 
     const newDeafenState = !isDeafened;
@@ -178,15 +165,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       }
     }
     
-    setMemberStates(prev => ({ ...prev, [currentUser.id]: { isMuted: finalMuteState, isDeafened: newDeafenState } }));
-
-    if (signalingChannelRef.current) {
-      signalingChannelRef.current.send({
-        type: 'broadcast',
-        event: 'state-update',
-        payload: { userId: currentUser.id, state: { isMuted: finalMuteState, isDeafened: newDeafenState } },
-      });
-    }
+    await updateDbVoiceState({ is_deafened: newDeafenState, is_muted: finalMuteState });
   }, [currentUser, isDeafened, isMuted]);
 
   const removePeer = (userId: string) => {
@@ -250,11 +229,10 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     setActiveVoiceChannelId(null);
     setActiveServerId(null);
-    setMemberStates({});
 
     await supabase
       .from('server_members')
-      .update({ voice_channel_id: null })
+      .update({ voice_channel_id: null, is_muted: false, is_deafened: false })
       .eq('server_id', serverToLeave)
       .eq('user_id', currentUser.id);
 
@@ -283,7 +261,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     await supabase
       .from('server_members')
-      .update({ voice_channel_id: channelId })
+      .update({ voice_channel_id: channelId, is_muted: isMuted, is_deafened: isDeafened })
       .eq('server_id', serverId)
       .eq('user_id', currentUser.id);
 
@@ -309,17 +287,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     channel.on('presence', { event: 'join' }, ({ key }) => {
       if (key !== currentUser?.id) {
         playSound('/enter.mp3');
-        // When someone else joins, I send them my current state.
-        if (currentUser) {
-          channel.send({
-            type: 'broadcast',
-            event: 'state-update',
-            payload: {
-              userId: currentUser.id,
-              state: { isMuted: isMutedRef.current, isDeafened: isDeafenedRef.current },
-            },
-          });
-        }
       }
     });
     
@@ -332,11 +299,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         peerData.peer.destroy();
         removePeer(key);
       }
-      setMemberStates(prev => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
     });
 
     channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
@@ -351,26 +313,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       }
     });
 
-    channel.on('broadcast', { event: 'state-update' }, ({ payload }) => {
-      setMemberStates(prev => ({
-        ...prev,
-        [payload.userId]: { ...prev[payload.userId], ...payload.state },
-      }));
-    });
-
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({});
-        if (currentUser) {
-          channel.send({
-            type: 'broadcast',
-            event: 'state-update',
-            payload: {
-              userId: currentUser.id,
-              state: { isMuted, isDeafened },
-            },
-          });
-        }
       }
     });
 
@@ -399,7 +344,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     toggleMute,
     toggleDeafen,
     activeVoiceChannelId,
-    memberStates,
+    memberStates: {}, // This is no longer the source of truth for other members
   };
 
   return (
