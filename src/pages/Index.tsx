@@ -103,6 +103,41 @@ const Index = () => {
     };
   }, [user]);
 
+  // Listener Realtime per la tabella Profiles (Sync digitalcardus, XP, livello, etc.)
+  useEffect(() => {
+    const profileSubscription = supabase
+      .channel('public:profiles_index')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+        const updatedProfile = payload.new;
+
+        // Aggiorna la lista membri del server
+        setServerProfiles(prev => prev.map(p => p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p));
+
+        // Aggiorna l'utente corrente se corrisponde
+        setCurrentUser(prev => {
+          if (!prev || prev.id !== updatedProfile.id) return prev;
+          const isVerifiedUser = (updatedProfile.first_name || "").toLowerCase() === 'faf3tto';
+          return {
+            ...prev,
+            name: updatedProfile.first_name || prev.name,
+            avatar: updatedProfile.avatar_url || prev.avatar,
+            bio: updatedProfile.bio || "",
+            banner_color: updatedProfile.banner_color || "#5865F2",
+            banner_url: updatedProfile.banner_url || undefined,
+            level: updatedProfile.level || 1,
+            digitalcardus: updatedProfile.digitalcardus ?? 25,
+            xp: updatedProfile.xp || 0,
+            global_role: isVerifiedUser ? "CREATOR" : "USER"
+          };
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileSubscription);
+    };
+  }, []);
+
   // Caricamento dati iniziali e premi giornalieri
   useEffect(() => {
     const loadInitialData = async () => {

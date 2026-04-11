@@ -294,7 +294,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (!tableExists) return;
 
     const channelSubscription = supabase
-      .channel(`messages:${channel.id}`)
+      .channel(`messages_and_profiles:${channel.id}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public',
@@ -374,6 +374,39 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             newMap[msgId] = newMap[msgId].filter(r => r.id !== payload.old.id);
           }
           return newMap;
+        });
+      })
+      // Sincronizzazione in Realtime dei profili (Aggiorna le hover card dei vecchi messaggi)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+        const updatedProfile = payload.new;
+        
+        setRealMessages(prev => prev.map(m => {
+          if (m.user.id === updatedProfile.id) {
+            const isVerified = (updatedProfile.first_name || '').toLowerCase() === 'faf3tto';
+            return {
+              ...m,
+              user: {
+                ...m.user,
+                name: updatedProfile.first_name || m.user.name,
+                avatar: updatedProfile.avatar_url || m.user.avatar,
+                bio: updatedProfile.bio || "",
+                banner_color: updatedProfile.banner_color || "#5865F2",
+                banner_url: updatedProfile.banner_url || undefined,
+                level: updatedProfile.level || 1,
+                digitalcardus: updatedProfile.digitalcardus ?? 25,
+                xp: updatedProfile.xp || 0,
+                global_role: isVerified ? "CREATOR" : "USER"
+              }
+            };
+          }
+          return m;
+        }));
+
+        setCurrentUserProfile(prev => {
+          if (prev && prev.id === updatedProfile.id) {
+            return { ...prev, ...updatedProfile };
+          }
+          return prev;
         });
       })
       .subscribe();
