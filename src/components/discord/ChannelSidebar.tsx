@@ -57,6 +57,36 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     speakingStates
   } = useVoiceChannel();
 
+  const previousVoiceMembersRef = useRef<ServerMemberWithProfile[]>([]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId) {
+      previousVoiceMembersRef.current = [];
+      return;
+    }
+
+    const currentVoiceMembers = members.filter(m => m.voice_channel_id === activeVoiceChannelId);
+    const previousVoiceMemberIds = new Set(previousVoiceMembersRef.current.map(m => m.user_id));
+    const currentVoiceMemberIds = new Set(currentVoiceMembers.map(m => m.user_id));
+
+    // Find who joined
+    currentVoiceMemberIds.forEach(id => {
+      if (!previousVoiceMemberIds.has(id) && id !== currentUser.id) {
+        playSound('/enter.mp3');
+      }
+    });
+
+    // Find who left
+    previousVoiceMemberIds.forEach(id => {
+      if (!currentVoiceMemberIds.has(id) && id !== currentUser.id) {
+        playSound('/exit.mp3');
+      }
+    });
+
+    previousVoiceMembersRef.current = currentVoiceMembers;
+
+  }, [members, activeVoiceChannelId, currentUser.id]);
+
   useEffect(() => {
     if (!activeServer?.id) return;
     const saved = localStorage.getItem(`collapsed-categories-${activeServer.id}`);
@@ -166,19 +196,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         if (!isMounted) return;
 
         if (payload.eventType === 'UPDATE') {
-          const oldMember = payload.old as ServerMember;
-          const newMember = payload.new as ServerMember;
-
-          if (activeVoiceChannelId && newMember.user_id !== currentUser.id) {
-            const joinedMyChannel = newMember.voice_channel_id === activeVoiceChannelId && oldMember.voice_channel_id !== activeVoiceChannelId;
-            const leftMyChannel = oldMember.voice_channel_id === activeVoiceChannelId && newMember.voice_channel_id !== activeVoiceChannelId;
-
-            if (joinedMyChannel) playSound('/enter.mp3');
-            if (leftMyChannel) playSound('/exit.mp3');
-          }
-          
-          setMembers(prev => prev.map(m => m.user_id === newMember.user_id ? { ...m, ...newMember } : m));
-
+          const updatedMember = payload.new as ServerMember;
+          // Usa lo spread state sicuro: {...m, ...updatedMember}
+          // In questo modo preserviamo i "profiles" ed evitiamo che la lista sparisca!
+          setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
         } else if (payload.eventType === 'INSERT') {
           const newMember = payload.new as ServerMember;
           const { data: profileData } = await supabase
@@ -203,7 +224,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(memberSub);
     };
-  }, [activeServer?.id, activeVoiceChannelId, currentUser.id]);
+  }, [activeServer?.id]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
