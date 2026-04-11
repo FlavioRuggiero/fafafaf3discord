@@ -93,6 +93,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
+  
+  // Stato per Modale di Eliminazione
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -435,8 +438,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleDeleteMessage = async (msgId: string) => {
-    if (!window.confirm("Sei sicuro di voler eliminare questo messaggio?")) return;
+  const confirmDeleteMessage = async () => {
+    if (!messageToDelete) return;
+    const msgId = messageToDelete;
+    setMessageToDelete(null);
 
     // Aggiornamento UI ottimistico
     const previousMessages = [...realMessages];
@@ -546,6 +551,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages as LocalMessage[]);
+  const msgToDeleteData = messageToDelete ? displayMessages.find(m => m.id === messageToDelete) : null;
 
   const typingNames = Object.values(typingUsers);
   let typingText = "";
@@ -554,7 +560,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0">
         <div className="flex items-center min-w-0 flex-1">
           <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
@@ -690,7 +696,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     <button 
                       className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
                       title={isServerCreator && !isMyMessage ? "Elimina come Moderatore" : "Elimina"} 
-                      onClick={() => handleDeleteMessage(msg.id)}
+                      onClick={() => setMessageToDelete(msg.id)}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -819,6 +825,48 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           />
         </div>
       </div>
+
+      {/* Modale Eliminazione Messaggio */}
+      {messageToDelete && msgToDeleteData && (
+        <div 
+          className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4" 
+          onClick={(e) => e.target === e.currentTarget && setMessageToDelete(null)}
+        >
+          <div className="bg-[#313338] w-full max-w-[440px] rounded-lg shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 relative">
+              <h2 className="text-[20px] font-bold text-white mb-4">Elimina Messaggio</h2>
+              <p className="text-[#dbdee1] text-[15px] mb-4">Sei sicuro di voler eliminare questo messaggio?</p>
+              
+              <div className="bg-[#2b2d31] border border-[#1e1f22] p-3 rounded flex items-start gap-3 shadow-inner">
+                <img src={msgToDeleteData.user.avatar} className="w-10 h-10 rounded-full object-cover" />
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-medium text-[#dbdee1]">{msgToDeleteData.user.name}</span>
+                    <span className="text-xs text-[#949ba4]">{msgToDeleteData.timestamp}</span>
+                  </div>
+                  <div className="text-[#dbdee1] text-[15px] mt-1 line-clamp-3 overflow-hidden break-words">
+                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '')}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-[#2b2d31] flex justify-end gap-3 mt-2">
+              <button 
+                onClick={() => setMessageToDelete(null)} 
+                className="px-4 py-2 text-sm font-medium text-white hover:underline transition-colors"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={confirmDeleteMessage} 
+                className="px-4 py-2 bg-[#da373c] hover:bg-[#a12828] text-white text-sm font-medium rounded transition-colors"
+              >
+                Elimina
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
