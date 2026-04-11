@@ -398,6 +398,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (!currentUser || !activeServer) return;
 
     if (activeVoiceChannelId !== channel.id) {
+      setMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.user_id === currentUser.id 
+            ? { ...member, voice_channel_id: channel.id } 
+            : member
+        )
+      );
       joinVoiceChannel(channel.id, activeServer.id);
     }
   };
@@ -749,6 +756,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             </span>
             <button 
               onClick={() => {
+                setMembers(prevMembers => 
+                  prevMembers.map(member => 
+                    member.user_id === currentUser.id 
+                      ? { ...member, voice_channel_id: null } 
+                      : member
+                  )
+                );
                 leaveVoiceChannel();
               }}
               className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
