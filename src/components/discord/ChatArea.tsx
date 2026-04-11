@@ -36,20 +36,33 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
     setIsLoading(true);
 
     const loadSources = async () => {
-      // Tentativo di usare un'API nativa (es. in ambiente Electron protetto)
+      // 1. App Desktop (Electron/WebView) con API custom definita dallo sviluppatore
       if ((window as any).electronAPI?.getDesktopSources) {
         try {
           const res = await (window as any).electronAPI.getDesktopSources();
-          setSources(res);
+          const formatted = res.map((s: any) => ({
+            ...s,
+            type: s.id.startsWith('screen') ? 'screen' : 'window',
+            thumbnail: s.thumbnail?.toDataURL ? s.thumbnail.toDataURL() : s.thumbnail
+          }));
+          setSources(formatted);
         } catch (err) {
           console.error(err);
         }
-      } else {
-        // Fallback per il Web - mockiamo l'interfaccia ma delegando l'API nativa del browser
+      } 
+      // 2. App Desktop ma senza l'API esplicita (ci affidiamo agli ID chromium predefiniti per gli schermi)
+      else if (navigator.userAgent.toLowerCase().includes('electron') || (window as any).process) {
         setSources([
-          { id: 'native-screen', name: 'Schermo Completo', type: 'screen' },
-          { id: 'native-window', name: 'Finestra dell\'Applicazione', type: 'window' },
-          { id: 'native-tab', name: 'Scheda del Browser', type: 'window' }
+          { id: 'screen:0:0', name: 'Schermo Principale', type: 'screen' },
+          { id: 'screen:1:0', name: 'Schermo Esterno 1', type: 'screen' },
+          { id: 'screen:2:0', name: 'Schermo Esterno 2', type: 'screen' },
+          { id: 'window:0', name: 'Finestra generica', type: 'window' }
+        ]);
+      } 
+      // 3. Fallback per la visualizzazione Web pura (affida al browser nativo la selezione)
+      else {
+        setSources([
+          { id: 'native-browser', name: 'Usa il selettore del browser', type: 'screen' }
         ]);
       }
       setIsLoading(false);
@@ -91,6 +104,11 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
             <div className="flex justify-center items-center h-full mt-20">
               <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
             </div>
+          ) : currentSources.length === 0 ? (
+            <div className="flex flex-col justify-center items-center h-full mt-10 text-[#949ba4]">
+              <Monitor size={48} className="mb-4 opacity-50" />
+              <p>Nessuna sorgente trovata in questa categoria.</p>
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {currentSources.map(source => (
@@ -118,7 +136,7 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
 
         <div className="p-4 bg-[#313338] border-t border-[#1e1f22] flex justify-between items-center text-xs text-[#949ba4]">
           <span>Seleziona una sorgente per avviare la condivisione.</span>
-          {sources.some(s => s.id.startsWith('native-')) && (
+          {sources.some(s => s.id === 'native-browser') && (
             <span className="italic text-[#f0b232]">Verrà usato il selettore del sistema.</span>
           )}
         </div>

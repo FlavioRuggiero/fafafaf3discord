@@ -306,11 +306,16 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       let stream: MediaStream | null = null;
       let lastError: any = null;
       
-      // 1. API Electron/Desktop Nativa (se abbiamo una sourceId valida)
-      if (sourceId && !sourceId.startsWith('native-')) {
+      // 1. Desktop Capturer (Se sourceId è valido e fornito dal wrapper desktop)
+      if (sourceId && sourceId !== 'native-browser') {
         try {
+          // Tentativo primario: CATTURA AUDIO + VIDEO SCHERMO
           stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
+            audio: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+              }
+            } as any,
             video: {
               mandatory: {
                 chromeMediaSource: 'desktop',
@@ -319,48 +324,42 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
             } as any
           });
         } catch (e) {
-          console.warn("Desktop capturer fallito", e);
-          lastError = e;
+          console.warn("Cattura audio+video desktop fallita. Ritento solo con video.", e);
+          try {
+            // Fallback secondario: CATTURA SOLO VIDEO SCHERMO
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: sourceId
+                }
+              } as any
+            });
+          } catch (vidErr) {
+            console.error("Fallita anche la cattura solo video.", vidErr);
+            lastError = vidErr;
+          }
         }
       }
       
-      // 2. API Web Standard (Web / PWA / WebView2 su Windows)
-      // Disabilitiamo l'audio nativo dello schermo per massimizzare la compatibilità (su Mac spesso blocca)
-      if (!stream && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+      // 2. Fallback Web Standard (Browser Picker Nativo)
+      if (!stream) {
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({ 
             video: true, 
-            audio: false 
+            audio: true 
           });
-        } catch (e: any) {
-          console.warn("getDisplayMedia fallito", e);
-          lastError = e;
-        }
-      }
-
-      // 3. Fallback Estremo (Vecchi browser o implementazioni Desktop Chromium generiche)
-      if (!stream && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-              mandatory: {
-                chromeMediaSource: 'desktop'
-              }
-            } as any
-          });
-        } catch (e: any) {
-          console.warn("Ultimo fallback getUserMedia desktop fallito", e);
+        } catch (e) {
           lastError = e;
         }
       }
 
       if (!stream) {
-        // Ignora l'errore se l'utente ha semplicemente chiuso la finestra di selezione (NotAllowedError)
-        if (lastError && (lastError.name === 'NotAllowedError' || lastError.message?.includes('Permission denied'))) {
-          return;
+        // Se non è l'utente che ha annullato la scelta, mostra l'errore
+        if (lastError?.name !== 'NotAllowedError') {
+          showError("Permessi negati o API di sistema non supportata in questo ambiente.");
         }
-        showError("Il tuo dispositivo o applicazione non supporta la condivisione schermo o mancano i permessi.");
         return;
       }
       
@@ -371,6 +370,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       localScreenStreamRef.current = stream;
       setLocalScreenStream(stream);
       
+      // Invio lo stream dello schermo (che ora include anche l'audio di sistema se supportato) ai peer
       peersRef.current.forEach(({ peer }) => {
         try { peer.addStream(stream!); } catch (e) { console.error(e) }
       });
