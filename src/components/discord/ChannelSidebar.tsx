@@ -9,7 +9,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
 
-type ServerMemberWithProfile = ServerMember & { profiles: Profile | null; is_muted?: boolean; is_deafened?: boolean; };
+type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
 interface ChannelSidebarProps {
   activeServer: Server | null;
@@ -53,6 +53,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     joinVoiceChannel, 
     leaveVoiceChannel, 
     activeVoiceChannelId, 
+    memberStates
   } = useVoiceChannel();
 
   useEffect(() => {
@@ -115,17 +116,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   // Gestione Membri Server per Chat Vocali: ottimizzato per aggiornamenti istantanei
   useEffect(() => {
-    if (!activeServer?.id) {
-      setMembers([]);
-      return;
-    }
+    if (!activeServer?.id) return;
 
     let isMounted = true;
 
     const fetchInitialMembers = async () => {
       const { data: membersData, error: membersError } = await supabase
         .from('server_members')
-        .select('*, profiles(*)')
+        .select('*')
         .eq('server_id', activeServer.id);
       
       if (membersError || !membersData) {
@@ -134,8 +132,24 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         return;
       }
       
+      if (membersData.length === 0) {
+        if (isMounted) setMembers([]);
+        return;
+      }
+
+      const userIds = membersData.map(m => m.user_id);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds);
+
+      const combinedData = membersData.map(m => ({
+        ...m,
+        profiles: profilesData?.find(p => p.id === m.user_id) || null
+      }));
+
       if (isMounted) {
-        setMembers(membersData as ServerMemberWithProfile[]);
+        setMembers(combinedData as ServerMemberWithProfile[]);
       }
     };
 
@@ -151,10 +165,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         if (!isMounted) return;
 
         if (payload.eventType === 'UPDATE') {
-          const updatedMember = payload.new as ServerMemberWithProfile;
+          const updatedMember = payload.new as ServerMember;
           setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
         } else if (payload.eventType === 'INSERT') {
-          const newMember = payload.new as ServerMemberWithProfile;
+          const newMember = payload.new as ServerMember;
           const { data: profileData } = await supabase
             .from('profiles')
             .select('*')
@@ -372,6 +386,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (!currentUser || !activeServer) return;
 
     if (activeVoiceChannelId !== channel.id) {
+      setMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.user_id === currentUser.id 
+            ? { ...member, voice_channel_id: channel.id } 
+            : member
+        )
+      );
       joinVoiceChannel(channel.id, activeServer.id);
     }
   };
@@ -680,8 +701,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           {isVoiceChannel && connectedMembers.length > 0 && (
                             <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
                               {connectedMembers.map(member => {
-                                const memberIsMuted = member.is_muted;
-                                const memberIsDeafened = member.is_deafened;
+                                const voiceState = memberStates[member.user_id];
+                                const memberIsMuted = voiceState?.isMuted ?? false;
+                                const memberIsDeafened = voiceState?.isDeafened ?? false;
 
                                 return (
                                   <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
@@ -722,6 +744,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             </span>
             <button 
               onClick={() => {
+                setMembers(prevMembers => 
+                  prevMembers.map(member => 
+                    member.user_id === currentUser.id 
+                      ? { ...member, voice_channel_id: null } 
+                      : member
+                  )
+                );
                 leaveVoiceChannel();
               }}
               className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
