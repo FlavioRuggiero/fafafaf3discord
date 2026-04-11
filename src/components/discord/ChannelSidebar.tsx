@@ -174,7 +174,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         } else if (payload.eventType === 'UPDATE') {
           setMembers(prev => prev.map(m => {
             if (m.user_id === payload.new.user_id) {
-              return { ...m, voice_channel_id: payload.new.voice_channel_id };
+              return { ...m, ...payload.new };
             }
             return m;
           }));
