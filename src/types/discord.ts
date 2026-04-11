@@ -62,6 +62,4 @@ export type ServerMember = {
   joined_at?: string;
   position?: number;
   voice_channel_id?: string | null;
-  is_muted: boolean;
-  is_deafened: boolean;
 };
