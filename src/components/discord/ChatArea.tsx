@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { Message, Channel, User } from "@/types/discord";
@@ -13,6 +13,16 @@ import { ProfilePopover } from "./ProfilePopover";
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
 const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔", "👎", "💯", "✨", "💀"];
+
+const StreamPlayer = ({ stream, className }: { stream: MediaStream; className?: string }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+  return <video ref={videoRef} autoPlay muted className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
+};
 
 interface ChatAreaProps {
   channel: Channel;
@@ -47,6 +57,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   // Stato per gli utenti connessi al canale vocale
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   const { speakingStates } = useVoiceChannel();
+
+  // Stato per condivisione schermo
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,6 +103,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, []);
 
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      if (localScreenStream) {
+        localScreenStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [localScreenStream]);
+
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -109,6 +132,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   useEffect(() => {
     if (channel?.type !== 'voice') {
       setVoiceMembers([]);
+      setLocalScreenStream(null);
+      setFocusedUserId(null);
       return;
     }
 
@@ -149,7 +174,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     fetchVoiceMembers();
 
-    // Sottoscriviti all'intero server_members del server, per individuare quando si disconnettono (voice_channel_id diventa null)
     const sub = supabase.channel(`voice_area_${channel.id}`)
       .on('postgres_changes', {
         event: '*',
@@ -245,7 +269,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         });
         setRealMessages(formatted);
 
-        // Fetch Reactions
         if (data.length > 0) {
           const msgIds = data.map((m: any) => m.id);
           const { data: reactionsData, error: reactionsError } = await supabase
@@ -647,8 +670,45 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return (now - msgTime) <= 5 * 60 * 1000;
   };
 
-  // VISTA CANALE VOCALE (Griglia Utenti, Niente chat testuale)
+  const toggleScreenShare = async () => {
+    if (localScreenStream) {
+      localScreenStream.getTracks().forEach(track => track.stop());
+      setLocalScreenStream(null);
+      if (focusedUserId === currentUser?.id) {
+        setFocusedUserId(null);
+      }
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        stream.getVideoTracks()[0].onended = () => {
+          setLocalScreenStream(null);
+          if (focusedUserId === currentUser?.id) {
+            setFocusedUserId(null);
+          }
+        };
+        setLocalScreenStream(stream);
+      } catch (err) {
+        console.error("Errore condivisione schermo:", err);
+      }
+    }
+  };
+
+  // VISTA CANALE VOCALE
   if (channel.type === 'voice') {
+    const displayVoiceMembers = [...voiceMembers];
+    // Se l'utente sta condividendo lo schermo ma non è nell'array members (magari non si è ancora unito formalmente),
+    // lo aggiungiamo localmente per potergli mostrare il suo stream.
+    if (localScreenStream && currentUser && !displayVoiceMembers.some(m => m.user_id === currentUser.id)) {
+      displayVoiceMembers.push({
+        user_id: currentUser.id,
+        is_muted: false,
+        is_deafened: false,
+        profiles: currentUserProfile
+      });
+    }
+
+    const focusedMember = focusedUserId ? displayVoiceMembers.find(m => m.user_id === focusedUserId) : null;
+
     return (
       <div className="flex-1 flex flex-col min-w-0 bg-[#000000] relative">
         <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338]">
@@ -666,37 +726,119 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-[#000000] flex flex-col">
-          <div className="flex-1 flex items-start justify-center pt-8">
-            {voiceMembers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-[#949ba4] animate-in fade-in zoom-in-95 duration-300 mt-20">
-                <Volume2 size={64} className="mb-4 opacity-50" />
-                <p className="text-xl font-medium text-white">Nessuno è connesso</p>
-                <p className="text-sm mt-2 text-[#949ba4]">Unisciti al canale cliccando nella barra laterale per iniziare a parlare.</p>
+        <div className="flex-1 overflow-hidden flex flex-col relative">
+          {focusedMember ? (
+            <div className="flex-1 flex flex-col min-h-0 bg-black animate-in fade-in duration-200">
+              <div className="flex-1 relative flex items-center justify-center min-h-0 p-4">
+                {focusedMember.user_id === currentUser?.id && localScreenStream ? (
+                  <StreamPlayer stream={localScreenStream} className="w-full h-full object-contain rounded-lg shadow-2xl" />
+                ) : (
+                  <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
+                    <img src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                
+                <button onClick={() => setFocusedUserId(null)} className="absolute top-6 right-6 p-2.5 bg-black/60 hover:bg-black/80 rounded-lg text-white transition-colors z-10 backdrop-blur-md" title="Riduci a griglia">
+                  <Minimize size={20} />
+                </button>
+                
+                <div className="absolute bottom-6 left-6 flex items-center bg-black/60 backdrop-blur-md rounded-lg px-4 py-2 shadow-lg z-10">
+                  <span className="text-white font-medium text-lg">{focusedMember.profiles?.first_name || 'Utente'}</span>
+                  {focusedMember.user_id === currentUser?.id && localScreenStream && (
+                     <span className="ml-3 px-2 py-0.5 bg-brand text-white text-xs font-bold rounded-md uppercase tracking-wide">In Condivisione</span>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="w-full max-w-7xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
-                {voiceMembers.map(member => {
-                  const isSpeaking = speakingStates[member.user_id];
-                  return (
-                    <div key={member.user_id} className={`relative flex flex-col items-center justify-center bg-[#111214] rounded-xl aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
-                      <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
-                        <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+              
+              {displayVoiceMembers.length > 1 && (
+                <div className="h-36 sm:h-44 bg-[#111214] flex items-center gap-4 px-4 overflow-x-auto border-t border-[#1f2023] flex-shrink-0 custom-scrollbar">
+                  {displayVoiceMembers.filter(m => m.user_id !== focusedUserId).map(member => {
+                    const isSpeaking = speakingStates[member.user_id];
+                    const hasScreen = member.user_id === currentUser?.id && localScreenStream;
+                    return (
+                      <div key={member.user_id} 
+                           onClick={() => setFocusedUserId(member.user_id)}
+                           className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${isSpeaking ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
+                        {hasScreen ? (
+                          <div className="w-full h-full overflow-hidden rounded-lg pointer-events-none opacity-80">
+                             <StreamPlayer stream={localScreenStream!} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
+                            <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="absolute bottom-1.5 left-1.5 flex items-center bg-black/70 backdrop-blur-md rounded px-2 py-1">
+                          <span className="text-white text-[10px] sm:text-xs truncate max-w-[100px] font-medium">
+                            {member.profiles?.first_name || 'Utente'}
+                          </span>
+                        </div>
                       </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-[#000000] flex flex-col">
+              <div className="flex-1 flex items-start justify-center pt-8">
+                {displayVoiceMembers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-[#949ba4] animate-in fade-in zoom-in-95 duration-300 mt-20">
+                    <Volume2 size={64} className="mb-4 opacity-50" />
+                    <p className="text-xl font-medium text-white">Nessuno è connesso</p>
+                    <p className="text-sm mt-2 text-[#949ba4]">Unisciti al canale cliccando nella barra laterale per iniziare a parlare.</p>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-7xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
+                    {displayVoiceMembers.map(member => {
+                      const isSpeaking = speakingStates[member.user_id];
+                      const hasScreen = member.user_id === currentUser?.id && localScreenStream;
                       
-                      <div className="absolute bottom-3 left-3 flex items-center bg-black/60 backdrop-blur-md rounded-lg px-2.5 py-1.5 shadow-lg">
-                        {member.is_deafened && <Headphones size={16} className="text-[#f23f43] mr-1.5" />}
-                        {member.is_muted && !member.is_deafened && <MicOff size={16} className="text-[#f23f43] mr-1.5" />}
-                        <span className="text-white text-sm font-medium truncate max-w-[120px]">
-                          {member.profiles?.first_name || 'Utente'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                      return (
+                        <div key={member.user_id} className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
+                          
+                          {hasScreen ? (
+                            <div className="w-full h-full bg-black relative">
+                              <StreamPlayer stream={localScreenStream!} className="w-full h-full object-cover" />
+                              <div className="absolute top-3 left-3 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded shadow-md uppercase tracking-wider">In onda</div>
+                            </div>
+                          ) : (
+                            <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
+                              <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+
+                          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                             <button onClick={() => setFocusedUserId(member.user_id)} className="p-2 bg-black/70 hover:bg-black/90 rounded-lg text-white shadow-lg backdrop-blur-md transition-colors" title="Schermo intero">
+                               <Maximize size={18} />
+                             </button>
+                          </div>
+
+                          <div className="absolute bottom-3 left-3 flex items-center bg-black/70 backdrop-blur-md rounded-lg px-2.5 py-1.5 shadow-lg z-10">
+                            {member.is_deafened && <Headphones size={16} className="text-[#f23f43] mr-1.5" />}
+                            {member.is_muted && !member.is_deafened && <MicOff size={16} className="text-[#f23f43] mr-1.5" />}
+                            <span className="text-white text-sm font-medium truncate max-w-[120px]">
+                              {member.profiles?.first_name || 'Utente'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
+
+        <div className="h-[72px] bg-[#1e1f22] border-t border-[#111214] flex items-center justify-center gap-4 flex-shrink-0 z-20">
+           <button 
+             onClick={toggleScreenShare}
+             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${localScreenStream ? 'bg-[#da373c] hover:bg-[#a12828] text-white shadow-[0_0_20px_rgba(218,55,60,0.3)]' : 'bg-[#313338] hover:bg-[#3f4147] text-[#dbdee1]'}`}
+             title={localScreenStream ? "Interrompi condivisione" : "Condividi schermo"}
+           >
+             {localScreenStream ? <MonitorOff size={24} /> : <MonitorUp size={24} />}
+           </button>
         </div>
       </div>
     );
