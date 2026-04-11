@@ -6,10 +6,8 @@ import * as HoverCard from "@radix-ui/react-hover-card";
 import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 
-// Estendiamo il tipo Message localmente per includere il raw timestamp necessario per calcolare i 5 minuti
 type LocalMessage = Message & { rawCreatedAt?: string };
 
-// Componente helper per mostrare la card del profilo al passaggio del mouse
 const ProfileHoverCard = ({ user, children }: { user: User, children: React.ReactNode }) => {
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
   
@@ -64,7 +62,6 @@ const ProfileHoverCard = ({ user, children }: { user: User, children: React.Reac
   );
 };
 
-
 interface ChatAreaProps {
   channel: Channel;
   messages: Message[];
@@ -83,7 +80,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [isLoading, setIsLoading] = useState(true);
   const [tableExists, setTableExists] = useState(true);
   
-  // Nuovi stati per Editing e Reply
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
@@ -97,6 +93,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToMessage = (msgId: string) => {
+    const el = document.getElementById(`msg-${msgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('bg-brand/20');
+      setTimeout(() => {
+        el.classList.remove('bg-brand/20');
+      }, 2000);
+    }
   };
 
   useEffect(() => {
@@ -115,7 +122,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, []);
 
-  // Recupero dell'utente corrente e del suo profilo
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -132,7 +138,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
-  // Recupero storico messaggi e iscrizione Realtime
   useEffect(() => {
     if (!channel?.id) return;
     
@@ -193,11 +198,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
-    // Sottoscrizione realtime ai messaggi (INSERT e UPDATE)
     const channelSubscription = supabase
       .channel(`messages:${channel.id}`)
       .on('postgres_changes', {
-        event: '*', // Ascolta sia INSERT che UPDATE (e DELETE)
+        event: '*', 
         schema: 'public',
         table: 'messages',
         filter: `channel_id=eq.${channel.id}`
@@ -253,7 +257,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, tableExists]);
 
-  // Ascolto Presence (chi sta scrivendo)
   useEffect(() => {
     if (!channel?.id || !currentUser?.id) return;
 
@@ -337,7 +340,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         let finalContent = content;
         if (replyingTo) {
-          finalContent = `**Risposta a ${replyingTo.user.name}:**\n${content}`;
+          finalContent = `<reply:${replyingTo.id}>${content}`;
         }
         
         const optimisticMsg: LocalMessage = {
@@ -379,12 +382,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  // Funzioni per l'Editing
   const startEditing = (msg: LocalMessage) => {
     setEditingMessageId(msg.id);
-    // Rimuove l'eventuale prefisso "Risposta a" per facilitare la modifica del testo reale
-    const content = msg.content.startsWith('**Risposta a') ? msg.content.split('\n').slice(1).join('\n') : msg.content;
-    setEditContent(content);
+    const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
+    let contentToEdit = replyMatch ? replyMatch[2] : msg.content;
+    
+    // Fallback retrocompatibilità se ci sono vecchi formati
+    if (contentToEdit.startsWith('**Risposta a')) {
+      contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
+    }
+    setEditContent(contentToEdit);
   };
 
   const cancelEditing = () => {
@@ -401,32 +408,23 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const originalMsg = realMessages.find(m => m.id === msgId);
     let finalContent = editContent.trim();
     
-    // Manteniamo il prefisso di risposta se esisteva
-    if (originalMsg?.content.startsWith('**Risposta a')) {
-      const prefix = originalMsg.content.split('\n')[0];
-      finalContent = `${prefix}\n${finalContent}`;
+    const replyMatch = originalMsg?.content.match(/^<reply:([a-zA-Z0-9-]+)>/);
+    if (replyMatch) {
+      finalContent = `${replyMatch[0]}${finalContent}`;
     }
 
-    // Update ottimistico
     setRealMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent } : m));
     setEditingMessageId(null);
 
     const { error } = await supabase.from('messages').update({ content: finalContent }).eq('id', msgId);
-    if (error) {
-      console.error("Errore salvataggio modifica:", error);
-      // Revert if error (semplificato)
-    }
+    if (error) console.error("Errore salvataggio modifica:", error);
   };
 
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, msgId: string) => {
-    if (e.key === 'Escape') {
-      cancelEditing();
-    } else if (e.key === 'Enter') {
-      saveEdit(msgId);
-    }
+    if (e.key === 'Escape') cancelEditing();
+    else if (e.key === 'Enter') saveEdit(msgId);
   };
 
-  // Utility per controllare se sono passati meno di 5 minuti
   const isWithin5Minutes = (rawDate?: string) => {
     if (!rawDate) return false;
     const msgTime = new Date(rawDate).getTime();
@@ -438,36 +436,22 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const typingNames = Object.values(typingUsers);
   let typingText = "";
-  if (typingNames.length === 1) {
-    typingText = `${typingNames[0]} sta scrivendo...`;
-  } else if (typingNames.length === 2) {
-    typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
-  } else if (typingNames.length > 2) {
-    typingText = "Più utenti stanno scrivendo...";
-  }
+  if (typingNames.length === 1) typingText = `${typingNames[0]} sta scrivendo...`;
+  else if (typingNames.length === 2) typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
+  else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-      {/* Header */}
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0">
         <div className="flex items-center min-w-0 flex-1">
           <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
             <Menu size={24} />
           </button>
-          
-          {channel.type === 'text' ? (
-            <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
-          ) : (
-            <Volume2 size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
-          )}
+          {channel.type === 'text' ? <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" /> : <Volume2 size={24} className="text-[#80848e] mr-2 flex-shrink-0" />}
           <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
         </div>
         <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
-          <button 
-            onClick={onToggleMembers} 
-            className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`}
-            title="Alterna Elenco Membri"
-          >
+          <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
             <Users size={24} />
           </button>
         </div>
@@ -480,7 +464,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
       )}
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
@@ -497,82 +480,110 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         )}
 
         {!isLoading && displayMessages.map((msg, idx) => {
-          const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id;
+          // Parsing del tag <reply:...>
+          const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
+          const isReply = !!replyMatch;
+          const replyToId = isReply ? replyMatch[1] : null;
+          const displayContent = isReply ? replyMatch[2] : msg.content;
+          
+          let repliedMessage = null;
+          let repliedMessageContent = "";
+          
+          if (isReply) {
+            repliedMessage = displayMessages.find(m => m.id === replyToId);
+            if (repliedMessage) {
+              repliedMessageContent = repliedMessage.content;
+              const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
+              if (nestedMatch) repliedMessageContent = nestedMatch[2]; // Pulisce se rispondi a una risposta
+            } else {
+              repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
+            }
+          }
+
+          // Raggruppamento si spezza se cambiamo utente O se il messaggio è una risposta
+          const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id && !isReply;
           const isMyMessage = currentUser?.id === msg.user.id;
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt);
           const isEditing = editingMessageId === msg.id;
           
           return (
-            <div key={msg.id} className={`group relative flex items-start hover:bg-[#2e3035] -mx-4 px-4 py-0.5 rounded ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'}`}>
+            <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col hover:bg-[#2e3035] -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'}`}>
               
-              {/* Menu Contestuale (Hover Options) */}
               {!isEditing && (
                 <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all">
-                  <button 
-                    className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors"
-                    title="Aggiungi reazione"
-                    onClick={() => { /* Placeholder per reazioni */ }}
-                  >
+                  <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Aggiungi reazione">
                     <SmilePlus size={18} />
                   </button>
-                  <button 
-                    className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors"
-                    title="Rispondi"
-                    onClick={() => { setReplyingTo(msg); editInputRef.current?.focus(); }}
-                  >
+                  <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Rispondi" onClick={() => { setReplyingTo(msg); editInputRef.current?.focus(); }}>
                     <ReplyIcon size={18} />
                   </button>
                   {canEdit && (
-                    <button 
-                      className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors"
-                      title="Modifica"
-                      onClick={() => startEditing(msg)}
-                    >
+                    <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Modifica" onClick={() => startEditing(msg)}>
                       <Pencil size={18} />
                     </button>
                   )}
                 </div>
               )}
 
-              {!isSameUserAsPrevious || isEditing ? (
-                <ProfileHoverCard user={msg.user}>
-                  <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
-                </ProfileHoverCard>
-              ) : (
-                <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
-                  {msg.timestamp?.split(' ')[2] || msg.timestamp}
+              {/* Anteprima Risposta */}
+              {isReply && (
+                <div className="relative flex items-center pl-[72px] mb-1 cursor-pointer group/reply select-none" onClick={() => replyToId && scrollToMessage(replyToId)}>
+                  <div className="absolute left-[36px] top-1/2 w-[32px] h-[14px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md -translate-y-[2px]"></div>
+                  {repliedMessage ? (
+                    <>
+                      <img src={repliedMessage.user.avatar} className="w-4 h-4 rounded-full mr-1.5 object-cover" alt="" />
+                      <span className="font-medium text-[#dbdee1] text-xs mr-2 hover:underline opacity-80 group-hover/reply:opacity-100 whitespace-nowrap">{repliedMessage.user.name}</span>
+                      <span className="text-[#b5bac1] text-xs truncate max-w-[50%] md:max-w-[70%] opacity-80 group-hover/reply:opacity-100 group-hover/reply:text-white">
+                        {repliedMessageContent}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[#949ba4] text-xs italic">{repliedMessageContent}</span>
+                  )}
                 </div>
               )}
-              
-              <div className="flex-1 min-w-0">
-                {(!isSameUserAsPrevious || isEditing) && (
-                  <div className="flex items-baseline min-w-0 mb-0.5">
-                    <ProfileHoverCard user={msg.user}>
-                      <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
-                    </ProfileHoverCard>
-                    <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
+
+              <div className="flex items-start">
+                {!isSameUserAsPrevious || isEditing ? (
+                  <ProfileHoverCard user={msg.user}>
+                    <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
+                  </ProfileHoverCard>
+                ) : (
+                  <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
+                    {msg.timestamp?.split(' ')[2] || msg.timestamp}
                   </div>
                 )}
                 
-                {isEditing ? (
-                  <div className="mt-1 mr-4">
-                    <div className="bg-[#383a40] p-2.5 rounded-md border border-[#1f2023]">
-                      <input
-                        ref={editInputRef}
-                        type="text"
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
-                        className="w-full bg-transparent border-none outline-none text-[#dbdee1]"
-                      />
+                <div className="flex-1 min-w-0">
+                  {(!isSameUserAsPrevious || isEditing) && (
+                    <div className="flex items-baseline min-w-0 mb-0.5">
+                      <ProfileHoverCard user={msg.user}>
+                        <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
+                      </ProfileHoverCard>
+                      <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
                     </div>
-                    <div className="text-[11px] text-[#b5bac1] mt-1.5">
-                      Premi esc per <button className="text-[#00a8fc] hover:underline" onClick={cancelEditing}>annullare</button> • invio per <button className="text-[#00a8fc] hover:underline" onClick={() => saveEdit(msg.id)}>salvare</button>
+                  )}
+                  
+                  {isEditing ? (
+                    <div className="mt-1 mr-4">
+                      <div className="bg-[#383a40] p-2.5 rounded-md border border-[#1f2023]">
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
+                          className="w-full bg-transparent border-none outline-none text-[#dbdee1]"
+                        />
+                      </div>
+                      <div className="text-[11px] text-[#b5bac1] mt-1.5">
+                        Premi esc per <button className="text-[#00a8fc] hover:underline" onClick={cancelEditing}>annullare</button> • invio per <button className="text-[#00a8fc] hover:underline" onClick={() => saveEdit(msg.id)}>salvare</button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">{msg.content}</div>
-                )}
+                  ) : (
+                    <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">{displayContent}</div>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -580,7 +591,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         <div ref={messagesEndRef} className="h-4 flex-shrink-0" />
       </div>
 
-      {/* Input Area */}
       <div className="p-4 pt-0 flex-shrink-0 flex flex-col relative">
         <div className="h-6 flex items-center mb-1 text-xs font-medium text-[#b5bac1] overflow-hidden truncate px-1">
           {typingText && (
@@ -595,7 +605,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           )}
         </div>
 
-        {/* Barra di Risposta */}
         {replyingTo && (
           <div className="bg-[#2b2d31] text-[#b5bac1] px-4 py-2 flex items-center justify-between text-sm rounded-t-lg -mb-2 z-10 relative border-x border-t border-[#1f2023]">
             <div className="flex items-center truncate">
