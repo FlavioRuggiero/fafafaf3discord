@@ -5,14 +5,13 @@ import { ChatArea } from "@/components/discord/ChatArea";
 import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
+import { FriendsArea } from "@/components/discord/FriendsArea";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus } from "lucide-react";
 import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
-import { UserPanel } from "@/components/discord/UserPanel";
 
 const Index = () => {
   const { user } = useAuth();
@@ -155,13 +154,9 @@ const Index = () => {
     const loadInitialData = async () => {
       if (!user) return;
       
-      // 1. Aggiorna data ultimo accesso
       await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
-      
-      // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
       await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
       
-      // Controllo del premio giornaliero
       const { data: rewardData } = await supabase.rpc('claim_daily_reward', { user_id_param: user.id });
       
       if (rewardData && rewardData.rewarded) {
@@ -249,7 +244,6 @@ const Index = () => {
 
     fetchServerMembers();
 
-    // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
     const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
       .on('postgres_changes', {
         event: '*',
@@ -289,22 +283,22 @@ const Index = () => {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
       if (newServerChannels.length > 0) {
         setActiveChannel(current => {
-          // Se non c'è un canale attivo, o quello attivo appartiene a un altro server, imposta il primo
           if (!current || current.server_id !== activeServerId) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
-          // Se il canale attivo è stato rimosso (cancellato globalmente), fa un fallback sicuro
           if (!newServerChannels.some(c => c.id === current.id)) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
-          // Altrimenti lascia invariato l'activeChannel
           return current;
         });
       } else {
         setActiveChannel(null);
       }
     } else {
-      setActiveChannel(null);
+      setActiveChannel(current => {
+        if (current?.type === 'dm' || current?.id === 'friends') return current;
+        return { id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null };
+      });
     }
   }, [activeServerId, allChannels]);
 
@@ -334,6 +328,55 @@ const Index = () => {
       ...prev,
       [activeChannel.id]: [...(prev[activeChannel.id] || []), newMessage]
     }));
+  };
+
+  const handleStartDM = async (userId: string) => {
+    if (!currentUser) return;
+    
+    const { data, error } = await supabase
+      .from('dm_channels')
+      .select('*')
+      .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUser.id})`)
+      .maybeSingle();
+
+    let dmId = data?.id;
+
+    if (!dmId) {
+      const { data: newDm } = await supabase
+        .from('dm_channels')
+        .insert({ user1_id: currentUser.id, user2_id: userId })
+        .select()
+        .single();
+      if (newDm) dmId = newDm.id;
+    }
+
+    if (dmId) {
+      const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (p) {
+        const recipient: User = {
+          id: p.id,
+          name: p.first_name || 'Utente',
+          avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+          status: onlineUserIds.has(p.id) ? 'online' : 'offline',
+          bio: p.bio || undefined,
+          banner_color: p.banner_color || undefined,
+          banner_url: p.banner_url || undefined,
+          level: p.level || 1,
+          digitalcardus: p.digitalcardus || 25,
+          xp: p.xp || 0,
+          global_role: (p.first_name || '').toLowerCase() === 'faf3tto' ? 'CREATOR' : 'USER'
+        };
+        setActiveChannel({
+          id: dmId,
+          server_id: null,
+          name: recipient.name,
+          type: 'dm',
+          category: 'Messaggi Diretti',
+          recipient
+        });
+        setActiveServerId('home');
+      }
+    }
   };
 
   const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
@@ -446,7 +489,6 @@ const Index = () => {
     if (newChannels) {
       setAllChannels([...allChannels, ...newChannels]);
       
-      // Invia un messaggio di benvenuto nel primo canale testuale
       const firstTextChannel = newChannels.find(c => c.type === 'text');
       if (firstTextChannel) {
         await supabase.from('messages').insert({
@@ -472,7 +514,7 @@ const Index = () => {
       .select();
 
     if (error || !data || data.length === 0) {
-      showError("Impossibile uscire dal server. Assicurati di aver eseguito lo script SQL.");
+      showError("Impossibile uscire dal server.");
       return;
     }
 
@@ -623,7 +665,6 @@ const Index = () => {
   }
 
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
-  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
 
   return (
     <VoiceChannelProvider currentUser={currentUser}>
@@ -681,47 +722,23 @@ const Index = () => {
             </div>
           </>
         ) : activeServerId === 'home' ? (
-          <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-            <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
-              <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
-                <Menu size={24} />
-              </button>
-              <Home size={20} className="text-[#80848e] mr-2" />
-              <h2 className="font-semibold text-white">Discord Canary 2</h2>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
-              <div className="max-w-xl w-full text-center">
-                <div className="w-20 h-20 bg-brand rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
-                  <MessageSquare size={40} className="text-white" />
-                </div>
-                <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
-                <p className="text-[#b5bac1] mb-8 text-lg">
-                  Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
-                </p>
-                
-                <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
-                  <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                    <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Compass size={24} className="text-[#23a559]" />
-                    </div>
-                    <h3 className="font-bold text-white mb-1">Esplora Server</h3>
-                    <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
-                  </button>
-                  
-                  {canCreate && (
-                    <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                      <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Plus size={24} className="text-brand" />
-                      </div>
-                      <h3 className="font-bold text-white mb-1">Crea un Server</h3>
-                      <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          activeChannel?.id === 'friends' ? (
+            <FriendsArea 
+              currentUser={currentUser} 
+              onStartDM={handleStartDM} 
+              onlineUserIds={onlineUserIds} 
+            />
+          ) : activeChannel?.type === 'dm' ? (
+            <ChatArea 
+              channel={activeChannel} 
+              messages={currentMessages} 
+              onSendMessage={handleSendMessage}
+              onToggleMembers={() => {}}
+              onToggleSidebar={() => setShowSidebar(true)}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center">Caricamento Home...</div>
+          )
         ) : (
           <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
         )}
