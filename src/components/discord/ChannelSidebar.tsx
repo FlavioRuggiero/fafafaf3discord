@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Hash, Volume2, ChevronDown, Mic, Headphones, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, Wallet } from "lucide-react";
-import { Channel, Server, User } from "@/types/discord";
+import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+
+type ServerMemberWithProfile = ServerMember & { profiles: Profile };
 
 interface ChannelSidebarProps {
   activeServer: Server;
@@ -40,9 +42,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [channelToEdit, setChannelToEdit] = useState<Channel | null>(null);
   const [editChannelName, setEditChannelName] = useState("");
 
-  // Drag & Drop States
   const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel', category?: string } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
+
+  const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
+  const [activeVoiceChannelId, setActiveVoiceChannelId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -61,48 +65,106 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   useEffect(() => {
     if (!activeServer?.id) return;
 
-    let mounted = true;
+    let isMounted = true;
 
     const loadChannels = async () => {
       const { data, error } = await supabase.from('channels').select('*').eq('server_id', activeServer.id);
-      if (data && mounted) {
+      if (data && isMounted) {
         setLocalChannels(data as Channel[]);
         setDeletedIds(new Set());
       }
     };
     loadChannels();
 
-    const channelSub = supabase.channel(`public:channels:${activeServer.id}-${Date.now()}`)
+    const channelSub = supabase.channel(`public:channels:server=${activeServer.id}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'channels'
+        table: 'channels',
+        filter: `server_id=eq.${activeServer.id}`
       }, (payload) => {
+        if (!isMounted) return;
         if (payload.eventType === 'INSERT') {
-          if (payload.new.server_id === activeServer.id) {
-            setLocalChannels(prev => {
-              if (prev.some(c => c.id === payload.new.id)) return prev;
-              return [...prev, payload.new as Channel];
-            });
-          }
+          setLocalChannels(prev => {
+            if (prev.some(c => c.id === payload.new.id)) return prev;
+            return [...prev, payload.new as Channel];
+          });
         } 
         else if (payload.eventType === 'DELETE') {
           setDeletedIds(prev => new Set(prev).add(payload.old.id));
           setLocalChannels(prev => prev.filter(c => c.id !== payload.old.id));
         } 
         else if (payload.eventType === 'UPDATE') {
-          if (payload.new.server_id === activeServer.id) {
-            setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
-          }
+          setLocalChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
         }
       })
       .subscribe();
 
     return () => {
-      mounted = false;
+      isMounted = false;
       supabase.removeChannel(channelSub);
     };
   }, [activeServer?.id]);
+
+  useEffect(() => {
+    if (!activeServer?.id || !currentUser?.id) return;
+
+    let isMounted = true;
+
+    const fetchMembers = async () => {
+      const { data, error } = await supabase
+        .from('server_members')
+        .select('*, profiles(*)')
+        .eq('server_id', activeServer.id);
+      
+      if (data && isMounted) {
+        const typedData = data as ServerMemberWithProfile[];
+        setMembers(typedData);
+        const currentUserMember = typedData.find(m => m.user_id === currentUser.id);
+        if (currentUserMember) {
+          setActiveVoiceChannelId(currentUserMember.voice_channel_id || null);
+        }
+      }
+    };
+
+    fetchMembers();
+
+    const memberSub = supabase.channel(`public:server_members:server=${activeServer.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'server_members',
+        filter: `server_id=eq.${activeServer.id}`
+      }, async (payload) => {
+        if (!isMounted) return;
+
+        if (payload.eventType === 'INSERT') {
+          const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
+          if (profileData) {
+            const newMember = { ...payload.new, profiles: profileData } as ServerMemberWithProfile;
+            setMembers(prev => [...prev.filter(m => m.user_id !== newMember.user_id), newMember]);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          setMembers(prev => prev.map(m => {
+            if (m.user_id === payload.new.user_id) {
+              return { ...m, ...payload.new };
+            }
+            return m;
+          }));
+          if (payload.new.user_id === currentUser.id) {
+            setActiveVoiceChannelId(payload.new.voice_channel_id || null);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setMembers(prev => prev.filter(m => m.user_id !== payload.old.user_id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(memberSub);
+    };
+  }, [activeServer?.id, currentUser?.id]);
 
   const displayChannels = useMemo(() => {
     const merged = [...localChannels];
@@ -119,7 +181,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       }
       return lc;
     }).filter(c => !deletedIds.has(c.id)).sort((a, b) => {
-      // Ordinamento primario per categoria, secondario per posizione canale
       const catA = a.category_position || 0;
       const catB = b.category_position || 0;
       if (catA !== catB) return catA - catB;
@@ -129,7 +190,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const serverChannels = displayChannels.filter(c => c.server_id === activeServer?.id);
   
-  // Estrai categorie mantenendo l'ordine
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   if (categories.length === 0 && activeServer) categories.push("Generale");
   
@@ -212,7 +272,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     e.preventDefault();
     if (!newChannelName.trim() || !activeServer) return;
 
-    // Calcola la posizione corretta per il nuovo canale
     const maxPos = localChannels
       .filter(c => c.category === selectedCategory)
       .reduce((max, c) => Math.max(max, c.position || 0), -1);
@@ -318,20 +377,41 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
-  // Drag & Drop Handlers
+  const handleVoiceChannelSelect = async (channel: Channel) => {
+    if (!currentUser || !activeServer) return;
+
+    const newVoiceChannelId = activeVoiceChannelId === channel.id ? null : channel.id;
+    const oldVoiceChannelId = activeVoiceChannelId;
+
+    setActiveVoiceChannelId(newVoiceChannelId);
+    setMembers(prev => prev.map(m => 
+      m.user_id === currentUser.id ? { ...m, voice_channel_id: newVoiceChannelId } : m
+    ));
+
+    const { error } = await supabase
+      .from('server_members')
+      .update({ voice_channel_id: newVoiceChannelId })
+      .eq('server_id', activeServer.id)
+      .eq('user_id', currentUser.id);
+
+    if (error) {
+      showError("Errore durante la connessione al canale vocale.");
+      setActiveVoiceChannelId(oldVoiceChannelId);
+      setMembers(prev => prev.map(m => 
+        m.user_id === currentUser.id ? { ...m, voice_channel_id: oldVoiceChannelId } : m
+      ));
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
-    e.stopPropagation(); // <-- FERMA LA PROPAGAZIONE PER EVITARE IL BUG
-    
+    e.stopPropagation();
     if (!isOwner) {
       e.preventDefault();
       return;
     }
-    
-    // Nascondi l'immagine fantasma nativa del browser creandone una trasparente
     const img = new Image();
     img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
     e.dataTransfer.setDragImage(img, 0, 0);
-
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
     setDragItem({ id, type, category });
@@ -341,13 +421,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
-    
     if (!dragItem) return;
-    if (dragItem.type === 'category' && type === 'channel') return; // Impedisci drop categoria dentro canale
-
+    if (dragItem.type === 'category' && type === 'channel') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const position = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
-
     if (dragOverInfo?.id !== id || dragOverInfo?.position !== position) {
       setDragOverInfo({ id, type, position });
     }
@@ -356,31 +433,21 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const handleDrop = async (e: React.DragEvent, targetId: string, targetType: 'category' | 'channel', targetCategoryStr?: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
     const source = dragItem;
     const target = dragOverInfo;
-    
     setDragItem(null);
     setDragOverInfo(null);
-
     if (!source || !target || !activeServer) return;
     if (source.id === target.id && source.type === target.type) return; 
-
-    // Copia profonda per evitare mutazioni di riferimento dello stato diretto
     const channelsCopy = localChannels.map(c => ({...c}));
-
-    // Spostamento di una Categoria
     if (source.type === 'category' && target.type === 'category') {
       const cats = Array.from(new Set(displayChannels.map(c => c.category)));
       const sIdx = cats.indexOf(source.id);
       const tIdx = cats.indexOf(target.id);
       if (sIdx === -1 || tIdx === -1) return;
-
       cats.splice(sIdx, 1);
-      
       const insertIdx = target.position === 'top' ? tIdx : tIdx + 1;
       cats.splice(insertIdx > sIdx ? insertIdx - 1 : insertIdx, 0, source.id);
-
       const updates: {id: string, category_position: number}[] = [];
       cats.forEach((cat, idx) => {
         channelsCopy.forEach(c => {
@@ -390,25 +457,20 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           }
         });
       });
-      
       setLocalChannels(channelsCopy);
-      
       try {
         await Promise.all(updates.map(u => supabase.from('channels').update({ category_position: u.category_position }).eq('id', u.id)));
       } catch(err) {
         showError("Errore durante il salvataggio della posizione.");
       }
     } 
-    // Spostamento di un Canale
     else if (source.type === 'channel') {
       const tCat = targetType === 'category' ? target.id : targetCategoryStr!;
       const sourceChannel = channelsCopy.find(c => c.id === source.id);
       if (!sourceChannel) return;
-      
       const catChannels = channelsCopy
         .filter(c => c.category === tCat && c.id !== source.id)
         .sort((a, b) => (a.position || 0) - (b.position || 0));
-
       let iIdx = catChannels.length;
       if (targetType === 'channel') {
         const cIdx = catChannels.findIndex(c => c.id === target.id);
@@ -416,11 +478,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
            iIdx = target.position === 'top' ? cIdx : cIdx + 1;
         }
       }
-
       catChannels.splice(iIdx, 0, sourceChannel);
-
       const targetCatPos = channelsCopy.find(c => c.category === tCat)?.category_position || 0;
-
       const updates: {id: string, position: number, category: string, category_position: number}[] = [];
       catChannels.forEach((c, idx) => {
         c.position = idx;
@@ -428,9 +487,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         c.category_position = targetCatPos;
         updates.push({ id: c.id, position: idx, category: tCat, category_position: targetCatPos });
       });
-      
       setLocalChannels(channelsCopy);
-      
       try {
         await Promise.all(updates.map(u => 
           supabase.from('channels').update({ 
@@ -507,7 +564,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         {categories.length === 0 ? (
           <div className="text-center text-[#949ba4] text-xs py-4 px-2">Nessun canale in questo server</div>
         ) : (
-          categories.map((category, idx) => {
+          categories.map((category) => {
             const categoryChannels = serverChannels.filter(c => c.category === category);
             const isCollapsed = collapsedCategories.has(category);
             
@@ -552,67 +609,92 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 {!isCollapsed && (
                   <div className="space-y-[2px] pb-2">
                     {categoryChannels.map(channel => {
-                      const isActive = channel.id === activeChannelId;
+                      const isActive = (channel.type === 'voice' ? channel.id === activeVoiceChannelId : channel.id === activeChannelId);
                       const Icon = channel.type === 'text' ? Hash : channel.type === 'voice' ? Volume2 : Gamepad2;
                       const isLastTextChannel = channel.type === 'text' && serverChannels.filter(c => c.type === 'text').length <= 1;
                       
+                      const isVoiceChannel = channel.type === 'voice';
+                      const connectedMembers = isVoiceChannel 
+                        ? members.filter(m => m.voice_channel_id === channel.id)
+                        : [];
+
                       return (
-                        <div
-                          key={channel.id}
-                          draggable={isOwner}
-                          onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
-                          onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
-                          onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
-                          onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
-                          onClick={() => onChannelSelect(channel)}
-                          className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${
-                            isActive 
-                              ? 'bg-[#404249] text-white' 
-                              : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                          } ${channel.unread && !isActive ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''} ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
-                        >
-                          <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
-                          <span className="truncate flex-1">{channel.name}</span>
-                          
-                          <div className="flex items-center flex-shrink-0">
-                            {channel.unread && !isActive && (
-                              <div className="w-2 h-2 rounded-full bg-white mr-1" />
-                            )}
-                            {isOwner && (
-                              <>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setChannelToEdit(channel);
-                                    setEditChannelName(channel.name);
-                                  }}
-                                  className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all"
-                                  title="Rinomina Canale"
-                                >
-                                  <Edit2 size={14} />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isLastTextChannel) {
-                                      showError("Il server deve avere almeno un canale testuale.");
-                                    } else {
-                                      setChannelToDelete(channel);
-                                    }
-                                  }}
-                                  className={`ml-1 p-0.5 transition-all ${
-                                    isLastTextChannel 
-                                      ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
-                                      : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
-                                  }`}
-                                  title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </>
-                            )}
+                        <React.Fragment key={channel.id}>
+                          <div
+                            draggable={isOwner}
+                            onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
+                            onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
+                            onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
+                            onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
+                            onClick={() => {
+                              if (channel.type === 'text' || channel.type === 'minigame') {
+                                onChannelSelect(channel);
+                              } else if (channel.type === 'voice') {
+                                handleVoiceChannelSelect(channel);
+                              }
+                            }}
+                            className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${
+                              isActive 
+                                ? 'bg-[#404249] text-white' 
+                                : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
+                            } ${channel.unread && !isActive && channel.type !== 'voice' ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''} ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
+                          >
+                            <Icon size={18} className="mr-1.5 opacity-70 flex-shrink-0" />
+                            <span className="truncate flex-1">{channel.name}</span>
+                            
+                            <div className="flex items-center flex-shrink-0">
+                              {channel.unread && !isActive && channel.type !== 'voice' && (
+                                <div className="w-2 h-2 rounded-full bg-white mr-1" />
+                              )}
+                              {isOwner && (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setChannelToEdit(channel);
+                                      setEditChannelName(channel.name);
+                                    }}
+                                    className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all"
+                                    title="Rinomina Canale"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isLastTextChannel) {
+                                        showError("Il server deve avere almeno un canale testuale.");
+                                      } else {
+                                        setChannelToDelete(channel);
+                                      }
+                                    }}
+                                    className={`ml-1 p-0.5 transition-all ${
+                                      isLastTextChannel 
+                                        ? 'opacity-0 group-hover:opacity-30 cursor-not-allowed' 
+                                        : 'opacity-0 group-hover:opacity-100 hover:text-[#f23f43]'
+                                    }`}
+                                    title={isLastTextChannel ? "Impossibile eliminare l'ultimo canale testuale" : "Elimina Canale"}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                          {isVoiceChannel && connectedMembers.length > 0 && (
+                            <div className="pl-7 pr-2 pt-1 pb-0.5 space-y-1.5">
+                              {connectedMembers.map(member => (
+                                <div key={member.user_id} className="flex items-center group/member">
+                                  <div className="relative">
+                                    <img src={member.profiles.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                  </div>
+                                  <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles.first_name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -623,7 +705,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         )}
       </div>
 
-      {/* Area Utente con Tooltip Profilo */}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 relative">
         <div className="relative flex items-center hover:bg-[#3f4147] p-1 -ml-1 rounded cursor-pointer flex-1 min-w-0 mr-1 group/profile">
           
@@ -668,7 +749,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         </div>
       </div>
 
-      {/* Modale Creazione Categoria */}
       {isAddingCategory && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setIsAddingCategory(false)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -714,7 +794,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         document.body
       )}
 
-      {/* Modale Rinomina Categoria */}
       {categoryToRename && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setCategoryToRename(null)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -759,7 +838,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         document.body
       )}
 
-      {/* Modale Creazione Canale */}
       {isAddingChannel && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setIsAddingChannel(false)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -849,7 +927,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         document.body
       )}
 
-      {/* Modale Rinomina Canale */}
       {channelToEdit && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setChannelToEdit(null)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -897,7 +974,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         document.body
       )}
 
-      {/* Modale Eliminazione Canale */}
       {channelToDelete && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setChannelToDelete(null)}>
           <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
