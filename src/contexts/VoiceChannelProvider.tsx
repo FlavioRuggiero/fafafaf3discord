@@ -27,6 +27,9 @@ interface VoiceChannelContextType {
   activeVoiceChannelId: string | null;
   memberStates: Record<string, Partial<VoiceState>>;
   speakingStates: Record<string, boolean>;
+  localScreenStream: MediaStream | null;
+  remoteScreenStreams: Record<string, MediaStream>;
+  toggleScreenShare: () => Promise<void>;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -52,7 +55,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [memberStates, setMemberStates] = useState<Record<string, Partial<VoiceState>>>({});
   const [speakingStates, setSpeakingStates] = useState<Record<string, boolean>>({});
   
+  // Screen Share States
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
+  
   const localStreamRef = useRef<MediaStream | null>(null);
+  const localScreenStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<PeerData[]>([]);
   const signalingChannelRef = useRef<any>(null);
   const audioAnalysisRefs = useRef<Record<string, { cancel: () => void; close: () => void }>>({});
@@ -132,6 +140,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     return () => {
       localStreamRef.current?.getTracks().forEach(track => track.stop());
+      localScreenStreamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, [requestMicrophone, currentUser]);
 
@@ -268,6 +277,57 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
   }, [currentUser, isDeafened, isMuted]);
 
+  const toggleScreenShare = useCallback(async () => {
+    if (!currentUser) return;
+
+    if (localScreenStreamRef.current) {
+      localScreenStreamRef.current.getTracks().forEach(t => t.stop());
+      peersRef.current.forEach(({ peer }) => {
+        try { peer.removeStream(localScreenStreamRef.current!); } catch (e) { console.error(e) }
+      });
+      localScreenStreamRef.current = null;
+      setLocalScreenStream(null);
+      
+      if (signalingChannelRef.current) {
+        signalingChannelRef.current.send({
+          type: 'broadcast',
+          event: 'screen-stop',
+          payload: { userId: currentUser.id }
+        });
+      }
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).catch(() => null);
+        if (!stream) return; 
+        
+        stream.getVideoTracks()[0].onended = () => {
+          peersRef.current.forEach(({ peer }) => {
+            try { peer.removeStream(stream); } catch (e) { console.error(e) }
+          });
+          localScreenStreamRef.current = null;
+          setLocalScreenStream(null);
+          
+          if (signalingChannelRef.current && currentUser) {
+            signalingChannelRef.current.send({
+              type: 'broadcast',
+              event: 'screen-stop',
+              payload: { userId: currentUser.id }
+            });
+          }
+        };
+        
+        localScreenStreamRef.current = stream;
+        setLocalScreenStream(stream);
+        
+        peersRef.current.forEach(({ peer }) => {
+          try { peer.addStream(stream); } catch (e) { console.error(e) }
+        });
+      } catch (err) {
+        console.error("Errore condivisione schermo:", err);
+      }
+    }
+  }, [currentUser]);
+
   const removePeer = (userId: string) => {
     const audioEl = document.querySelector(`audio[data-user-id="${userId}"]`);
     if (audioEl) document.body.removeChild(audioEl);
@@ -284,6 +344,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       delete next[userId];
       return next;
     });
+    setRemoteScreenStreams(prev => {
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
   };
 
   const createPeer = useCallback((userId: string, initiator: boolean, channel: any, receivedSignal?: any) => {
@@ -291,6 +356,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     if (!stream || !currentUser) return;
 
     const peer = new Peer({ initiator, trickle: true, stream });
+
+    // Se stiamo già condividendo lo schermo, inviamolo immediatamente
+    if (localScreenStreamRef.current) {
+      peer.addStream(localScreenStreamRef.current);
+    }
 
     peer.on('signal', signal => {
       channel.send({
@@ -301,6 +371,19 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     });
 
     peer.on('stream', remoteStream => {
+      if (remoteStream.getVideoTracks().length > 0) {
+        setRemoteScreenStreams(prev => ({ ...prev, [userId]: remoteStream }));
+        
+        remoteStream.getVideoTracks()[0].onended = () => {
+          setRemoteScreenStreams(prev => {
+            const next = { ...prev };
+            delete next[userId];
+            return next;
+          });
+        };
+        return;
+      }
+
       if (document.querySelector(`audio[data-user-id="${userId}"]`)) return;
       const audio = document.createElement('audio');
       audio.srcObject = remoteStream;
@@ -357,6 +440,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     
     playSound('/exit.mp3');
 
+    // Interrompi lo screen sharing se attivo
+    if (localScreenStreamRef.current) {
+      localScreenStreamRef.current.getTracks().forEach(t => t.stop());
+      localScreenStreamRef.current = null;
+      setLocalScreenStream(null);
+    }
+
     if (signalingChannelRef.current) {
       await signalingChannelRef.current.untrack();
       await supabase.removeChannel(signalingChannelRef.current);
@@ -378,6 +468,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     setActiveServerId(null);
     setMemberStates({});
     setSpeakingStates({});
+    setRemoteScreenStreams({});
 
     await supabase
       .from('server_members')
@@ -459,6 +550,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         delete next[key];
         return next;
       });
+      setRemoteScreenStreams(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
     });
 
     channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
@@ -478,6 +574,14 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         ...prev,
         [payload.userId]: { ...prev[payload.userId], ...payload.state },
       }));
+    });
+
+    channel.on('broadcast', { event: 'screen-stop' }, ({ payload }) => {
+      setRemoteScreenStreams(prev => {
+        const next = { ...prev };
+        delete next[payload.userId];
+        return next;
+      });
     });
 
     channel.subscribe(async (status) => {
@@ -536,6 +640,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     activeVoiceChannelId,
     memberStates,
     speakingStates,
+    localScreenStream,
+    remoteScreenStreams,
+    toggleScreenShare,
   };
 
   return (

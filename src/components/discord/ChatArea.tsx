@@ -14,14 +14,14 @@ type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
 const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔", "👎", "💯", "✨", "💀"];
 
-const StreamPlayer = ({ stream, className }: { stream: MediaStream; className?: string }) => {
+const StreamPlayer = ({ stream, isLocal, className }: { stream: MediaStream; isLocal?: boolean; className?: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
   }, [stream]);
-  return <video ref={videoRef} autoPlay muted className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
+  return <video ref={videoRef} autoPlay muted={isLocal} className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
 };
 
 interface ChatAreaProps {
@@ -56,10 +56,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Stato per gli utenti connessi al canale vocale
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
-  const { speakingStates } = useVoiceChannel();
+  
+  // Utilizziamo i metodi e lo state dal VoiceChannelProvider
+  const { 
+    speakingStates, 
+    localScreenStream, 
+    remoteScreenStreams, 
+    toggleScreenShare 
+  } = useVoiceChannel();
 
-  // Stato per condivisione schermo
-  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -103,15 +108,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, []);
 
-  // Cleanup stream on unmount
-  useEffect(() => {
-    return () => {
-      if (localScreenStream) {
-        localScreenStream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [localScreenStream]);
-
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -132,7 +128,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   useEffect(() => {
     if (channel?.type !== 'voice') {
       setVoiceMembers([]);
-      setLocalScreenStream(null);
       setFocusedUserId(null);
       return;
     }
@@ -670,34 +665,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return (now - msgTime) <= 5 * 60 * 1000;
   };
 
-  const toggleScreenShare = async () => {
-    if (localScreenStream) {
-      localScreenStream.getTracks().forEach(track => track.stop());
-      setLocalScreenStream(null);
-      if (focusedUserId === currentUser?.id) {
-        setFocusedUserId(null);
-      }
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-        stream.getVideoTracks()[0].onended = () => {
-          setLocalScreenStream(null);
-          if (focusedUserId === currentUser?.id) {
-            setFocusedUserId(null);
-          }
-        };
-        setLocalScreenStream(stream);
-      } catch (err) {
-        console.error("Errore condivisione schermo:", err);
-      }
-    }
-  };
-
   // VISTA CANALE VOCALE
   if (channel.type === 'voice') {
     const displayVoiceMembers = [...voiceMembers];
-    // Se l'utente sta condividendo lo schermo ma non è nell'array members (magari non si è ancora unito formalmente),
-    // lo aggiungiamo localmente per potergli mostrare il suo stream.
+    
     if (localScreenStream && currentUser && !displayVoiceMembers.some(m => m.user_id === currentUser.id)) {
       displayVoiceMembers.push({
         user_id: currentUser.id,
@@ -730,13 +701,22 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           {focusedMember ? (
             <div className="flex-1 flex flex-col min-h-0 bg-black animate-in fade-in duration-200">
               <div className="flex-1 relative flex items-center justify-center min-h-0 p-4">
-                {focusedMember.user_id === currentUser?.id && localScreenStream ? (
-                  <StreamPlayer stream={localScreenStream} className="w-full h-full object-contain rounded-lg shadow-2xl" />
-                ) : (
-                  <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
-                    <img src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} className="w-full h-full object-cover" />
-                  </div>
-                )}
+                
+                {(() => {
+                  const isLocal = focusedMember.user_id === currentUser?.id;
+                  const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[focusedMember.user_id];
+                  const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[focusedMember.user_id];
+                  
+                  if (hasScreen && streamToPlay) {
+                    return <StreamPlayer stream={streamToPlay} isLocal={isLocal} className="w-full h-full object-contain rounded-lg shadow-2xl" />;
+                  } else {
+                    return (
+                      <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
+                        <img src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} className="w-full h-full object-cover" />
+                      </div>
+                    );
+                  }
+                })()}
                 
                 <button onClick={() => setFocusedUserId(null)} className="absolute top-6 right-6 p-2.5 bg-black/60 hover:bg-black/80 rounded-lg text-white transition-colors z-10 backdrop-blur-md" title="Riduci a griglia">
                   <Minimize size={20} />
@@ -744,7 +724,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 
                 <div className="absolute bottom-6 left-6 flex items-center bg-black/60 backdrop-blur-md rounded-lg px-4 py-2 shadow-lg z-10">
                   <span className="text-white font-medium text-lg">{focusedMember.profiles?.first_name || 'Utente'}</span>
-                  {focusedMember.user_id === currentUser?.id && localScreenStream && (
+                  {((focusedMember.user_id === currentUser?.id && localScreenStream) || remoteScreenStreams[focusedMember.user_id]) && (
                      <span className="ml-3 px-2 py-0.5 bg-brand text-white text-xs font-bold rounded-md uppercase tracking-wide">In Condivisione</span>
                   )}
                 </div>
@@ -754,14 +734,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div className="h-36 sm:h-44 bg-[#111214] flex items-center gap-4 px-4 overflow-x-auto border-t border-[#1f2023] flex-shrink-0 custom-scrollbar">
                   {displayVoiceMembers.filter(m => m.user_id !== focusedUserId).map(member => {
                     const isSpeaking = speakingStates[member.user_id];
-                    const hasScreen = member.user_id === currentUser?.id && localScreenStream;
+                    const isLocal = member.user_id === currentUser?.id;
+                    const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
+                    const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
+
                     return (
                       <div key={member.user_id} 
                            onClick={() => setFocusedUserId(member.user_id)}
                            className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${isSpeaking ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
-                        {hasScreen ? (
+                        {hasScreen && streamToPlay ? (
                           <div className="w-full h-full overflow-hidden rounded-lg pointer-events-none opacity-80">
-                             <StreamPlayer stream={localScreenStream!} className="w-full h-full object-cover" />
+                             <StreamPlayer stream={streamToPlay} isLocal={isLocal} className="w-full h-full object-cover" />
                           </div>
                         ) : (
                           <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
@@ -792,14 +775,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   <div className="w-full max-w-7xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
                     {displayVoiceMembers.map(member => {
                       const isSpeaking = speakingStates[member.user_id];
-                      const hasScreen = member.user_id === currentUser?.id && localScreenStream;
+                      const isLocal = member.user_id === currentUser?.id;
+                      const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
+                      const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
                       
                       return (
                         <div key={member.user_id} className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
                           
-                          {hasScreen ? (
+                          {hasScreen && streamToPlay ? (
                             <div className="w-full h-full bg-black relative">
-                              <StreamPlayer stream={localScreenStream!} className="w-full h-full object-cover" />
+                              <StreamPlayer stream={streamToPlay} isLocal={isLocal} className="w-full h-full object-cover" />
                               <div className="absolute top-3 left-3 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded shadow-md uppercase tracking-wider">In onda</div>
                             </div>
                           ) : (
