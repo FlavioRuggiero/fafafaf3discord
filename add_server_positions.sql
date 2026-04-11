@@ -1,0 +1,1 @@
+ALTER TABLE public.server_members ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0;
