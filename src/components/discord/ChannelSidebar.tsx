@@ -9,6 +9,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
 import { playSound } from "@/utils/sounds";
+import { ProfileHoverCard } from "./ProfileHoverCard";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -758,19 +759,36 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 const memberIsMuted = member.is_muted ?? false;
                                 const memberIsDeafened = member.is_deafened ?? false;
                                 const isSpeaking = speakingStates[member.user_id] ?? false;
+                                
+                                const userProfile = member.profiles;
+                                const userForCard: User | null = userProfile ? {
+                                  id: userProfile.id,
+                                  name: userProfile.first_name || 'Utente',
+                                  avatar: userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.id}`,
+                                  status: 'online',
+                                  bio: userProfile.bio || undefined,
+                                  banner_color: userProfile.banner_color || undefined,
+                                  banner_url: userProfile.banner_url || undefined,
+                                  level: userProfile.level || 1,
+                                  digitalcardus: userProfile.digitalcardus ?? 25,
+                                  xp: userProfile.xp || 0,
+                                  global_role: (userProfile.first_name || '').toLowerCase() === 'faf3tto' ? 'CREATOR' : 'USER',
+                                } : null;
 
                                 return (
-                                  <div key={member.user_id} className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300">
-                                    <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
-                                      <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
-                                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                  <ProfileHoverCard key={member.user_id} user={userForCard} side="right" align="center">
+                                    <div className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300 cursor-pointer">
+                                      <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
+                                        <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                      </div>
+                                      <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate flex-1">{member.profiles?.first_name || 'Utente'}</span>
+                                      <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
+                                        {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
+                                        {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
+                                      </div>
                                     </div>
-                                    <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate flex-1">{member.profiles?.first_name || 'Utente'}</span>
-                                    <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
-                                      {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
-                                      {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
-                                    </div>
-                                  </div>
+                                  </ProfileHoverCard>
                                 );
                               })}
                             </div>
