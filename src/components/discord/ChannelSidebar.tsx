@@ -137,25 +137,44 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     };
   }, [activeServer?.id]);
 
-  // Gestione Membri Server per Chat Vocali (Senza filtro stringente per fixare il bug)
+  // Gestione Membri Server per Chat Vocali: uniamo i dati manualmente per evitare errori PGRST200
   useEffect(() => {
     if (!activeServer?.id) return;
 
     let isMounted = true;
 
     const fetchMembers = async () => {
-      const { data, error } = await supabase
+      // Step 1: Prendiamo i server_members senza provare a fare JOIN
+      const { data: membersData, error: membersError } = await supabase
         .from('server_members')
-        .select('*, profiles(*)')
+        .select('*')
         .eq('server_id', activeServer.id);
       
-      if (error) {
-        console.error("Error fetching server members:", error);
+      if (membersError) {
+        console.error("Error fetching server members:", membersError);
         return;
       }
       
-      if (data && isMounted) {
-        setMembers(data as ServerMemberWithProfile[]);
+      if (membersData && isMounted) {
+        if (membersData.length === 0) {
+          setMembers([]);
+          return;
+        }
+
+        // Step 2: Estraiamo gli ID e prendiamo i profili
+        const userIds = membersData.map(m => m.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+
+        // Step 3: Uniamo i dati lato client
+        const combinedData = membersData.map(m => ({
+          ...m,
+          profiles: profilesData?.find(p => p.id === m.user_id) || null
+        }));
+
+        setMembers(combinedData as ServerMemberWithProfile[]);
       }
     };
 
@@ -167,10 +186,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         schema: 'public',
         table: 'server_members'
       }, () => {
-        // Ignoriamo il filtro lato Supabase e aggiorniamo sempre in locale 
-        // per assicurarci di vedere gli update dei canali vocali in tempo reale
         if (isMounted) {
-          fetchMembers();
+          fetchMembers(); // Ricarichiamo manualmente se notiamo cambiamenti (es: utente in chat vocale)
         }
       })
       .subscribe();
