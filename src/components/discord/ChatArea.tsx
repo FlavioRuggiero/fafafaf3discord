@@ -392,7 +392,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-w-0 flex flex-col relative">
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-0 flex flex-col relative">
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
             {channel.type === 'text' ? <Hash size={32} /> : <Volume2 size={32} />}
@@ -411,20 +411,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id;
           
           return (
-            <div key={msg.id} className="group flex items-start hover:bg-[#2e3035] -mx-4 px-4 py-1 rounded">
+            <div key={msg.id} className={`group flex items-start hover:bg-[#2e3035] -mx-4 px-4 py-0.5 rounded ${isSameUserAsPrevious ? 'mt-0' : 'mt-4'}`}>
               {!isSameUserAsPrevious ? (
                 <ProfileHoverCard user={msg.user}>
                   <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
                 </ProfileHoverCard>
               ) : (
-                <div className="w-10 mr-4 text-xs text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
+                <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
                   {msg.timestamp?.split(' ')[2] || msg.timestamp}
                 </div>
               )}
               
               <div className="flex-1 min-w-0">
                 {!isSameUserAsPrevious && (
-                  <div className="flex items-baseline min-w-0">
+                  <div className="flex items-baseline min-w-0 mb-0.5">
                     <ProfileHoverCard user={msg.user}>
                       <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
                     </ProfileHoverCard>
@@ -436,7 +436,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-4 flex-shrink-0" />
       </div>
 
       {/* Input Area */}
