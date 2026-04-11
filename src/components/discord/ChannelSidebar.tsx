@@ -320,6 +320,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   // Drag & Drop Handlers
   const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
+    e.stopPropagation(); // <-- FERMA LA PROPAGAZIONE PER EVITARE IL BUG
+    
     if (!isOwner) {
       e.preventDefault();
       return;
@@ -516,7 +518,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 onDragStart={(e) => handleDragStart(e, category, 'category')}
                 onDragOver={(e) => handleDragOver(e, category, 'category')}
                 onDrop={(e) => handleDrop(e, category, 'category')}
-                onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
+                onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
                 className={`relative ${getDropIndicator(category, 'category')} ${dragItem?.id === category ? 'opacity-40' : ''}`}
               >
                 <div 
@@ -561,7 +563,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
                           onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
                           onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
-                          onDragEnd={() => { setDragItem(null); setDragOverInfo(null); }}
+                          onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
                           onClick={() => onChannelSelect(channel)}
                           className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${
                             isActive 
