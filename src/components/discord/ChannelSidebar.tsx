@@ -9,7 +9,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "./UserPanel";
 import { playSound } from "@/utils/sounds";
-import { ProfileHoverCard } from "./ProfileHoverCard";
+import { ProfilePopover } from "./ProfilePopover";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -776,7 +776,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 } : null;
 
                                 return (
-                                  <ProfileHoverCard key={member.user_id} user={userForCard} side="right" align="center">
+                                  <ProfilePopover key={member.user_id} user={userForCard} side="right" align="center">
                                     <div className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300 cursor-pointer">
                                       <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
                                         <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
@@ -788,7 +788,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                         {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
                                       </div>
                                     </div>
-                                  </ProfileHoverCard>
+                                  </ProfilePopover>
                                 );
                               })}
                             </div>

@@ -1,7 +1,7 @@
 import React from "react";
 import { User } from "@/types/discord";
 import { Crown } from "lucide-react";
-import { ProfileHoverCard } from "./ProfileHoverCard";
+import { ProfilePopover } from "./ProfilePopover";
 
 interface MemberListProps {
   users: User[];
@@ -34,7 +34,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
     const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
 
     return (
-      <ProfileHoverCard user={user} side="left" align="start">
+      <ProfilePopover user={user} side="left" align="start">
         <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
           <div className="relative mr-3 mt-1.5 flex-shrink-0">
             {isCreator && (
@@ -70,7 +70,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
             )}
           </div>
         </div>
-      </ProfileHoverCard>
+      </ProfilePopover>
     );
   };
 

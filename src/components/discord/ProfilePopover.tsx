@@ -1,5 +1,5 @@
 import React from "react";
-import * as HoverCard from "@radix-ui/react-hover-card";
+import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
 
 const statusColors = {
@@ -16,7 +16,7 @@ const statusText = {
   offline: "Offline",
 };
 
-export const ProfileHoverCard = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
+export const ProfilePopover = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
   if (!user) return <>{children}</>;
 
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
@@ -25,13 +25,13 @@ export const ProfileHoverCard = ({ user, children, side = "right", align = "star
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
   
   return (
-    <HoverCard.Root openDelay={250} closeDelay={150}>
-      <HoverCard.Trigger asChild>
+    <Popover.Root>
+      <Popover.Trigger asChild>
         {children}
-      </HoverCard.Trigger>
+      </Popover.Trigger>
       
-      <HoverCard.Portal>
-        <HoverCard.Content 
+      <Popover.Portal>
+        <Popover.Content 
           side={side} 
           align={align} 
           sideOffset={16} 
@@ -97,8 +97,8 @@ export const ProfileHoverCard = ({ user, children, side = "right", align = "star
               )}
             </div>
           </div>
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 };

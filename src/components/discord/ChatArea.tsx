@@ -8,7 +8,7 @@ import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
-import { ProfileHoverCard } from "./ProfileHoverCard";
+import { ProfilePopover } from "./ProfilePopover";
 
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
@@ -869,9 +869,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
               <div className="flex items-start">
                 {!isSameUserAsPrevious || isEditing ? (
-                  <ProfileHoverCard user={msg.user}>
+                  <ProfilePopover user={msg.user}>
                     <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
-                  </ProfileHoverCard>
+                  </ProfilePopover>
                 ) : (
                   <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
                     {msg.timestamp?.split(' ')[2] || msg.timestamp}
@@ -881,9 +881,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div className="flex-1 min-w-0">
                   {(!isSameUserAsPrevious || isEditing) && (
                     <div className="flex items-baseline min-w-0 mb-0.5">
-                      <ProfileHoverCard user={msg.user}>
+                      <ProfilePopover user={msg.user}>
                         <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
-                      </ProfileHoverCard>
+                      </ProfilePopover>
                       <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
                     </div>
                   )}
