@@ -55,7 +55,12 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryName,<think>**Finalizing Optimistic Updates**
+
+I've reviewed and finalized the code for `ChannelSidebar.tsx`. I'm confident in the approach; it directly addresses the need for immediate visual feedback for the current user when joining or leaving a voice channel. The changes are localized and use optimistic updates to the component's state, followed by calls to the existing functions. I am now preparing to implement these changes.
+
+
+</think> setNewCategoryName] = useState("");
   
   const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
   const [editCategoryName, setEditCategoryName] = useState("");
@@ -430,12 +435,20 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const handleVoiceChannelSelect = (channel: Channel) => {
     if (!currentUser || !activeServer) return;
 
-    // Se si clicca su un canale vocale diverso da quello attivo, entra
     if (activeVoiceChannelId !== channel.id) {
       playTone(880, 150);
+      
+      // Aggiornamento ottimistico: sposta l'utente istantaneamente nella UI
+      setMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.user_id === currentUser.id 
+            ? { ...member, voice_channel_id: channel.id } 
+            : member
+        )
+      );
+
       joinVoiceChannel(channel.id, activeServer.id);
     }
-    // Se si clicca sullo stesso canale vocale, non fare nulla per evitare la disconnessione
   };
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
@@ -759,6 +772,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             <button 
               onClick={() => {
                 playTone(440, 200);
+                // Aggiornamento ottimistico: rimuove l'utente istantaneamente dalla UI
+                setMembers(prevMembers => 
+                  prevMembers.map(member => 
+                    member.user_id === currentUser.id 
+                      ? { ...member, voice_channel_id: null } 
+                      : member
+                  )
+                );
                 leaveVoiceChannel();
               }}
               className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
