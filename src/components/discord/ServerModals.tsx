@@ -369,7 +369,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     can_delete_messages: false,
     can_use_commands: false,
     can_manage_server: false,
-    can_manage_roles: false
+    can_manage_roles: false,
+    can_manage_users: false
   });
 
   useEffect(() => {
@@ -491,7 +492,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       can_delete_messages: false,
       can_use_commands: false,
       can_manage_server: false,
-      can_manage_roles: false
+      can_manage_roles: false,
+      can_manage_users: false
     }).select().single();
     
     if (data) {
@@ -504,7 +506,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
         can_delete_messages: false,
         can_use_commands: false,
         can_manage_server: false,
-        can_manage_roles: false
+        can_manage_roles: false,
+        can_manage_users: false
       });
       setActiveRoleTab('members');
     } else {
@@ -566,6 +569,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     { key: 'can_use_commands', label: 'Usa Comandi', desc: 'Permette di usare comandi speciali come /statusmessage e /mentionseveryone.' },
     { key: 'can_manage_server', label: 'Gestione Server', desc: 'Permette di modificare le impostazioni generali del server.' },
     { key: 'can_manage_roles', label: 'Gestione Ruoli', desc: 'Permette di creare, modificare o eliminare ruoli e assegnarli agli utenti.' },
+    { key: 'can_manage_users', label: 'Gestione Utenti', desc: 'Permette di spostare o disconnettere gli utenti dai canali vocali.' },
   ] as const;
 
   return (
@@ -802,6 +806,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                               can_use_commands: role.can_use_commands || false,
                               can_manage_server: role.can_manage_server || false,
                               can_manage_roles: role.can_manage_roles || false,
+                              can_manage_users: role.can_manage_users || false,
                             });
                             setActiveRoleTab('members');
                           }}
