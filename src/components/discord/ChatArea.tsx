@@ -214,6 +214,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   // Mentions State
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [pendingMentions, setPendingMentions] = useState<{name: string, id: string}[]>([]);
 
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   
@@ -389,6 +390,36 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   }, [channel?.id, channel?.type, channel?.server_id]);
 
   useEffect(() => {
+    if (!activeVoiceChannelId || !currentUser) return;
+
+    const currentVCUserIds = new Set(
+      members
+        .filter(m => m.voice_channel_id === activeVoiceChannelId)
+        .map(m => m.user_id)
+    );
+    
+    const prevVCUserIds = new Set(
+      prevMembersRef.current
+        .filter(m => m.voice_channel_id === activeVoiceChannelId)
+        .map(m => m.user_id)
+    );
+
+    currentVCUserIds.forEach(userId => {
+      if (!prevVCUserIds.has(userId) && userId !== currentUser.id) {
+        playSound('/enter.mp3');
+      }
+    });
+
+    prevVCUserIds.forEach(userId => {
+      if (!currentVCUserIds.has(userId) && userId !== currentUser.id) {
+        playSound('/exit.mp3');
+      }
+    });
+
+    prevMembersRef.current = members;
+  }, [members, activeVoiceChannelId, currentUser]);
+
+  useEffect(() => {
     if (!channel?.id || channel?.type === 'voice') {
       setIsLoading(false);
       return;
@@ -401,6 +432,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     setSelectedFile(null);
     setFilePreview(null);
     setFileType(null);
+    setPendingMentions([]);
 
     const fetchMessages = async () => {
       let { data, error } = await supabase
@@ -716,27 +748,57 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEditContent(value);
+    
+    const cursorPosition = e.target.selectionStart || 0;
+    const textBeforeCursor = value.slice(0, cursorPosition);
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
+
+    if (match) {
+      setMentionQuery(match[1].toLowerCase());
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
   const filteredMembers = mentionQuery !== null && serverMembers
     ? serverMembers.filter(m => m.name.toLowerCase().includes(mentionQuery))
     : [];
   const showMentions = mentionQuery !== null && filteredMembers.length > 0;
 
-  const insertMention = (name: string) => {
-    if (!chatInputRef.current) return;
-    const cursorPosition = chatInputRef.current.selectionStart || 0;
-    const textBeforeCursor = inputValue.slice(0, cursorPosition);
-    const textAfterCursor = inputValue.slice(cursorPosition);
+  const insertMention = (member: User) => {
+    const isEditing = editingMessageId !== null;
+    const inputRef = isEditing ? editInputRef : chatInputRef;
+    const currentValue = isEditing ? editContent : inputValue;
+    
+    if (!inputRef.current) return;
+    const cursorPosition = inputRef.current.selectionStart || 0;
+    const textBeforeCursor = currentValue.slice(0, cursorPosition);
+    const textAfterCursor = currentValue.slice(cursorPosition);
 
     const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
     if (match) {
-      const newTextBefore = textBeforeCursor.slice(0, match.index) + `@${name} `;
-      setInputValue(newTextBefore + textAfterCursor);
+      const newTextBefore = textBeforeCursor.slice(0, match.index) + `@${member.name} `;
+      if (isEditing) {
+        setEditContent(newTextBefore + textAfterCursor);
+      } else {
+        setInputValue(newTextBefore + textAfterCursor);
+      }
       setMentionQuery(null);
+      setPendingMentions(prev => {
+        if (!prev.some(m => m.id === member.id)) {
+          return [...prev, { name: member.name, id: member.id }];
+        }
+        return prev;
+      });
       setTimeout(() => {
-        if (chatInputRef.current) {
-          chatInputRef.current.selectionStart = newTextBefore.length;
-          chatInputRef.current.selectionEnd = newTextBefore.length;
-          chatInputRef.current.focus();
+        if (inputRef.current) {
+          inputRef.current.selectionStart = newTextBefore.length;
+          inputRef.current.selectionEnd = newTextBefore.length;
+          inputRef.current.focus();
         }
       }, 0);
     }
@@ -884,7 +946,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        insertMention(filteredMembers[mentionIndex].name);
+        insertMention(filteredMembers[mentionIndex]);
         return;
       }
       if (e.key === 'Escape') {
@@ -897,12 +959,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       e.preventDefault();
       if ((!inputValue.trim() && !selectedFile) || isUploading || isLocked || cooldownRemaining > 0) return;
       
-      const content = inputValue.trim();
+      let finalContent = inputValue.trim();
       setInputValue("");
       setShowChatEmojiPicker(false);
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setTypingStatus(false); 
+
+      // Sostituisci le menzioni @nome con <@id>
+      pendingMentions.forEach(m => {
+        const escapedName = m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`@${escapedName}(?=[\\s.,!?]|$)`, 'gi');
+        finalContent = finalContent.replace(regex, `<@${m.id}>`);
+      });
+      setPendingMentions([]);
 
       if (currentUser && channel && tableExists) {
         setIsUploading(true);
@@ -936,7 +1006,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         const rawDate = new Date().toISOString();
         
-        let finalContent = content;
         if (fileUrl) {
           const tag = fileType === 'image' ? `<img:${fileUrl}>` : `<audio:${fileUrl}>`;
           finalContent = finalContent ? `${finalContent} ${tag}` : tag;
@@ -986,7 +1055,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           setRealMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id, rawCreatedAt: data.created_at, updatedAt: data.updated_at } : m));
         }
       } else {
-        onSendMessage(content);
+        onSendMessage(finalContent);
         setReplyingTo(null);
       }
     }
@@ -1019,12 +1088,28 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (contentToEdit.startsWith('**Risposta a')) {
       contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
     }
+
+    // Converti <@id> in @nome per l'input
+    const existingMentions: {name: string, id: string}[] = [];
+    contentToEdit = contentToEdit.replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
+      const member = serverMembers?.find(m => m.id === id);
+      if (member) {
+        if (!existingMentions.some(m => m.id === member.id)) {
+          existingMentions.push({ name: member.name, id: member.id });
+        }
+        return `@${member.name}`;
+      }
+      return match;
+    });
+    
+    setPendingMentions(existingMentions);
     setEditContent(contentToEdit);
   };
 
   const cancelEditing = () => {
     setEditingMessageId(null);
     setEditContent("");
+    setPendingMentions([]);
   };
 
   const saveEdit = async (msgId: string) => {
@@ -1035,6 +1120,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     const originalMsg = realMessages.find(m => m.id === msgId);
     let finalContent = editContent.trim();
+    
+    // Sostituisci le menzioni @nome con <@id>
+    pendingMentions.forEach(m => {
+      const escapedName = m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`@${escapedName}(?=[\\s.,!?]|$)`, 'gi');
+      finalContent = finalContent.replace(regex, `<@${m.id}>`);
+    });
+    setPendingMentions([]);
     
     const replyMatch = originalMsg?.content.match(/^<reply:([a-zA-Z0-9-]+)>/);
     if (replyMatch) {
@@ -1064,6 +1157,28 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, msgId: string) => {
+    if (showMentions) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev + 1) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev - 1 + filteredMembers.length) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredMembers[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (e.key === 'Escape') cancelEditing();
     else if (e.key === 'Enter') saveEdit(msgId);
   };
@@ -1120,38 +1235,29 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   const renderContentWithMentions = (text: string) => {
-    if (!serverMembers || serverMembers.length === 0) return text;
-
-    const sortedMembers = [...serverMembers].sort((a, b) => b.name.length - a.name.length);
-    let elements: React.ReactNode[] = [text];
-
-    sortedMembers.forEach(member => {
-      const mentionStr = `@${member.name}`;
-      elements = elements.flatMap((el, i) => {
-        if (typeof el === 'string') {
-          const parts = el.split(mentionStr);
-          if (parts.length === 1) return [el];
-          const result: React.ReactNode[] = [];
-          parts.forEach((part, j) => {
-            result.push(part);
-            if (j < parts.length - 1) {
-              const isMe = member.id === currentUser?.id;
-              result.push(
-                <ProfilePopover key={`${member.id}-${i}-${j}`} user={member}>
-                  <span className={`font-medium px-1 rounded ${isMe ? 'bg-yellow-500/30 text-yellow-500' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
-                    {mentionStr}
-                  </span>
-                </ProfilePopover>
-              );
-            }
-          });
-          return result;
+    if (!text) return null;
+    const regex = /(<@[a-zA-Z0-9-]+>)/g;
+    const parts = text.split(regex);
+    
+    return parts.map((part, i) => {
+      const match = part.match(/^<@([a-zA-Z0-9-]+)>$/);
+      if (match) {
+        const userId = match[1];
+        const member = serverMembers?.find(m => m.id === userId);
+        if (member) {
+          const isMe = member.id === currentUser?.id;
+          return (
+            <ProfilePopover key={i} user={member}>
+              <span className={`font-medium px-1 rounded ${isMe ? 'bg-yellow-500/30 text-yellow-500' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
+                @{member.name}
+              </span>
+            </ProfilePopover>
+          );
         }
-        return [el];
-      });
+        return <span key={i} className="font-medium px-1 rounded bg-[#404249] text-[#dbdee1]">@Sconosciuto</span>;
+      }
+      return <React.Fragment key={i}>{part}</React.Fragment>;
     });
-
-    return elements;
   };
 
   // VISTA CANALE VOCALE
@@ -1585,7 +1691,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               repliedMessageContent = repliedMessage.content;
               const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
               if (nestedMatch) repliedMessageContent = nestedMatch[2];
-              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').trim();
+              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (m, id) => {
+                const member = serverMembers?.find(sm => sm.id === id);
+                return member ? `@${member.name}` : '@Sconosciuto';
+              }).trim();
             } else {
               repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
             }
@@ -1608,7 +1717,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             if (r.user_id === currentUser?.id) reactionCounts[r.emoji].hasReacted = true;
           });
 
-          const isMentioned = textContent.includes(`@${currentUser?.name}`);
+          const isMentioned = msg.content.includes(`<@${currentUser?.id}>`);
 
           return (
             <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-yellow-500/10 border-l-2 border-yellow-500 hover:bg-yellow-500/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
@@ -1723,7 +1832,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                           ref={editInputRef}
                           type="text"
                           value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
+                          onChange={handleEditInputChange}
                           onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
                           className="w-full bg-transparent border-none outline-none text-[#dbdee1]"
                         />
@@ -1816,11 +1925,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               {filteredMembers.map((member, idx) => (
                 <div
                   key={member.id}
-                  onClick={() => insertMention(member.name)}
+                  onClick={() => insertMention(member)}
                   className={`flex items-center px-3 py-1.5 cursor-pointer ${idx === mentionIndex ? 'bg-[#35373c]' : 'hover:bg-[#35373c]'}`}
                 >
                   <img src={member.avatar} className="w-6 h-6 rounded-full mr-2 object-cover" />
-                  <span className="text-[#dbdee1] text-sm font-medium">{member.name}</span>
+                  <div className="flex flex-col">
+                    <span className="text-[#dbdee1] text-sm font-medium leading-tight">{member.name}</span>
+                    <span className="text-[#949ba4] text-[10px] leading-tight">ID: {member.id.substring(0, 8)}...</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1954,7 +2066,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     <span className="text-xs text-[#949ba4]">{msgToDeleteData.timestamp}</span>
                   </div>
                   <div className="text-[#dbdee1] text-[15px] mt-1 line-clamp-3 overflow-hidden break-words">
-                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').trim()}
+                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
+                      const member = serverMembers?.find(m => m.id === id);
+                      return member ? `@${member.name}` : '@Sconosciuto';
+                    }).trim()}
                   </div>
                 </div>
               </div>
