@@ -215,22 +215,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         if (payload.eventType === 'UPDATE') {
           const updatedMember = payload.new as ServerMember;
           setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
-
-          // Se l'utente corrente è stato spostato o disconnesso da qualcun altro
-          if (updatedMember.user_id === currentUser.id) {
-            const currentVoiceId = activeVoiceChannelIdRef.current;
-            const newVoiceId = updatedMember.voice_channel_id;
-
-            if (newVoiceId !== currentVoiceId) {
-              if (newVoiceId === null) {
-                leaveVoiceChannel(true);
-                showError("Sei stato disconnesso dal canale vocale.");
-              } else {
-                joinVoiceChannel(newVoiceId, activeServer.id, true);
-                showSuccess("Sei stato spostato in un altro canale.");
-              }
-            }
-          }
         } else if (payload.eventType === 'INSERT') {
           const newMember = payload.new as ServerMember;
           const { data: profileData } = await supabase
@@ -247,10 +231,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         } else if (payload.eventType === 'DELETE') {
           const deletedMember = payload.old as { user_id: string };
           setMembers(prev => prev.filter(m => m.user_id !== deletedMember.user_id));
-
-          if (deletedMember.user_id === currentUser.id && activeVoiceChannelIdRef.current) {
-            leaveVoiceChannel(true);
-          }
         }
       })
       .subscribe();
@@ -259,7 +239,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(memberSub);
     };
-  }, [activeServer?.id, currentUser.id, leaveVoiceChannel, joinVoiceChannel]);
+  }, [activeServer?.id]);
 
   useEffect(() => {
     if (!activeVoiceChannelId || !currentUser) return;

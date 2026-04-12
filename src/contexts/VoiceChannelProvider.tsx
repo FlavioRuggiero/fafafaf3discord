@@ -18,8 +18,8 @@ interface VoiceState {
 }
 
 interface VoiceChannelContextType {
-  joinVoiceChannel: (channelId: string, serverId: string, skipDbUpdate?: boolean) => void;
-  leaveVoiceChannel: (skipDbUpdate?: boolean) => void;
+  joinVoiceChannel: (channelId: string, serverId: string) => void;
+  leaveVoiceChannel: () => void;
   isMuted: boolean;
   isDeafened: boolean;
   toggleMute: () => void;
@@ -702,7 +702,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     peersRef.current = [...peersRef.current.filter(p => p.userId !== userId), { peer, userId }];
   }, [currentUser, selectedAudioOutput]);
 
-  const leaveVoiceChannel = useCallback(async (skipDbUpdate = false) => {
+  const leaveVoiceChannel = useCallback(async () => {
     const channelToLeave = activeVoiceChannelIdRef.current;
     const serverToLeave = activeServerIdRef.current;
 
@@ -735,29 +735,26 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     document.querySelectorAll('audio[data-user-id]').forEach(el => el.remove());
 
     setActiveVoiceChannelId(null);
-    activeVoiceChannelIdRef.current = null;
     setActiveServerId(null);
-    activeServerIdRef.current = null;
     setMemberStates({});
     setSpeakingStates({});
     setRemoteScreenStreams({});
 
-    if (!skipDbUpdate) {
-      await supabase
-        .from('server_members')
-        .update({ voice_channel_id: null })
-        .eq('server_id', serverToLeave)
-        .eq('user_id', currentUser.id);
-    }
+    await supabase
+      .from('server_members')
+      .update({ voice_channel_id: null })
+      .eq('server_id', serverToLeave)
+      .eq('user_id', currentUser.id);
+
   }, [currentUser]);
 
-  const joinVoiceChannel = useCallback(async (channelId: string, serverId: string, skipDbUpdate = false) => {
+  const joinVoiceChannel = useCallback(async (channelId: string, serverId: string) => {
     if (!currentUser || isJoiningRef.current) return;
     
     isJoiningRef.current = true;
     try {
       if (activeVoiceChannelIdRef.current) {
-        await leaveVoiceChannel(true);
+        await leaveVoiceChannel();
       }
       
       let stream = localStreamRef.current;
@@ -772,17 +769,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       playSound('/enter.mp3');
 
       setActiveVoiceChannelId(channelId);
-      activeVoiceChannelIdRef.current = channelId;
       setActiveServerId(serverId);
-      activeServerIdRef.current = serverId;
 
-      if (!skipDbUpdate) {
-        await supabase
-          .from('server_members')
-          .update({ voice_channel_id: channelId })
-          .eq('server_id', serverId)
-          .eq('user_id', currentUser.id);
-      }
+      await supabase
+        .from('server_members')
+        .update({ voice_channel_id: channelId })
+        .eq('server_id', serverId)
+        .eq('user_id', currentUser.id);
 
       const channel = supabase.channel(`voice-chat:${channelId}`, {
         config: { presence: { key: currentUser.id } },
