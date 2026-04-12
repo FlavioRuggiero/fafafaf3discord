@@ -827,7 +827,7 @@ const Index = () => {
             
             <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
               <div className="max-w-xl w-full text-center">
-                <div className="w-20 h-20 bg-brand rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
+                <div className="w-20 h-20 bg-yellow-500 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
                   <MessageSquare size={40} className="text-white" />
                 </div>
                 <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>

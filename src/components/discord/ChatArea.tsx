@@ -1138,7 +1138,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               const isMe = member.id === currentUser?.id;
               result.push(
                 <ProfilePopover key={`${member.id}-${i}-${j}`} user={member}>
-                  <span className={`font-medium px-1 rounded ${isMe ? 'bg-brand/30 text-brand' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
+                  <span className={`font-medium px-1 rounded ${isMe ? 'bg-yellow-500/30 text-yellow-500' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
                     {mentionStr}
                   </span>
                 </ProfilePopover>
@@ -1611,7 +1611,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const isMentioned = textContent.includes(`@${currentUser?.name}`);
 
           return (
-            <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-brand/10 border-l-2 border-brand hover:bg-brand/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
+            <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-yellow-500/10 border-l-2 border-yellow-500 hover:bg-yellow-500/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
               
               {!isEditing && (
                 <div className={`absolute right-4 -top-3 ${isPopoverOpen ? 'flex' : 'hidden group-hover:flex'} items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all`}>
