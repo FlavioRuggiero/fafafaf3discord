@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Server } from "@/types/discord";
-import { X, Trash2, Upload, Mic, Square, Volume2, Shield } from "lucide-react";
+import { Server, ServerRole } from "@/types/discord";
+import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DiscoverModalProps {
   isOpen: boolean;
@@ -352,6 +353,14 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
+  // Roles states
+  const [roles, setRoles] = useState<ServerRole[]>([]);
+  const [memberRoles, setMemberRoles] = useState<{user_id: string, role_id: string}[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [editRoleName, setEditRoleName] = useState("");
+  const [editRoleColor, setEditRoleColor] = useState("#99aab5");
+
   useEffect(() => {
     if (server && isOpen) {
       setActiveTab('main');
@@ -366,6 +375,28 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
     }
   }, [server, isOpen]);
+
+  const loadRolesData = async () => {
+    if (!server) return;
+    const { data: r } = await supabase.from('server_roles').select('*').eq('server_id', server.id);
+    if (r) setRoles(r);
+    
+    const { data: mr } = await supabase.from('server_member_roles').select('*').eq('server_id', server.id);
+    if (mr) setMemberRoles(mr);
+
+    const { data: sm } = await supabase.from('server_members').select('user_id').eq('server_id', server.id);
+    if (sm) {
+      const userIds = sm.map(m => m.user_id);
+      const { data: profiles } = await supabase.from('profiles').select('id, first_name, avatar_url').in('id', userIds);
+      if (profiles) setMembers(profiles);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'roles' && server) {
+      loadRolesData();
+    }
+  }, [activeTab, server]);
 
   if (!isOpen || !server) return null;
 
@@ -436,6 +467,59 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     e.preventDefault();
     if (name.trim() && !isUpdating) {
       onUpdate(server.id, name.trim(), description.trim(), imageFile, audioFile);
+    }
+  };
+
+  const handleCreateRole = async () => {
+    if (!server) return;
+    const { data, error } = await supabase.from('server_roles').insert({
+      server_id: server.id,
+      name: 'Nuovo Ruolo',
+      color: '#99aab5'
+    }).select().single();
+    
+    if (data) {
+      setRoles([...roles, data]);
+      setSelectedRoleId(data.id);
+      setEditRoleName(data.name);
+      setEditRoleColor(data.color);
+    } else {
+      showError("Errore creazione ruolo. Hai eseguito lo script SQL?");
+    }
+  };
+
+  const handleSaveRole = async () => {
+    if (!selectedRoleId) return;
+    const { error } = await supabase.from('server_roles').update({
+      name: editRoleName,
+      color: editRoleColor
+    }).eq('id', selectedRoleId);
+    
+    if (!error) {
+      setRoles(roles.map(r => r.id === selectedRoleId ? { ...r, name: editRoleName, color: editRoleColor } : r));
+      showSuccess("Ruolo aggiornato!");
+    }
+  };
+
+  const handleDeleteRole = async () => {
+    if (!selectedRoleId) return;
+    const { error } = await supabase.from('server_roles').delete().eq('id', selectedRoleId);
+    if (!error) {
+      setRoles(roles.filter(r => r.id !== selectedRoleId));
+      setSelectedRoleId(null);
+      showSuccess("Ruolo eliminato!");
+    }
+  };
+
+  const handleToggleMemberRole = async (userId: string, hasRole: boolean) => {
+    if (!selectedRoleId || !server) return;
+    
+    if (hasRole) {
+      await supabase.from('server_member_roles').delete().eq('server_id', server.id).eq('user_id', userId).eq('role_id', selectedRoleId);
+      setMemberRoles(memberRoles.filter(mr => !(mr.user_id === userId && mr.role_id === selectedRoleId)));
+    } else {
+      await supabase.from('server_member_roles').insert({ server_id: server.id, user_id: userId, role_id: selectedRoleId });
+      setMemberRoles([...memberRoles, { server_id: server.id, user_id: userId, role_id: selectedRoleId }]);
     }
   };
 
@@ -641,16 +725,102 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
             )}
 
             {activeTab === 'roles' && (
-              <div className="animate-in fade-in duration-200">
+              <div className="animate-in fade-in duration-200 h-full flex flex-col">
                 <h2 className="text-xl font-bold text-white mb-6">Gestione Ruoli</h2>
-                <div className="bg-[#2b2d31] border border-[#1e1f22] rounded-lg p-8 text-center mt-10">
-                  <div className="w-20 h-20 bg-[#1e1f22] rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Shield size={40} className="text-[#5865F2]" />
+                
+                <div className="flex h-full gap-6">
+                  {/* Left Sidebar for Roles List */}
+                  <div className="w-1/3 border-r border-[#1f2023] pr-4 flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-[#b5bac1] text-xs font-bold uppercase">Ruoli ({roles.length})</h3>
+                      <button onClick={handleCreateRole} className="text-[#dbdee1] hover:text-white p-1" title="Crea Ruolo"><Plus size={16} /></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
+                      {roles.map(role => (
+                        <button
+                          key={role.id}
+                          onClick={() => {
+                            setSelectedRoleId(role.id);
+                            setEditRoleName(role.name);
+                            setEditRoleColor(role.color);
+                          }}
+                          className={`w-full flex items-center px-3 py-2 rounded text-sm transition-colors ${selectedRoleId === role.id ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+                        >
+                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: role.color }} />
+                          <span className="truncate">{role.name}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <h3 className="text-xl font-medium text-white mb-3">Ruoli del Server</h3>
-                  <p className="text-[#b5bac1] text-[15px] max-w-md mx-auto leading-relaxed">
-                    Usa i ruoli per raggruppare i membri del tuo server e assegnare loro permessi specifici. Questa funzionalità sarà disponibile a breve.
-                  </p>
+
+                  {/* Right Area for Role Edit */}
+                  <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
+                    {selectedRoleId ? (
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">Nome Ruolo</label>
+                          <input 
+                            type="text" 
+                            value={editRoleName}
+                            onChange={(e) => setEditRoleName(e.target.value)}
+                            className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">Colore Ruolo</label>
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="color" 
+                              value={editRoleColor}
+                              onChange={(e) => setEditRoleColor(e.target.value)}
+                              className="w-10 h-10 p-0 border-none bg-transparent rounded cursor-pointer"
+                            />
+                            <span className="text-[#dbdee1] text-sm uppercase">{editRoleColor}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-3 pt-2">
+                          <button onClick={handleSaveRole} className="bg-[#23a559] hover:bg-[#1a7c43] text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+                            Salva Modifiche
+                          </button>
+                          <button onClick={handleDeleteRole} className="bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+                            Elimina Ruolo
+                          </button>
+                        </div>
+
+                        <div className="pt-6 border-t border-[#1f2023]">
+                          <h3 className="text-[#b5bac1] text-xs font-bold uppercase mb-4">Membri con questo ruolo</h3>
+                          <div className="space-y-2">
+                            {members.map(member => {
+                              const hasRole = memberRoles.some(mr => mr.user_id === member.id && mr.role_id === selectedRoleId);
+                              return (
+                                <div key={member.id} className="flex items-center justify-between bg-[#2b2d31] p-2 rounded border border-[#1e1f22]">
+                                  <div className="flex items-center gap-3">
+                                    <img src={member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`} className="w-8 h-8 rounded-full object-cover" />
+                                    <span className="text-[#dbdee1] text-sm font-medium">{member.first_name || 'Utente'}</span>
+                                  </div>
+                                  <label className="relative inline-flex items-center cursor-pointer">
+                                    <input 
+                                      type="checkbox" 
+                                      className="sr-only peer" 
+                                      checked={hasRole}
+                                      onChange={() => handleToggleMemberRole(member.id, hasRole)}
+                                    />
+                                    <div className="w-9 h-5 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#23a559]"></div>
+                                  </label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-[#949ba4]">
+                        <Shield size={48} className="mb-4 opacity-50" />
+                        <p>Seleziona un ruolo per modificarlo o creane uno nuovo.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

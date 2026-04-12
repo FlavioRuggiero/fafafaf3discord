@@ -6,7 +6,7 @@ import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { INITIAL_MESSAGES } from "@/data/mockData";
-import { Message, User, Server, Channel } from "@/types/discord";
+import { Message, User, Server, Channel, ServerRole } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
@@ -48,6 +48,10 @@ const Index = () => {
   // State per gestire la Presence in tempo reale e i profili
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [serverProfiles, setServerProfiles] = useState<any[]>([]);
+  
+  // State per i ruoli
+  const [serverRoles, setServerRoles] = useState<ServerRole[]>([]);
+  const [memberRoles, setMemberRoles] = useState<{user_id: string, role_id: string}[]>([]);
 
   // States per UI
   const [showMembers, setShowMembers] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -148,6 +152,11 @@ const Index = () => {
         role = 'MODERATOR';
     }
 
+    const userRoles = memberRoles
+      .filter(mr => mr.user_id === p.id)
+      .map(mr => serverRoles.find(r => r.id === mr.role_id))
+      .filter(Boolean) as ServerRole[];
+
     return {
       id: p.id,
       name: name,
@@ -159,7 +168,8 @@ const Index = () => {
       banner_url: p.banner_url || undefined,
       level: p.level || 1,
       digitalcardus: p.digitalcardus ?? 25,
-      xp: p.xp || 0
+      xp: p.xp || 0,
+      server_roles: userRoles
     };
   });
 
@@ -338,12 +348,14 @@ const Index = () => {
   useEffect(() => {
     if (!activeServerId || activeServerId === 'home') {
       setServerProfiles([]);
+      setServerRoles([]);
+      setMemberRoles([]);
       return;
     }
 
     let isMounted = true;
 
-    const fetchServerMembers = async () => {
+    const fetchServerData = async () => {
       const { data: membersData } = await supabase
         .from('server_members')
         .select('user_id')
@@ -362,9 +374,15 @@ const Index = () => {
       } else if (isMounted) {
         setServerProfiles([]);
       }
+
+      const { data: roles } = await supabase.from('server_roles').select('*').eq('server_id', activeServerId);
+      if (roles && isMounted) setServerRoles(roles);
+
+      const { data: mRoles } = await supabase.from('server_member_roles').select('user_id, role_id').eq('server_id', activeServerId);
+      if (mRoles && isMounted) setMemberRoles(mRoles);
     };
 
-    fetchServerMembers();
+    fetchServerData();
 
     // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
     const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
@@ -393,6 +411,8 @@ const Index = () => {
           setServerProfiles(prev => prev.filter(p => p.id !== deletedUserId));
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_member_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
       .subscribe();
 
     return () => {
@@ -781,7 +801,7 @@ const Index = () => {
           />
           
           <ChannelSidebar 
-            activeServer={activeServer}
+            activeServer={activeServer || null}
             channels={allChannels}
             activeChannelId={activeChannel?.id || ''} 
             onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 

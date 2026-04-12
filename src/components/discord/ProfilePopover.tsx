@@ -127,6 +127,20 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
                 <p className="text-[13px] text-[#949ba4] italic">Nessuna biografia impostata.</p>
               )}
             </div>
+
+            {user.server_roles && user.server_roles.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-[#2b2d31]">
+                <h4 className="text-[11px] font-bold uppercase text-[#b5bac1] mb-2 tracking-wider">Ruoli</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {user.server_roles.map(role => (
+                    <div key={role.id} className="flex items-center bg-[#2b2d31] border border-[#1e1f22] rounded px-2 py-1">
+                      <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: role.color }} />
+                      <span className="text-xs font-medium text-[#dbdee1]">{role.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Popover.Content>
       </Popover.Portal>

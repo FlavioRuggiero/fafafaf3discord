@@ -248,6 +248,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const isServerCreator = currentUser?.id === serverCreatorId;
   const isLocked = channel.is_locked && !isServerCreator;
 
+  // Helper per aggiungere i ruoli all'utente
+  const getUserWithRoles = (baseUser: User) => {
+    const memberInfo = serverMembers?.find(m => m.id === baseUser.id);
+    return { ...baseUser, server_roles: memberInfo?.server_roles || [] };
+  };
+
   // Auto-resize textareas
   useEffect(() => {
     if (chatInputRef.current) {
@@ -439,6 +445,35 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       supabase.removeChannel(sub);
     };
   }, [channel?.id, channel?.type, channel?.server_id]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId || !currentUser) return;
+
+    const currentVCUserIds = new Set(
+      voiceMembers
+        .filter(m => m.voice_channel_id === activeVoiceChannelId)
+        .map(m => m.user_id)
+    );
+    
+    const prevVCUserIds = new Set(
+      voiceMembers
+        .filter(m => m.voice_channel_id === activeVoiceChannelId)
+        .map(m => m.user_id)
+    );
+
+    currentVCUserIds.forEach(userId => {
+      if (!prevVCUserIds.has(userId) && userId !== currentUser.id) {
+        playSound('/enter.mp3');
+      }
+    });
+
+    prevVCUserIds.forEach(userId => {
+      if (!currentVCUserIds.has(userId) && userId !== currentUser.id) {
+        playSound('/exit.mp3');
+      }
+    });
+
+  }, [voiceMembers, activeVoiceChannelId, currentUser]);
 
   useEffect(() => {
     if (!channel?.id || channel?.type === 'voice') {
@@ -1824,7 +1859,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div className="flex items-center gap-2 text-[#949ba4] bg-[#2b2d31] px-4 py-2 rounded-full border border-[#1e1f22] shadow-sm">
                   <span className="text-xl">👋</span>
                   <span className="flex items-center">
-                    <ProfilePopover user={msg.user}>
+                    <ProfilePopover user={getUserWithRoles(msg.user)}>
                       <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline mr-1.5">{msg.user.name}</span>
                     </ProfilePopover>
                     {msg.user.id === adminId && (
@@ -1974,7 +2009,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
               <div className="flex items-start">
                 {!isSameUserAsPrevious || isEditing ? (
-                  <ProfilePopover user={msg.user}>
+                  <ProfilePopover user={getUserWithRoles(msg.user)}>
                     <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
                   </ProfilePopover>
                 ) : (
@@ -1986,7 +2021,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div className="flex-1 min-w-0">
                   {(!isSameUserAsPrevious || isEditing) && (
                     <div className="flex items-center min-w-0 mb-0.5">
-                      <ProfilePopover user={msg.user}>
+                      <ProfilePopover user={getUserWithRoles(msg.user)}>
                         <span className="font-medium text-[#dbdee1] mr-1.5 cursor-pointer hover:underline truncate">{msg.user.name}</span>
                       </ProfilePopover>
                       {msg.user.id === adminId && (

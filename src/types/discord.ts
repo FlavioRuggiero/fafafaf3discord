@@ -1,3 +1,10 @@
+export type ServerRole = {
+  id: string;
+  server_id: string;
+  name: string;
+  color: string;
+};
+
 export type User = {
   id: string;
   name: string;
@@ -11,6 +18,7 @@ export type User = {
   level?: number;
   digitalcardus?: number;
   xp?: number;
+  server_roles?: ServerRole[];
 };
 
 export type Server = {
