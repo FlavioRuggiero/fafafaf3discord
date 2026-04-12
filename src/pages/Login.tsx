@@ -195,6 +195,9 @@ const Login = () => {
             </svg>
             Continua con Discord
           </button>
+          <p className="text-xs text-[#23a559] text-center mt-3 font-medium bg-[#23a559]/10 py-2 rounded">
+            ✨ Consigliato: importa in automatico il tuo nome e l'immagine del profilo!
+          </p>
         </div>
         
         <div className="mt-4 text-sm">
