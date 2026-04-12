@@ -157,7 +157,7 @@ interface ChatAreaProps {
 }
 
 export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId }: ChatAreaProps) => {
-  const { user: authUser, adminId } = useAuth();
+  const { user: authUser, adminId, moderatorIds } = useAuth();
   const [inputValue, setInputValue] = useState("");
   const [realMessages, setRealMessages] = useState<LocalMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
@@ -366,7 +366,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       if (data) {
         const formatted = data.map((m: any) => {
           const name = m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente';
-          const isVerified = m.user_id === adminId || (m.user_id === authUser?.id && authUser?.email === 'fafetto05@gmail.com');
+          
+          let role: User['global_role'] = 'USER';
+          if (m.user_id === adminId) {
+              role = 'CREATOR';
+          } else if (moderatorIds.includes(m.user_id)) {
+              role = 'MODERATOR';
+          }
           
           return {
             id: m.id,
@@ -384,7 +390,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               level: m.profiles?.level || 1,
               digitalcardus: m.profiles?.digitalcardus ?? 25,
               xp: m.profiles?.xp || 0,
-              global_role: isVerified ? "CREATOR" : "USER",
+              global_role: role,
               status: "online" as const
             }
           };
@@ -436,7 +442,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           .single();
           
         const name = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente';
-        const isVerified = payload.new.user_id === adminId || (payload.new.user_id === authUser?.id && authUser?.email === 'fafetto05@gmail.com');
+        
+        let role: User['global_role'] = 'USER';
+        if (payload.new.user_id === adminId) {
+            role = 'CREATOR';
+        } else if (moderatorIds.includes(payload.new.user_id)) {
+            role = 'MODERATOR';
+        }
 
         const newMsg: LocalMessage = {
           id: payload.new.id,
@@ -454,7 +466,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             level: profileData?.level || 1,
             digitalcardus: profileData?.digitalcardus ?? 25,
             xp: profileData?.xp || 0,
-            global_role: isVerified ? "CREATOR" : "USER",
+            global_role: role,
             status: "online"
           }
         };
@@ -509,7 +521,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         setRealMessages(prev => prev.map(m => {
           if (m.user.id === updatedProfile.id) {
-            const isVerified = updatedProfile.id === adminId || (updatedProfile.id === authUser?.id && authUser?.email === 'fafetto05@gmail.com');
+            let role: User['global_role'] = 'USER';
+            if (updatedProfile.id === adminId) {
+                role = 'CREATOR';
+            } else if (moderatorIds.includes(updatedProfile.id)) {
+                role = 'MODERATOR';
+            }
             return {
               ...m,
               user: {
@@ -522,7 +539,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 level: updatedProfile.level || 1,
                 digitalcardus: updatedProfile.digitalcardus ?? 25,
                 xp: updatedProfile.xp || 0,
-                global_role: isVerified ? "CREATOR" : "USER"
+                global_role: role
               }
             };
           }
@@ -541,7 +558,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return () => {
       supabase.removeChannel(channelSubscription);
     };
-  }, [channel?.id, channel?.type, tableExists, adminId, authUser?.id, authUser?.email]);
+  }, [channel?.id, channel?.type, tableExists, adminId, moderatorIds, authUser?.id]);
 
   useEffect(() => {
     if (!channel?.id || !currentUser?.id || channel?.type === 'voice') return;
@@ -627,7 +644,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       if (currentUser && channel && tableExists) {
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
-        const isVerified = currentUser.id === adminId || authUser?.email === 'fafetto05@gmail.com';
+        
+        let role: User['global_role'] = 'USER';
+        if (currentUser.id === adminId) {
+            role = 'CREATOR';
+        } else if (moderatorIds.includes(currentUser.id)) {
+            role = 'MODERATOR';
+        }
+        
         const rawDate = new Date().toISOString();
         
         let finalContent = content;
@@ -650,7 +674,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             level: currentUserProfile?.level || 1,
             digitalcardus: currentUserProfile?.digitalcardus ?? 25,
             xp: currentUserProfile?.xp || 0,
-            global_role: isVerified ? "CREATOR" : "USER",
+            global_role: role,
             status: "online"
           }
         };

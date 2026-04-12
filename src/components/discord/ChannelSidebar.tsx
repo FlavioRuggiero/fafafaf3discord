@@ -26,7 +26,7 @@ interface ChannelSidebarProps {
 }
 
 export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
-  const { user: authUser, adminId } = useAuth();
+  const { user: authUser, adminId, moderatorIds } = useAuth();
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [dmChannels, setDmChannels] = useState<Channel[]>([]);
@@ -883,7 +883,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                   level: userProfile.level || 1,
                                   digitalcardus: userProfile.digitalcardus ?? 25,
                                   xp: userProfile.xp || 0,
-                                  global_role: (userProfile.id === adminId || (userProfile.id === authUser?.id && authUser?.email === 'fafetto05@gmail.com')) ? 'CREATOR' : 'USER',
+                                  global_role: (userProfile.id === adminId || moderatorIds.includes(userProfile.id)) ? (userProfile.id === adminId ? 'CREATOR' : 'MODERATOR') : 'USER',
                                 } : null;
 
                                 return (

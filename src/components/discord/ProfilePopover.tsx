@@ -20,6 +20,7 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
   if (!user) return <>{children}</>;
 
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
+  const isModerator = user.global_role === 'MODERATOR';
   const xpNeeded = (user.level || 1) * 5;
   const currentXp = user.xp || 0;
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
@@ -57,6 +58,11 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
               {isAdmin && (
                 <span className="text-[10px] font-bold text-white border border-[#f23f43] rounded px-1.5 py-[2px] leading-none tracking-wide">
                   ADMIN
+                </span>
+              )}
+              {isModerator && (
+                <span className="text-[10px] font-bold text-yellow-300 border border-yellow-600 bg-yellow-600/20 rounded px-1.5 py-[2px] leading-none tracking-wide">
+                  MODERATORE
                 </span>
               )}
             </div>

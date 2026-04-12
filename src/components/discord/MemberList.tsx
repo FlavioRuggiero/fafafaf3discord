@@ -32,6 +32,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
     const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
+    const isModerator = user.global_role === 'MODERATOR';
 
     return (
       <ProfilePopover user={user} side="left" align="start">
@@ -62,6 +63,11 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
               {isAdmin && (
                 <span className="text-[9px] font-bold text-white border border-[#f23f43] rounded px-1 py-[2px] leading-none tracking-wide flex-shrink-0">
                   ADMIN
+                </span>
+              )}
+              {isModerator && (
+                <span className="text-[9px] font-bold text-yellow-300 border border-yellow-600 bg-yellow-600/20 rounded px-1 py-[2px] leading-none tracking-wide flex-shrink-0">
+                  MODERATORE
                 </span>
               )}
             </div>

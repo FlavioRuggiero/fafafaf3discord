@@ -15,7 +15,7 @@ import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
 
 const Index = () => {
-  const { user, adminId } = useAuth();
+  const { user, adminId, moderatorIds } = useAuth();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // States per Server e Canali dal DB
@@ -49,14 +49,20 @@ const Index = () => {
   const serverMembersList: User[] = serverProfiles.map(p => {
     const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
     const name = p.first_name || "Utente";
-    const isVerifiedUser = p.id === adminId || (p.id === user?.id && user?.email === 'fafetto05@gmail.com');
+    
+    let role: User['global_role'] = 'USER';
+    if (p.id === adminId) {
+        role = 'CREATOR';
+    } else if (moderatorIds.includes(p.id)) {
+        role = 'MODERATOR';
+    }
 
     return {
       id: p.id,
       name: name,
       avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
       status: isOnline ? "online" : "offline",
-      global_role: isVerifiedUser ? "CREATOR" : "USER",
+      global_role: role,
       bio: p.bio || "",
       banner_color: p.banner_color || "#5865F2",
       banner_url: p.banner_url || undefined,
@@ -116,7 +122,14 @@ const Index = () => {
 
         setCurrentUser(prev => {
           if (!prev || prev.id !== updatedProfile.id) return prev;
-          const isVerifiedUser = updatedProfile.id === adminId || (updatedProfile.id === user?.id && user?.email === 'fafetto05@gmail.com');
+          
+          let role: User['global_role'] = 'USER';
+          if (updatedProfile.id === adminId) {
+              role = 'CREATOR';
+          } else if (moderatorIds.includes(updatedProfile.id)) {
+              role = 'MODERATOR';
+          }
+
           return {
             ...prev,
             name: updatedProfile.first_name || prev.name,
@@ -127,7 +140,7 @@ const Index = () => {
             level: updatedProfile.level || 1,
             digitalcardus: updatedProfile.digitalcardus ?? 25,
             xp: updatedProfile.xp || 0,
-            global_role: isVerifiedUser ? "CREATOR" : "USER"
+            global_role: role
           };
         });
       })
@@ -148,7 +161,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(profileSubscription);
     };
-  }, [adminId, user?.id, user?.email]);
+  }, [adminId, moderatorIds, user?.id]);
 
   // Caricamento dati iniziali e premi giornalieri
   useEffect(() => {
@@ -174,14 +187,20 @@ const Index = () => {
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
-      const isVerifiedUser = user.id === adminId || user.email === 'fafetto05@gmail.com';
+      
+      let role: User['global_role'] = 'USER';
+      if (user.id === adminId) {
+        role = 'CREATOR';
+      } else if (moderatorIds.includes(user.id)) {
+        role = 'MODERATOR';
+      }
 
       const loadedUser: User = {
         id: user.id,
         name: userName,
         avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
         status: "online",
-        global_role: isVerifiedUser ? "CREATOR" : "USER",
+        global_role: role,
         bio: profile?.bio || "",
         banner_color: profile?.banner_color || "#5865F2",
         banner_url: profile?.banner_url || undefined,
@@ -215,7 +234,7 @@ const Index = () => {
     };
     
     loadInitialData();
-  }, [user, adminId]);
+  }, [user, adminId, moderatorIds]);
 
   // Caricamento Membri e Sottoscrizione Realtime
   useEffect(() => {
@@ -336,7 +355,7 @@ const Index = () => {
   const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
     if (!currentUser) return;
     
-    const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
+    const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
     if (!canCreate) {
       showError("Non hai i permessi per creare un server. Serve un account verificato.");
       return;
@@ -619,7 +638,7 @@ const Index = () => {
   }
 
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
-  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
+  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
 
   return (
     <VoiceChannelProvider currentUser={currentUser}>

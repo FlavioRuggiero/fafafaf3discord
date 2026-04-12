@@ -7,15 +7,17 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   adminId: string | null;
+  moderatorIds: string[];
 };
 
-const AuthContext = createContext<AuthContextType>({ session: null, user: null, loading: true, adminId: null });
+const AuthContext = createContext<AuthContextType>({ session: null, user: null, loading: true, adminId: null, moderatorIds: [] });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [adminId, setAdminId] = useState<string | null>(null);
+  const [moderatorIds, setModeratorIds] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,11 +39,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
+    // Recupera gli ID dei moderatori
+    supabase.rpc('get_moderator_ids').then(({ data, error }) => {
+      if (!error && data) {
+        setModeratorIds(data);
+      }
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, adminId }}>
+    <AuthContext.Provider value={{ session, user, loading, adminId, moderatorIds }}>
       {children}
     </AuthContext.Provider>
   );

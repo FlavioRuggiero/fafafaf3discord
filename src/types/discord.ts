@@ -4,7 +4,7 @@ export type User = {
   avatar: string;
   status: "online" | "idle" | "dnd" | "offline";
   customStatus?: string;
-  global_role?: "USER" | "CREATOR" | "ADMIN";
+  global_role?: "USER" | "MODERATOR" | "CREATOR" | "ADMIN";
   bio?: string;
   banner_color?: string;
   banner_url?: string;
