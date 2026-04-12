@@ -33,6 +33,14 @@ interface VoiceChannelContextType {
   stopScreenShare: () => void;
   userVolumes: Record<string, number>;
   setUserVolume: (userId: string, volume: number) => void;
+  
+  // Audio Devices
+  audioInputDevices: MediaDeviceInfo[];
+  audioOutputDevices: MediaDeviceInfo[];
+  selectedAudioInput: string | null;
+  selectedAudioOutput: string | null;
+  setSelectedAudioInput: (id: string) => void;
+  setSelectedAudioOutput: (id: string) => void;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -62,7 +70,22 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   
-  // Volume States - Inizializza dal localStorage
+  // Audio Devices States
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioInput, setSelectedAudioInputState] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('discord-audio-input');
+    return null;
+  });
+  const [selectedAudioOutput, setSelectedAudioOutputState] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('discord-audio-output');
+    return null;
+  });
+  
+  const selectedAudioInputRef = useRef(selectedAudioInput);
+  useEffect(() => { selectedAudioInputRef.current = selectedAudioInput; }, [selectedAudioInput]);
+
+  // Volume States
   const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('discord-user-volumes');
@@ -97,6 +120,27 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   useEffect(() => { isMutedRef.current = isMuted }, [isMuted]);
   useEffect(() => { isDeafenedRef.current = isDeafened }, [isDeafened]);
 
+  // Fetch Audio Devices
+  useEffect(() => {
+    const getDevices = async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        setAudioInputDevices(devices.filter(d => d.kind === 'audioinput'));
+        setAudioOutputDevices(devices.filter(d => d.kind === 'audiooutput'));
+      } catch (e) {
+        console.error("Error enumerating devices", e);
+      }
+    };
+    
+    getDevices();
+    
+    if (navigator.mediaDevices?.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', getDevices);
+      return () => navigator.mediaDevices.removeEventListener('devicechange', getDevices);
+    }
+  }, []);
+
   // Effetto per applicare il sordomutato a tutti i GainNode attivi
   useEffect(() => {
     Object.entries(gainNodesRef.current).forEach(([userId, gainNode]) => {
@@ -122,7 +166,18 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
   const requestMicrophone = useCallback(async (playSounds = true) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      const audioConstraints: MediaTrackConstraints | boolean = selectedAudioInputRef.current
+        ? { deviceId: { exact: selectedAudioInputRef.current } }
+        : true;
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: audioConstraints });
+      } catch (e) {
+        // Fallback se il dispositivo specifico fallisce
+        stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      }
+      
       localStreamRef.current = stream;
       
       const muted = !stream.getAudioTracks()[0].enabled;
@@ -146,6 +201,47 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       return null;
     }
   }, [currentUser]);
+
+  const setSelectedAudioInput = useCallback(async (id: string) => {
+    setSelectedAudioInputState(id);
+    if (typeof window !== 'undefined') localStorage.setItem('discord-audio-input', id);
+
+    if (activeVoiceChannelIdRef.current && !isMutedRef.current && localStreamRef.current) {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: { deviceId: { exact: id } }
+        });
+        const newTrack = newStream.getAudioTracks()[0];
+        const oldTrack = localStreamRef.current.getAudioTracks()[0];
+
+        localStreamRef.current.removeTrack(oldTrack);
+        localStreamRef.current.addTrack(newTrack);
+        oldTrack.stop();
+
+        peersRef.current.forEach(({ peer }) => {
+          try {
+            peer.replaceTrack(oldTrack, newTrack, localStreamRef.current!);
+          } catch (e) {
+            console.error("Error replacing track", e);
+          }
+        });
+      } catch (e) {
+        console.error("Failed to switch audio input", e);
+      }
+    }
+  }, []);
+
+  const setSelectedAudioOutput = useCallback((id: string) => {
+    setSelectedAudioOutputState(id);
+    if (typeof window !== 'undefined') localStorage.setItem('discord-audio-output', id);
+
+    document.querySelectorAll('audio[data-user-id]').forEach((audio: any) => {
+      if (typeof audio.setSinkId === 'function') {
+        audio.setSinkId(id).catch(console.error);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const initializeMedia = async () => {
@@ -498,6 +594,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       audio.autoplay = true;
       audio.muted = true; 
       audio.setAttribute('data-user-id', userId);
+      
+      // Applica il dispositivo di uscita selezionato se supportato
+      if (selectedAudioOutputState && typeof (audio as any).setSinkId === 'function') {
+        (audio as any).setSinkId(selectedAudioOutputState).catch(console.error);
+      }
+      
       document.body.appendChild(audio);
 
       const analyser = audioContext.createAnalyser();
@@ -537,7 +639,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     if (receivedSignal) peer.signal(receivedSignal);
 
     peersRef.current = [...peersRef.current.filter(p => p.userId !== userId), { peer, userId }];
-  }, [currentUser]);
+  }, [currentUser, selectedAudioOutputState]);
 
   const leaveVoiceChannel = useCallback(async () => {
     const channelToLeave = activeVoiceChannelIdRef.current;
@@ -757,6 +859,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     stopScreenShare,
     userVolumes,
     setUserVolume,
+    audioInputDevices,
+    audioOutputDevices,
+    selectedAudioInput,
+    selectedAudioOutput,
+    setSelectedAudioInput,
+    setSelectedAudioOutput,
   };
 
   return (
