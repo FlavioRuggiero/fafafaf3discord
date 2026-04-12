@@ -229,7 +229,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     stopScreenShare,
     userVolumes,
     setUserVolume,
-    isDeafened
+    isDeafened,
+    activeVoiceChannelId
   } = useVoiceChannel();
 
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
@@ -388,36 +389,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       supabase.removeChannel(sub);
     };
   }, [channel?.id, channel?.type, channel?.server_id]);
-
-  useEffect(() => {
-    if (!activeVoiceChannelId || !currentUser) return;
-
-    const currentVCUserIds = new Set(
-      members
-        .filter(m => m.voice_channel_id === activeVoiceChannelId)
-        .map(m => m.user_id)
-    );
-    
-    const prevVCUserIds = new Set(
-      prevMembersRef.current
-        .filter(m => m.voice_channel_id === activeVoiceChannelId)
-        .map(m => m.user_id)
-    );
-
-    currentVCUserIds.forEach(userId => {
-      if (!prevVCUserIds.has(userId) && userId !== currentUser.id) {
-        playSound('/enter.mp3');
-      }
-    });
-
-    prevVCUserIds.forEach(userId => {
-      if (!currentVCUserIds.has(userId) && userId !== currentUser.id) {
-        playSound('/exit.mp3');
-      }
-    });
-
-    prevMembersRef.current = members;
-  }, [members, activeVoiceChannelId, currentUser]);
 
   useEffect(() => {
     if (!channel?.id || channel?.type === 'voice') {
