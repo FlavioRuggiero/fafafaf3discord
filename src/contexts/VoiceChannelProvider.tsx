@@ -20,7 +20,6 @@ interface VoiceState {
 interface VoiceChannelContextType {
   joinVoiceChannel: (channelId: string, serverId: string) => void;
   leaveVoiceChannel: () => void;
-  kickFromVoiceChannel: (userId: string) => void;
   isMuted: boolean;
   isDeafened: boolean;
   toggleMute: () => void;
@@ -749,16 +748,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
   }, [currentUser]);
 
-  const kickFromVoiceChannel = useCallback((userId: string) => {
-    if (signalingChannelRef.current) {
-      signalingChannelRef.current.send({
-        type: 'broadcast',
-        event: 'force-disconnect',
-        payload: { userId }
-      });
-    }
-  }, []);
-
   const joinVoiceChannel = useCallback(async (channelId: string, serverId: string) => {
     if (!currentUser || isJoiningRef.current) return;
     
@@ -867,13 +856,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         });
       });
 
-      channel.on('broadcast', { event: 'force-disconnect' }, ({ payload }) => {
-        if (payload.userId === currentUser.id) {
-          leaveVoiceChannel();
-          showError("Sei stato disconnesso dal canale vocale dal proprietario del server.");
-        }
-      });
-
       channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({});
@@ -925,7 +907,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const value = {
     joinVoiceChannel,
     leaveVoiceChannel,
-    kickFromVoiceChannel,
     isMuted,
     isDeafened,
     toggleMute,

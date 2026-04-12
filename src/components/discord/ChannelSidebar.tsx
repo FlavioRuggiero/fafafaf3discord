@@ -70,8 +70,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     activeVoiceChannelId,
     speakingStates,
     userVolumes,
-    setUserVolume,
-    kickFromVoiceChannel
+    setUserVolume
   } = useVoiceChannel();
 
   const activeChannelIdRef = useRef(activeChannelId);
@@ -995,7 +994,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 const userProfile = member.profiles;
                                 const isAdmin = member.user_id === adminId;
                                 const isMod = moderatorIds.includes(member.user_id);
-                                const isServerOwner = activeServer?.created_by === currentUser?.id;
 
                                 const userForCard: User | null = userProfile ? {
                                   id: userProfile.id,
@@ -1074,21 +1072,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                           onChange={(e) => setUserVolume(member.user_id, parseInt(e.target.value))}
                                           className="w-full h-1.5 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
                                         />
-                                        {isServerOwner && !isLocal && (
-                                          <>
-                                            <div className="h-[1px] bg-[#1e1f22] my-2" />
-                                            <ContextMenu.Item
-                                              className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none transition-colors"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                kickFromVoiceChannel(member.user_id);
-                                              }}
-                                            >
-                                              <PhoneOff size={14} className="mr-2" />
-                                              Disconnetti
-                                            </ContextMenu.Item>
-                                          </>
-                                        )}
                                       </ContextMenu.Content>
                                     </ContextMenu.Portal>
                                   </ContextMenu.Root>
