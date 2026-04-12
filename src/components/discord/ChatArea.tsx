@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
@@ -200,6 +200,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Audio Recording States
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Image Viewer State
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
+
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   
   const { 
@@ -253,6 +263,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, []);
 
@@ -712,6 +726,51 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (file) {
       validateAndSetFile(file);
     }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `voice_message_${Date.now()}.webm`, { type: 'audio/webm' });
+        validateAndSetFile(audioFile);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+      setRecordingTime(0);
+
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          if (prev >= 14) {
+            stopRecording();
+            return 15;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } catch (err) {
+      console.error("Errore accesso microfono:", err);
+      showError("Impossibile accedere al microfono.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingAudio(false);
+    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1524,9 +1583,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                       {images.length > 0 && (
                         <div className="mt-2 flex flex-col gap-2">
                           {images.map((imgUrl, i) => (
-                            <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer" className="inline-block max-w-sm">
-                              <img src={imgUrl} alt="Attachment" className="max-h-80 rounded-lg object-contain bg-[#2b2d31] border border-[#1e1f22]" />
-                            </a>
+                            <div key={i} className="inline-block max-w-sm cursor-pointer" onClick={() => setViewingImage(imgUrl)}>
+                              <img src={imgUrl} alt="Attachment" className="max-h-80 rounded-lg object-contain bg-[#2b2d31] border border-[#1e1f22] hover:opacity-90 transition-opacity" />
+                            </div>
                           ))}
                         </div>
                       )}
@@ -1619,55 +1678,77 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         )}
 
         <div className={`bg-[#383a40] flex items-center px-4 py-2.5 min-w-0 z-20 relative ${hasTopAttachment ? 'rounded-b-lg rounded-t-none border-x border-b border-[#1f2023]' : 'rounded-lg'}`}>
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors mr-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
-            title="Carica un file"
-          >
-            <PlusCircle size={24} />
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/*,audio/*" 
-            onChange={handleFileSelect} 
-          />
-          
-          <input
-            ref={chatInputRef}
-            type="text"
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            disabled={isUploading}
-            placeholder={isUploading ? "Caricamento file in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
-            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
-          />
-          <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
-            <Popover.Trigger asChild>
-              <button disabled={isUploading} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" title="Scegli Emoji">
-                <SmilePlus size={24} />
+          {isRecordingAudio ? (
+            <div className="flex-1 flex items-center justify-between text-[#dbdee1]">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-[#f23f43] animate-pulse" />
+                <span className="font-medium">Registrazione in corso... {recordingTime}s / 15s</span>
+              </div>
+              <button onClick={stopRecording} className="p-1.5 bg-[#f23f43] hover:bg-[#da373c] text-white rounded-full transition-colors">
+                <Square size={16} fill="currentColor" />
               </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content 
-                side="top" 
-                align="end" 
-                sideOffset={10} 
-                className="z-[99999] border-none shadow-2xl bg-transparent"
-                onInteractOutside={() => setShowChatEmojiPicker(false)}
+            </div>
+          ) : (
+            <>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors mr-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
+                title="Carica un file"
               >
-                <EmojiPicker 
-                  theme={Theme.DARK} 
-                  onEmojiClick={handleChatEmojiSelect} 
-                  searchPlaceHolder="Cerca emoji..." 
-                  lazyLoadEmojis={true} 
-                />
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
+                <PlusCircle size={24} />
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*,audio/*" 
+                onChange={handleFileSelect} 
+              />
+              
+              <input
+                ref={chatInputRef}
+                type="text"
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                disabled={isUploading}
+                placeholder={isUploading ? "Caricamento file in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
+                className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
+              />
+              <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
+                <Popover.Trigger asChild>
+                  <button disabled={isUploading} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" title="Scegli Emoji">
+                    <SmilePlus size={24} />
+                  </button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content 
+                    side="top" 
+                    align="end" 
+                    sideOffset={10} 
+                    className="z-[99999] border-none shadow-2xl bg-transparent"
+                    onInteractOutside={() => setShowChatEmojiPicker(false)}
+                  >
+                    <EmojiPicker 
+                      theme={Theme.DARK} 
+                      onEmojiClick={handleChatEmojiSelect} 
+                      searchPlaceHolder="Cerca emoji..." 
+                      lazyLoadEmojis={true} 
+                    />
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+              <button 
+                disabled={isUploading} 
+                onClick={startRecording} 
+                className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
+                title="Registra Audio"
+              >
+                <Mic size={24} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1709,6 +1790,26 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {viewingImage && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200" 
+          onClick={() => setViewingImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors p-2" 
+            onClick={() => setViewingImage(null)}
+          >
+            <X size={32} />
+          </button>
+          <img 
+            src={viewingImage} 
+            alt="Enlarged" 
+            className="max-w-full max-h-full object-contain rounded-md shadow-2xl animate-in zoom-in-95 duration-200" 
+            onClick={(e) => e.stopPropagation()} 
+          />
         </div>
       )}
     </div>
