@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
+import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
@@ -26,9 +26,10 @@ interface ChannelSidebarProps {
   onOpenSettings?: () => void;
   onLeaveServer?: () => void;
   onOpenUserSettings?: () => void;
+  serverPermissions?: ServerPermissions;
 }
 
-export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings, serverPermissions }: ChannelSidebarProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -504,7 +505,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
     e.stopPropagation();
-    if (!activeServer || activeServer.created_by !== currentUser?.id) {
+    if (!serverPermissions?.can_manage_channels) {
       e.preventDefault();
       return;
     }
@@ -684,7 +685,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const serverChannels = displayChannels.filter(c => c.server_id === activeServer.id);
   const categories = Array.from(new Set(serverChannels.map(c => c.category)));
   if (categories.length === 0) categories.push("Generale");
-  const isOwner = activeServer.created_by === currentUser?.id;
+  
+  const canManageChannels = serverPermissions?.can_manage_channels ?? false;
+  const canManageServer = serverPermissions?.can_manage_server || serverPermissions?.can_manage_roles;
 
   const toggleCategory = (category: string) => {
     setCollapsedCategories(prev => {
@@ -706,35 +709,32 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       >
         <h1 className="font-semibold text-white truncate pr-2">{activeServer.name}</h1>
         <div className="flex items-center flex-shrink-0">
-          {isOwner ? (
-            <>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setIsAddingCategory(true); setNewCategoryName(""); }}
-                className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
-                title="Crea Categoria"
-              >
-                <FolderPlus size={16} />
-              </button>
-              {onOpenSettings && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
-                  className="p-1 text-[#dbdee1] hover:text-white transition-opacity ml-1"
-                  title="Impostazioni Server"
-                >
-                  <Settings size={16} />
-                </button>
-              )}
-            </>
-          ) : (
-            onLeaveServer && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onLeaveServer(); }}
-                className="p-1 text-[#dbdee1] hover:text-[#f23f43] transition-colors"
-                title="Esci dal Server"
-              >
-                <LogOut size={16} />
-              </button>
-            )
+          {canManageChannels && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsAddingCategory(true); setNewCategoryName(""); }}
+              className="p-1 text-[#dbdee1] hover:text-white transition-opacity"
+              title="Crea Categoria"
+            >
+              <FolderPlus size={16} />
+            </button>
+          )}
+          {canManageServer && onOpenSettings && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+              className="p-1 text-[#dbdee1] hover:text-white transition-opacity ml-1"
+              title="Impostazioni Server"
+            >
+              <Settings size={16} />
+            </button>
+          )}
+          {!canManageServer && onLeaveServer && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onLeaveServer(); }}
+              className="p-1 text-[#dbdee1] hover:text-[#f23f43] transition-colors"
+              title="Esci dal Server"
+            >
+              <LogOut size={16} />
+            </button>
           )}
           <ChevronDown size={18} className="text-[#dbdee1] ml-1" />
         </div>
@@ -751,7 +751,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             return (
               <div 
                 key={category}
-                draggable={isOwner}
+                draggable={canManageChannels}
                 onDragStart={(e) => handleDragStart(e, category, 'category')}
                 onDragOver={(e) => handleDragOver(e, category, 'category')}
                 onDrop={(e) => handleDrop(e, category, 'category')}
@@ -766,7 +766,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                     <ChevronDown size={12} className={`mr-1 flex-shrink-0 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
                     <span className="text-xs font-semibold uppercase tracking-wider truncate">{category}</span>
                   </div>
-                  {isOwner && (
+                  {canManageChannels && (
                     <div className="opacity-0 group-hover/category:opacity-100 flex items-center flex-shrink-0 transition-opacity">
                       <button 
                         onClick={(e) => { e.stopPropagation(); setCategoryToRename(category); setEditCategoryName(category); }}
@@ -801,7 +801,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                       return (
                         <div
                           key={channel.id}
-                          draggable={isOwner}
+                          draggable={canManageChannels}
                           onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
                           onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
                           onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
@@ -830,7 +830,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               {channel.unread && !isActive && channel.type !== 'voice' && (
                                 <div className="w-2 h-2 rounded-full bg-white mr-1" />
                               )}
-                              {isOwner && (
+                              {canManageChannels && (
                                 <>
                                   {channel.type === 'text' && (
                                     <button

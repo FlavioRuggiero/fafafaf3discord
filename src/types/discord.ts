@@ -3,6 +3,20 @@ export type ServerRole = {
   server_id: string;
   name: string;
   color: string;
+  can_manage_channels?: boolean;
+  can_delete_messages?: boolean;
+  can_use_commands?: boolean;
+  can_manage_server?: boolean;
+  can_manage_roles?: boolean;
+};
+
+export type ServerPermissions = {
+  isOwner: boolean;
+  can_manage_channels: boolean;
+  can_delete_messages: boolean;
+  can_use_commands: boolean;
+  can_manage_server: boolean;
+  can_manage_roles: boolean;
 };
 
 export type User = {

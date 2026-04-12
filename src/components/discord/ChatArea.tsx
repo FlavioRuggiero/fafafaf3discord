@@ -5,7 +5,7 @@ import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, T
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
-import { Message, Channel, User } from "@/types/discord";
+import { Message, Channel, User, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
@@ -156,9 +156,10 @@ interface ChatAreaProps {
   showMembers?: boolean;
   serverCreatorId?: string;
   serverMembers?: User[];
+  serverPermissions?: ServerPermissions;
 }
 
-export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId, serverMembers }: ChatAreaProps) => {
+export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId, serverMembers, serverPermissions }: ChatAreaProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
   
   const adminIdRef = useRef(adminId);
@@ -274,21 +275,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (!currentUser) return [];
     const cmds = [];
     
-    let role = 'USER';
-    if (currentUser.id === adminIdRef.current) {
-        role = 'CREATOR';
-    } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser.id)) {
-        role = 'MODERATOR';
-    }
+    const canUseCommands = serverPermissions?.can_use_commands ?? false;
 
-    if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(role) || isServerCreator) {
+    if (canUseCommands) {
       cmds.push({ command: '/statusmessage', description: 'Invia un messaggio di stato ufficiale' });
-    }
-    if (isServerCreator) {
       cmds.push({ command: '/mentionseveryone', description: 'Menziona tutti gli utenti del server' });
     }
     return cmds;
-  }, [currentUser, currentUserProfile, isServerCreator]);
+  }, [currentUser, serverPermissions]);
 
   const filteredCommands = useMemo(() => {
     if (!inputValue.startsWith('/')) return [];
@@ -1051,13 +1045,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setTypingStatus(false); 
 
       // Controllo comandi
-      let role = 'USER';
-      if (currentUser?.id === adminIdRef.current) {
-          role = 'CREATOR';
-      } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser?.id)) {
-          role = 'MODERATOR';
-      }
-      const canUseCommands = ['ADMIN', 'CREATOR', 'MODERATOR'].includes(role) || isServerCreator;
+      const canUseCommands = serverPermissions?.can_use_commands ?? false;
       
       if (finalContent.startsWith('/statusmessage ') && canUseCommands) {
         const statusText = finalContent.replace('/statusmessage ', '').trim();
@@ -1065,7 +1053,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         finalContent = `<system:status>${statusText}`;
       }
 
-      if (finalContent.startsWith('/mentionseveryone ') && isServerCreator) {
+      if (finalContent.startsWith('/mentionseveryone ') && canUseCommands) {
         const msgText = finalContent.replace('/mentionseveryone ', '').trim();
         if (!msgText) return;
         finalContent = `<@everyone> ${msgText}`;
@@ -1112,6 +1100,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           finalContent = `<reply:${replyingTo.id}>${finalContent}`;
         }
         
+        let role: User['global_role'] = 'USER';
+        if (currentUser.id === adminIdRef.current) {
+            role = 'CREATOR';
+        } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser.id)) {
+            role = 'MODERATOR';
+        }
+
         const optimisticMsg: LocalMessage = {
           id: tempId,
           content: finalContent,
@@ -1229,7 +1224,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     });
     setPendingMentions([]);
 
-    if (isServerCreator) {
+    if (serverPermissions?.can_use_commands) {
       finalContent = finalContent.replace(/@tutti(?=[\s.,!?]|$)/gi, '<@everyone>');
     }
     
@@ -1827,7 +1822,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const isMyMessage = currentUser?.id === msg.user.id;
           
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome && !isSystemStatus;
-          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || isServerCreator || (isSystemStatus && isMyMessage);
+          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || (serverPermissions?.can_delete_messages ?? false) || (isSystemStatus && isMyMessage);
           
           const isEditing = editingMessageId === msg.id;
           const isPopoverOpen = openPopoverId === msg.id;
@@ -1981,7 +1976,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   {canDelete && (
                     <button 
                       className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
-                      title={isServerCreator && !isMyMessage ? "Elimina come Moderatore" : "Elimina"} 
+                      title={!isMyMessage ? "Elimina come Moderatore" : "Elimina"} 
                       onClick={() => setMessageToDelete(msg.id)}
                     >
                       <Trash2 size={18} />

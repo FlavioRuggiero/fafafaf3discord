@@ -6,7 +6,7 @@ import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { INITIAL_MESSAGES } from "@/data/mockData";
-import { Message, User, Server, Channel, ServerRole } from "@/types/discord";
+import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
@@ -172,6 +172,20 @@ const Index = () => {
       server_roles: userRoles
     };
   });
+
+  // Calcolo dei permessi per l'utente corrente nel server attivo
+  const currentUserMember = serverMembersList.find(m => m.id === currentUser?.id);
+  const isOwner = activeServer?.created_by === currentUser?.id;
+  const isGlobalAdmin = currentUser?.global_role === 'ADMIN' || currentUser?.global_role === 'CREATOR';
+
+  const serverPermissions: ServerPermissions = {
+    isOwner: isOwner || false,
+    can_manage_channels: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_channels) ?? false),
+    can_delete_messages: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_delete_messages) ?? false),
+    can_use_commands: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_use_commands) ?? false),
+    can_manage_server: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_server) ?? false),
+    can_manage_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_roles) ?? false),
+  };
 
   // Gestione Supabase Presence
   useEffect(() => {
@@ -384,7 +398,7 @@ const Index = () => {
 
     fetchServerData();
 
-    // Listener per unione/uscita dal server e aggiornamento ruoli in tempo reale
+    // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
     const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
       .on('postgres_changes', {
         event: '*',
@@ -411,27 +425,8 @@ const Index = () => {
           setServerProfiles(prev => prev.filter(p => p.id !== deletedUserId));
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, (payload) => {
-        if (!isMounted) return;
-        if (payload.eventType === 'INSERT') {
-          setServerRoles(prev => [...prev, payload.new as ServerRole]);
-        } else if (payload.eventType === 'UPDATE') {
-          setServerRoles(prev => prev.map(r => r.id === payload.new.id ? payload.new as ServerRole : r));
-        } else if (payload.eventType === 'DELETE') {
-          setServerRoles(prev => prev.filter(r => r.id !== payload.old.id));
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_member_roles', filter: `server_id=eq.${activeServerId}` }, (payload) => {
-        if (!isMounted) return;
-        if (payload.eventType === 'INSERT') {
-          setMemberRoles(prev => {
-            if (prev.some(mr => mr.user_id === payload.new.user_id && mr.role_id === payload.new.role_id)) return prev;
-            return [...prev, { user_id: payload.new.user_id, role_id: payload.new.role_id }];
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setMemberRoles(prev => prev.filter(mr => !(mr.user_id === payload.old.user_id && mr.role_id === payload.old.role_id)));
-        }
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_member_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
       .subscribe();
 
     return () => {
@@ -828,6 +823,7 @@ const Index = () => {
             onOpenSettings={() => setShowSettingsModal(true)}
             onLeaveServer={() => handleLeaveServer(activeServer!.id)}
             onOpenUserSettings={() => setShowUserSettingsModal(true)}
+            serverPermissions={serverPermissions}
           />
         </div>
 
@@ -842,6 +838,7 @@ const Index = () => {
               showMembers={showMembers}
               serverCreatorId={activeServer?.created_by}
               serverMembers={serverMembersList}
+              serverPermissions={serverPermissions}
             />
             {showMembers && (
               <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
@@ -923,6 +920,7 @@ const Index = () => {
           onUpdate={handleUpdateServer}
           onDelete={handleDeleteServer}
           isUpdating={isUpdatingServer}
+          serverPermissions={serverPermissions}
         />
 
         <UserSettingsModal
