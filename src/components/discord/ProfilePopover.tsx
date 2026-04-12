@@ -44,10 +44,18 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
           align={align} 
           sideOffset={16} 
           collisionPadding={20}
-          className={`w-[300px] p-0 bg-[#111214] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 ${isAdmin ? 'electrified-border' : 'border border-[#1e1f22]'}`}
+          className={`w-[300px] p-0 bg-[#111214] text-[#dbdee1] shadow-2xl rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 relative ${
+            isAdmin 
+              ? 'border-2 border-transparent' 
+              : isModerator 
+                ? 'border-2 border-[#60a5fa] shadow-[0_0_15px_rgba(96,165,250,0.3)]' 
+                : 'border border-[#1e1f22]'
+          }`}
         >
+          {isAdmin && <div className="admin-popover-glow" />}
+          
           <div 
-            className="h-[60px] relative flex-shrink-0 bg-cover bg-center"
+            className="h-[60px] relative flex-shrink-0 bg-cover bg-center rounded-t-lg"
             style={{ 
               backgroundColor: user.banner_color || '#5865F2',
               backgroundImage: user.banner_url ? `url(${user.banner_url})` : undefined
