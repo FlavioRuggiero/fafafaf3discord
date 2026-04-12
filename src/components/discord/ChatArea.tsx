@@ -259,11 +259,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         role = 'MODERATOR';
     }
 
-    if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(role)) {
+    if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(role) || isServerCreator) {
       cmds.push({ command: '/statusmessage', description: 'Invia un messaggio di stato ufficiale' });
     }
     return cmds;
-  }, [currentUser, currentUserProfile]);
+  }, [currentUser, currentUserProfile, isServerCreator]);
 
   const filteredCommands = useMemo(() => {
     if (!inputValue.startsWith('/')) return [];
@@ -1000,7 +1000,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser?.id)) {
           role = 'MODERATOR';
       }
-      const canUseCommands = ['ADMIN', 'CREATOR', 'MODERATOR'].includes(role);
+      const canUseCommands = ['ADMIN', 'CREATOR', 'MODERATOR'].includes(role) || isServerCreator;
       
       if (finalContent.startsWith('/statusmessage ') && canUseCommands) {
         const statusText = finalContent.replace('/statusmessage ', '').trim();
@@ -1806,16 +1806,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     </button>
                   </div>
                 )}
-                <div className="flex items-center gap-3 text-white bg-brand/10 px-6 py-3 rounded-lg border border-brand/30 shadow-sm max-w-3xl text-center">
-                  <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl">📢</span>
+                <div className="flex flex-col items-center text-center text-white bg-brand/10 px-6 py-3 rounded-lg border border-brand/30 shadow-sm max-w-3xl">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-[11px] text-[#949ba4] uppercase tracking-wider">da {msg.user.name} • {msg.timestamp}</span>
                   </div>
-                  <div className="flex flex-col items-start text-left">
-                    <div className="flex items-baseline gap-2 mb-0.5">
-                      <span className="text-xs font-bold text-brand uppercase tracking-wider">Messaggio di Stato</span>
-                      <span className="text-[10px] text-[#949ba4] opacity-80">da {msg.user.name} • {msg.timestamp}</span>
-                    </div>
-                    <span className="text-[15px] text-[#dbdee1] leading-relaxed">{statusText}</span>
+                  <div className="text-[15px] text-[#dbdee1] leading-relaxed whitespace-pre-wrap break-words">
+                    {renderContentWithMentions(statusText)}
                   </div>
                 </div>
               </div>
