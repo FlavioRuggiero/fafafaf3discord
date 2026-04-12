@@ -8,6 +8,7 @@ import { Message, Channel, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { BombParty } from "./BombParty";
 
@@ -156,6 +157,7 @@ interface ChatAreaProps {
 }
 
 export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId }: ChatAreaProps) => {
+  const { user: authUser, adminId } = useAuth();
   const [inputValue, setInputValue] = useState("");
   const [realMessages, setRealMessages] = useState<LocalMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
@@ -364,7 +366,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       if (data) {
         const formatted = data.map((m: any) => {
           const name = m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente';
-          const isVerified = name.toLowerCase() === 'faf3tto';
+          const isVerified = m.user_id === adminId || (m.user_id === authUser?.id && authUser?.email === 'fafetto05@gmail.com');
           
           return {
             id: m.id,
@@ -434,7 +436,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           .single();
           
         const name = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente';
-        const isVerified = name.toLowerCase() === 'faf3tto';
+        const isVerified = payload.new.user_id === adminId || (payload.new.user_id === authUser?.id && authUser?.email === 'fafetto05@gmail.com');
 
         const newMsg: LocalMessage = {
           id: payload.new.id,
@@ -507,7 +509,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         setRealMessages(prev => prev.map(m => {
           if (m.user.id === updatedProfile.id) {
-            const isVerified = (updatedProfile.first_name || '').toLowerCase() === 'faf3tto';
+            const isVerified = updatedProfile.id === adminId || (updatedProfile.id === authUser?.id && authUser?.email === 'fafetto05@gmail.com');
             return {
               ...m,
               user: {
@@ -539,7 +541,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return () => {
       supabase.removeChannel(channelSubscription);
     };
-  }, [channel?.id, channel?.type, tableExists]);
+  }, [channel?.id, channel?.type, tableExists, adminId, authUser?.id, authUser?.email]);
 
   useEffect(() => {
     if (!channel?.id || !currentUser?.id || channel?.type === 'voice') return;
@@ -625,7 +627,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       if (currentUser && channel && tableExists) {
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
-        const isVerified = userName.toLowerCase() === 'faf3tto';
+        const isVerified = currentUser.id === adminId || authUser?.email === 'fafetto05@gmail.com';
         const rawDate = new Date().toISOString();
         
         let finalContent = content;

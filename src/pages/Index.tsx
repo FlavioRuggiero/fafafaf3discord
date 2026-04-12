@@ -15,7 +15,7 @@ import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
 
 const Index = () => {
-  const { user } = useAuth();
+  const { user, adminId } = useAuth();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // States per Server e Canali dal DB
@@ -49,7 +49,7 @@ const Index = () => {
   const serverMembersList: User[] = serverProfiles.map(p => {
     const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
     const name = p.first_name || "Utente";
-    const isVerifiedUser = name.toLowerCase() === 'faf3tto';
+    const isVerifiedUser = p.id === adminId || (p.id === user?.id && user?.email === 'fafetto05@gmail.com');
 
     return {
       id: p.id,
@@ -116,7 +116,7 @@ const Index = () => {
 
         setCurrentUser(prev => {
           if (!prev || prev.id !== updatedProfile.id) return prev;
-          const isVerifiedUser = (updatedProfile.first_name || "").toLowerCase() === 'faf3tto';
+          const isVerifiedUser = updatedProfile.id === adminId || (updatedProfile.id === user?.id && user?.email === 'fafetto05@gmail.com');
           return {
             ...prev,
             name: updatedProfile.first_name || prev.name,
@@ -148,7 +148,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(profileSubscription);
     };
-  }, []);
+  }, [adminId, user?.id, user?.email]);
 
   // Caricamento dati iniziali e premi giornalieri
   useEffect(() => {
@@ -174,7 +174,7 @@ const Index = () => {
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
-      const isVerifiedUser = userName.toLowerCase() === 'faf3tto';
+      const isVerifiedUser = user.id === adminId || user.email === 'fafetto05@gmail.com';
 
       const loadedUser: User = {
         id: user.id,
@@ -215,7 +215,7 @@ const Index = () => {
     };
     
     loadInitialData();
-  }, [user]);
+  }, [user, adminId]);
 
   // Caricamento Membri e Sottoscrizione Realtime
   useEffect(() => {
@@ -289,15 +289,12 @@ const Index = () => {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
       if (newServerChannels.length > 0) {
         setActiveChannel(current => {
-          // Se non c'è un canale attivo, o quello attivo appartiene a un altro server, imposta il primo
           if (!current || current.server_id !== activeServerId) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
-          // Se il canale attivo è stato rimosso (cancellato globalmente), fa un fallback sicuro
           if (!newServerChannels.some(c => c.id === current.id)) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
-          // Altrimenti lascia invariato l'activeChannel
           return current;
         });
       } else {
@@ -446,7 +443,6 @@ const Index = () => {
     if (newChannels) {
       setAllChannels([...allChannels, ...newChannels]);
       
-      // Invia un messaggio di benvenuto nel primo canale testuale
       const firstTextChannel = newChannels.find(c => c.type === 'text');
       if (firstTextChannel) {
         await supabase.from('messages').insert({
