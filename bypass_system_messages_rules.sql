@@ -10,7 +10,7 @@ DECLARE
     v_admin_id UUID;
 BEGIN
     -- Ignora le regole per i messaggi di sistema
-    IF NEW.content = '<system:welcome>' THEN
+    IF NEW.content = '<system:welcome>' OR NEW.content LIKE '<system:status>%' THEN
         RETURN NEW;
     END IF;
 
@@ -41,7 +41,7 @@ BEGIN
         -- Trova l'ultimo messaggio inviato da questo utente in questo canale (escludendo i messaggi di sistema)
         SELECT created_at INTO v_last_msg_time
         FROM public.messages
-        WHERE channel_id = NEW.channel_id AND user_id = NEW.user_id AND content != '<system:welcome>'
+        WHERE channel_id = NEW.channel_id AND user_id = NEW.user_id AND content != '<system:welcome>' AND content NOT LIKE '<system:status>%'
         ORDER BY created_at DESC
         LIMIT 1;
 

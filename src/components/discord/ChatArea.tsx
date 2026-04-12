@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square } from "lucide-react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
@@ -211,10 +211,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   // Image Viewer State
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
-  // Mentions State
+  // Mentions & Commands State
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [pendingMentions, setPendingMentions] = useState<{name: string, id: string}[]>([]);
+  const [commandIndex, setCommandIndex] = useState(0);
 
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   
@@ -245,6 +246,24 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const isServerCreator = currentUser?.id === serverCreatorId;
   const isLocked = channel.is_locked && !isServerCreator;
+
+  // Commands Logic
+  const availableCommands = useMemo(() => {
+    if (!currentUser) return [];
+    const cmds = [];
+    if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(currentUser.global_role || '')) {
+      cmds.push({ command: '/statusmessage', description: 'Invia un messaggio di stato ufficiale' });
+    }
+    return cmds;
+  }, [currentUser]);
+
+  const filteredCommands = useMemo(() => {
+    if (!inputValue.startsWith('/')) return [];
+    const query = inputValue.toLowerCase();
+    return availableCommands.filter(c => c.command.startsWith(query));
+  }, [inputValue, availableCommands]);
+
+  const showCommandMenu = inputValue.startsWith('/') && filteredCommands.length > 0;
 
   const scrollToBottom = () => {
     if (channel?.type !== 'voice') {
@@ -307,7 +326,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
 
     // Ignora i messaggi di sistema per il calcolo del cooldown
-    const myLastMsg = [...realMessages].reverse().find(m => m.user.id === currentUser.id && m.content !== '<system:welcome>');
+    const myLastMsg = [...realMessages].reverse().find(m => m.user.id === currentUser.id && m.content !== '<system:welcome>' && !m.content.startsWith('<system:status>'));
     if (!myLastMsg) {
       setCooldownRemaining(0);
       return;
@@ -707,8 +726,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     } else {
       setMentionQuery(null);
     }
+
+    // Reset command index se cambia l'input
+    if (value.startsWith('/')) {
+      setCommandIndex(0);
+    }
     
-    if (value.length > 0) {
+    if (value.length > 0 && !value.startsWith('/')) {
       setTypingStatus(true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
@@ -905,6 +929,29 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showCommandMenu) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCommandIndex(prev => (prev + 1) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCommandIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        setInputValue(filteredCommands[commandIndex].command + ' ');
+        setTimeout(() => chatInputRef.current?.focus(), 0);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setInputValue('');
+        return;
+      }
+    }
+
     if (showMentions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -937,6 +984,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setTypingStatus(false); 
+
+      // Controllo comandi
+      const canUseCommands = ['ADMIN', 'CREATOR', 'MODERATOR'].includes(currentUser?.global_role || '');
+      if (finalContent.startsWith('/statusmessage ') && canUseCommands) {
+        const statusText = finalContent.replace('/statusmessage ', '').trim();
+        if (!statusText) return;
+        finalContent = `<system:status>${statusText}`;
+      }
 
       // Sostituisci le menzioni @nome con <@id>
       pendingMentions.forEach(m => {
@@ -1637,6 +1692,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
         {!isLoading && displayMessages.map((msg, idx) => {
           const isSystemWelcome = msg.content === '<system:welcome>';
+          const isSystemStatus = msg.content.startsWith('<system:status>');
           
           const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
           const isReply = !!replyMatch;
@@ -1678,11 +1734,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                                        displayMessages[idx - 1].user.id === msg.user.id && 
                                        !isReply && 
                                        displayMessages[idx - 1].content !== '<system:welcome>' && 
-                                       !isSystemWelcome;
+                                       !displayMessages[idx - 1].content.startsWith('<system:status>') &&
+                                       !isSystemWelcome &&
+                                       !isSystemStatus;
           const isMyMessage = currentUser?.id === msg.user.id;
           
-          const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome;
-          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || isServerCreator;
+          const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome && !isSystemStatus;
+          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || isServerCreator || (isSystemStatus && isMyMessage);
           
           const isEditing = editingMessageId === msg.id;
           const isPopoverOpen = openPopoverId === msg.id;
@@ -1720,6 +1778,37 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     {' '}è appena entrato nel server!
                   </span>
                   <span className="text-[10px] ml-2 opacity-50">{msg.timestamp}</span>
+                </div>
+              </div>
+            );
+          }
+
+          if (isSystemStatus) {
+            const statusText = msg.content.replace('<system:status>', '');
+            return (
+              <div id={`msg-${msg.id}`} key={msg.id} className="group relative flex flex-col items-center justify-center my-4 px-4 py-2">
+                {canDelete && (
+                  <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10">
+                    <button 
+                      className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
+                      title="Elimina" 
+                      onClick={() => setMessageToDelete(msg.id)}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 text-white bg-brand/10 px-6 py-3 rounded-lg border border-brand/30 shadow-sm max-w-3xl text-center">
+                  <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">📢</span>
+                  </div>
+                  <div className="flex flex-col items-start text-left">
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <span className="text-xs font-bold text-brand uppercase tracking-wider">Messaggio di Stato</span>
+                      <span className="text-[10px] text-[#949ba4] opacity-80">da {msg.user.name} • {msg.timestamp}</span>
+                    </div>
+                    <span className="text-[15px] text-[#dbdee1] leading-relaxed">{statusText}</span>
+                  </div>
                 </div>
               </div>
             );
@@ -1922,7 +2011,30 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           )}
         </div>
 
-        {showMentions && (
+        {showCommandMenu && (
+          <div className="absolute bottom-full left-4 mb-2 w-80 bg-[#2b2d31] border border-[#1e1f22] rounded-lg shadow-xl overflow-hidden z-50">
+            <div className="px-3 py-2 bg-[#1e1f22] border-b border-[#1f2023] text-xs font-bold text-[#b5bac1] uppercase flex items-center gap-2">
+              <Command size={14} /> Comandi
+            </div>
+            <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+              {filteredCommands.map((cmd, idx) => (
+                <div
+                  key={cmd.command}
+                  onClick={() => {
+                    setInputValue(cmd.command + ' ');
+                    setTimeout(() => chatInputRef.current?.focus(), 0);
+                  }}
+                  className={`flex flex-col px-3 py-2 cursor-pointer ${idx === commandIndex ? 'bg-[#35373c]' : 'hover:bg-[#35373c]'}`}
+                >
+                  <span className="text-[#dbdee1] text-sm font-bold leading-tight">{cmd.command}</span>
+                  <span className="text-[#949ba4] text-xs leading-tight mt-0.5">{cmd.description}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showMentions && !showCommandMenu && (
           <div className="absolute bottom-full left-4 mb-2 w-64 bg-[#2b2d31] border border-[#1e1f22] rounded-lg shadow-xl overflow-hidden z-50">
             <div className="px-3 py-2 bg-[#1e1f22] border-b border-[#1f2023] text-xs font-bold text-[#b5bac1] uppercase">
               Membri
@@ -2074,6 +2186,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   <div className="text-[#dbdee1] text-[15px] mt-1 line-clamp-3 overflow-hidden break-words">
                     {msgToDeleteData.content === '<system:welcome>' 
                       ? '👋 Messaggio di benvenuto' 
+                      : msgToDeleteData.content.startsWith('<system:status>')
+                      ? `📢 ${msgToDeleteData.content.replace('<system:status>', '')}`
                       : msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
                       const member = serverMembers?.find(m => m.id === id);
                       return member ? `@${member.name}` : '@Sconosciuto';
