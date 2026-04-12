@@ -374,13 +374,21 @@ const Index = () => {
   const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
     if (!currentUser) return;
     
-    const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
-    if (!canCreate) {
-      showError("Non hai i permessi per creare un server. Solo gli Admin e i Moderatori possono farlo.");
+    setIsCreatingServer(true);
+
+    // Controllo di sicurezza in tempo reale dal database
+    const { data: checkProfile } = await supabase.from('profiles').select('role').eq('id', currentUser.id).single();
+    const isReallyAdmin = currentUser.id === adminIdRef.current;
+    const isReallyMod = checkProfile?.role === 'moderator';
+
+    if (!isReallyAdmin && !isReallyMod) {
+      showError("Permesso negato: non sei più un moderatore o admin.");
+      setIsCreatingServer(false);
+      setShowCreateModal(false);
+      // Aggiorniamo lo stato locale per far sparire il pulsante
+      setCurrentUser(prev => prev ? { ...prev, global_role: 'USER' } : null);
       return;
     }
-
-    setIsCreatingServer(true);
     
     let icon_url = `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`;
     let audio_url = null;
