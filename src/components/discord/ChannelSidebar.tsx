@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +49,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const [channelToEdit, setChannelToEdit] = useState<Channel | null>(null);
   const [editChannelName, setEditChannelName] = useState("");
+
+  const [channelToSettings, setChannelToSettings] = useState<Channel | null>(null);
+  const [settingsCooldown, setSettingsCooldown] = useState(0);
+  const [settingsIsLocked, setSettingsIsLocked] = useState(false);
+  const [settingsIsWelcome, setSettingsIsWelcome] = useState(false);
 
   const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel', category?: string } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
@@ -442,6 +447,46 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
+  const handleSaveChannelSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!channelToSettings || !activeServer) return;
+
+    const channelId = channelToSettings.id;
+    
+    // Aggiornamento ottimistico
+    setLocalChannels(prev => prev.map(c => {
+      if (c.id === channelId) {
+        return { ...c, cooldown: settingsCooldown, is_locked: settingsIsLocked, is_welcome_channel: settingsIsWelcome };
+      }
+      if (settingsIsWelcome && c.server_id === activeServer.id && c.id !== channelId) {
+        return { ...c, is_welcome_channel: false };
+      }
+      return c;
+    }));
+
+    setChannelToSettings(null);
+
+    try {
+      if (settingsIsWelcome) {
+        await supabase.from('channels').update({ is_welcome_channel: false }).eq('server_id', activeServer.id);
+      }
+      
+      const { error } = await supabase.from('channels').update({
+        cooldown: settingsCooldown,
+        is_locked: settingsIsLocked,
+        is_welcome_channel: settingsIsWelcome
+      }).eq('id', channelId);
+
+      if (error) {
+        showError("Errore durante il salvataggio delle impostazioni. Hai eseguito lo script SQL?");
+      } else {
+        showSuccess("Impostazioni canale salvate!");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleVoiceChannelSelect = (channel: Channel) => {
     if (!currentUser || !activeServer) return;
 
@@ -787,6 +832,21 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               )}
                               {isOwner && (
                                 <>
+                                  {channel.type === 'text' && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setChannelToSettings(channel);
+                                        setSettingsCooldown(channel.cooldown || 0);
+                                        setSettingsIsLocked(channel.is_locked || false);
+                                        setSettingsIsWelcome(channel.is_welcome_channel || false);
+                                      }}
+                                      className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all"
+                                      title="Impostazioni Canale"
+                                    >
+                                      <Settings size={14} />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1175,6 +1235,108 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                   type="submit" 
                   disabled={!editChannelName.trim() || editChannelName === channelToEdit.name} 
                   className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Salva Modifiche
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {channelToSettings && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setChannelToSettings(null)}>
+          <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[#1e1f22]">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Settings size={20} /> Impostazioni Canale
+              </h2>
+              <p className="text-sm text-[#b5bac1] mt-1">#{channelToSettings.name}</p>
+            </div>
+            
+            <form onSubmit={handleSaveChannelSettings} className="flex flex-col">
+              <div className="p-4 space-y-6">
+                
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center text-white font-medium">
+                      <Clock size={18} className="mr-2 text-[#949ba4]" />
+                      Slowmode (Cooldown)
+                    </label>
+                  </div>
+                  <p className="text-xs text-[#b5bac1] mb-3">Limita la frequenza con cui gli utenti possono inviare messaggi in questo canale.</p>
+                  <select 
+                    value={settingsCooldown}
+                    onChange={(e) => setSettingsCooldown(Number(e.target.value))}
+                    className="w-full bg-[#1e1f22] text-white p-2 rounded border-none outline-none focus:ring-1 focus:ring-brand"
+                  >
+                    <option value={0}>Disattivata</option>
+                    <option value={5}>5 secondi</option>
+                    <option value={10}>10 secondi</option>
+                    <option value={15}>15 secondi</option>
+                    <option value={30}>30 secondi</option>
+                    <option value={60}>1 minuto</option>
+                    <option value={120}>2 minuti</option>
+                    <option value={300}>5 minuti</option>
+                  </select>
+                </div>
+
+                <div className="h-[1px] bg-[#3f4147] w-full"></div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center text-white font-medium mb-1">
+                      <Lock size={18} className="mr-2 text-[#949ba4]" />
+                      Canale Bloccato
+                    </div>
+                    <div className="text-xs text-[#b5bac1]">Solo il proprietario del server potrà scrivere in questo canale.</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={settingsIsLocked}
+                      onChange={(e) => setSettingsIsLocked(e.target.checked)}
+                    />
+                    <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                  </label>
+                </div>
+
+                <div className="h-[1px] bg-[#3f4147] w-full"></div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center text-white font-medium mb-1">
+                      <MessageSquare size={18} className="mr-2 text-[#949ba4]" />
+                      Canale di Benvenuto
+                    </div>
+                    <div className="text-xs text-[#b5bac1]">Invia un messaggio automatico quando un nuovo utente entra nel server. (Solo un canale per server)</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={settingsIsWelcome}
+                      onChange={(e) => setSettingsIsWelcome(e.target.checked)}
+                    />
+                    <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                  </label>
+                </div>
+
+              </div>
+
+              <div className="flex justify-end items-center bg-[#2b2d31] p-4">
+                <button 
+                  type="button" 
+                  onClick={() => setChannelToSettings(null)} 
+                  className="text-white hover:underline text-sm px-6 py-2 mr-2"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] transition-colors"
                 >
                   Salva Modifiche
                 </button>

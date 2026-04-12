@@ -217,6 +217,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   
+  // Cooldown State
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
   const { 
     speakingStates, 
     localScreenStream, 
@@ -237,6 +240,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
+
+  const isServerCreator = currentUser?.id === serverCreatorId;
+  const isLocked = channel.is_locked && !isServerCreator;
 
   const scrollToBottom = () => {
     if (channel?.type !== 'voice') {
@@ -290,6 +296,36 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
     fetchUser();
   }, []);
+
+  // Cooldown Logic
+  useEffect(() => {
+    if (!channel.cooldown || channel.cooldown === 0 || isServerCreator || !currentUser) {
+      setCooldownRemaining(0);
+      return;
+    }
+
+    const myLastMsg = [...realMessages].reverse().find(m => m.user.id === currentUser.id);
+    if (!myLastMsg) {
+      setCooldownRemaining(0);
+      return;
+    }
+
+    const lastTime = new Date(myLastMsg.rawCreatedAt || Date.now()).getTime();
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.floor((now - lastTime) / 1000);
+      const remaining = channel.cooldown! - diff;
+      if (remaining > 0) {
+        setCooldownRemaining(remaining);
+      } else {
+        setCooldownRemaining(0);
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [realMessages, channel.cooldown, currentUser?.id, isServerCreator]);
 
   useEffect(() => {
     if (channel?.type !== 'voice') {
@@ -859,7 +895,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if ((!inputValue.trim() && !selectedFile) || isUploading) return;
+      if ((!inputValue.trim() && !selectedFile) || isUploading || isLocked || cooldownRemaining > 0) return;
       
       const content = inputValue.trim();
       setInputValue("");
@@ -1466,6 +1502,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const hasTopAttachment = replyingTo || filePreview;
 
+  const isInputDisabled = isUploading || isLocked || cooldownRemaining > 0;
+  let placeholderText = `Invia un messaggio in #${channel.name}`;
+  if (isUploading) placeholderText = "Caricamento file in corso...";
+  else if (isLocked) placeholderText = "Solo il proprietario può scrivere qui.";
+  else if (cooldownRemaining > 0) placeholderText = `Slowmode attiva. Attendi ${cooldownRemaining}s...`;
+  else if (replyingTo) placeholderText = `Rispondi a @${replyingTo.user.name}`;
+
   return (
     <div 
       className="flex-1 flex flex-col min-w-0 bg-[#313338] relative"
@@ -1473,7 +1516,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {isDraggingFile && (
+      {isDraggingFile && !isLocked && (
         <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-lg border-2 border-dashed border-brand m-4">
           <div className="bg-[#2b2d31] p-6 rounded-xl flex flex-col items-center shadow-2xl pointer-events-none">
             <UploadCloud size={48} className="text-brand mb-4" />
@@ -1549,7 +1592,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
           const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id && !isReply;
           const isMyMessage = currentUser?.id === msg.user.id;
-          const isServerCreator = currentUser?.id === serverCreatorId;
           
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt);
           const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt)) || isServerCreator;
@@ -1832,7 +1874,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             <>
               <button 
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                disabled={isInputDisabled}
                 className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors mr-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
                 title="Carica un file"
               >
@@ -1853,13 +1895,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                disabled={isUploading}
-                placeholder={isUploading ? "Caricamento file in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
+                disabled={isInputDisabled}
+                placeholder={placeholderText}
                 className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
               />
               <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
                 <Popover.Trigger asChild>
-                  <button disabled={isUploading} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" title="Scegli Emoji">
+                  <button disabled={isInputDisabled} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" title="Scegli Emoji">
                     <SmilePlus size={24} />
                   </button>
                 </Popover.Trigger>
@@ -1881,7 +1923,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 </Popover.Portal>
               </Popover.Root>
               <button 
-                disabled={isUploading} 
+                disabled={isInputDisabled} 
                 onClick={startRecording} 
                 className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
                 title="Registra Audio"

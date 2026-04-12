@@ -33,6 +33,9 @@ export type Channel = {
   category_position?: number;
   created_at?: string;
   recipient?: User;
+  cooldown?: number;
+  is_locked?: boolean;
+  is_welcome_channel?: boolean;
 };
 
 export type Message = {
