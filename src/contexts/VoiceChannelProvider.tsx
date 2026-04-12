@@ -62,8 +62,21 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   
-  // Volume States
-  const [userVolumes, setUserVolumes] = useState<Record<string, number>>({});
+  // Volume States - Inizializza dal localStorage
+  const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('discord-user-volumes');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse saved volumes', e);
+        }
+      }
+    }
+    return {};
+  });
+  
   const userVolumesRef = useRef(userVolumes);
   useEffect(() => { userVolumesRef.current = userVolumes; }, [userVolumes]);
   const gainNodesRef = useRef<Record<string, GainNode>>({});
@@ -392,7 +405,14 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   }, [currentUser, stopScreenShare]);
 
   const setUserVolume = useCallback((userId: string, volume: number) => {
-    setUserVolumes(prev => ({ ...prev, [userId]: volume }));
+    setUserVolumes(prev => {
+      const newVolumes = { ...prev, [userId]: volume };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('discord-user-volumes', JSON.stringify(newVolumes));
+      }
+      return newVolumes;
+    });
+    
     if (gainNodesRef.current[userId]) {
       gainNodesRef.current[userId].gain.value = isDeafenedRef.current ? 0 : volume / 100;
     }
@@ -458,16 +478,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       if (document.querySelector(`audio[data-user-id="${userId}"]`)) return;
       
-      // Creiamo l'elemento audio HTML ma lo teniamo PERMANENTEMENTE mutato. 
-      // Questo è un workaround necessario per Chrome per mantenere vivo il flusso WebRTC.
-      // L'audio vero uscirà dall'AudioContext.
-      const audio = document.createElement('audio');
-      audio.srcObject = remoteStream;
-      audio.autoplay = true;
-      audio.muted = true; 
-      audio.setAttribute('data-user-id', userId);
-      document.body.appendChild(audio);
-
       const audioContext = new AudioContext();
       audioContext.resume(); 
       
@@ -483,7 +493,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      // Analizzatore per l'indicatore di chi sta parlando
+      const audio = document.createElement('audio');
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+      audio.muted = true; 
+      audio.setAttribute('data-user-id', userId);
+      document.body.appendChild(audio);
+
       const analyser = audioContext.createAnalyser();
       source.connect(analyser); 
       analyser.fftSize = 256;
