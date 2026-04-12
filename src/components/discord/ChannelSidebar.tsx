@@ -61,7 +61,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
   
-  const [showShopAlert, setShowShopAlert] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const { 
@@ -700,15 +699,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 flex flex-col">
           <button
             onClick={() => onChannelSelect({ id: 'home', name: 'Benvenuto', type: 'text', category: '', server_id: null })}
-            className="w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 bg-[#404249] text-white"
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'home' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
           >
             <Home size={20} className="mr-3" />
             <span className="font-medium">Benvenuto</span>
           </button>
           
           <button
-            onClick={() => setShowShopAlert(true)}
-            className="w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] transition-colors"
+            onClick={() => onChannelSelect({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'shop' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
           >
             <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain" />
             <span className="font-medium">Cardi E-Shop</span>
@@ -753,33 +752,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         <UserPanel currentUser={currentUser} onOpenUserSettings={onOpenUserSettings} />
 
         {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
-
-        {showShopAlert && typeof document !== 'undefined' && createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setShowShopAlert(false)}>
-            <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-              <div className="p-4 border-b border-[#1e1f22]">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <img src="/digitalcardus.png" alt="dc" className="w-6 h-6 object-contain" />
-                  Cardi E-Shop
-                </h2>
-              </div>
-              <div className="p-4">
-                <p className="text-[#dbdee1] text-[15px]">
-                  Questa funzione arriverà prossimamente! Resta sintonizzato per i futuri aggiornamenti.
-                </p>
-              </div>
-              <div className="flex justify-end items-center bg-[#2b2d31] p-4">
-                <button 
-                  onClick={() => setShowShopAlert(false)} 
-                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] transition-colors"
-                >
-                  Ho capito
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
       </div>
     );
   }
