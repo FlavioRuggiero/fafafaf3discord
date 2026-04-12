@@ -1,7 +1,10 @@
+"use client";
+
 import React from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
 import { Shield } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -18,10 +21,12 @@ const statusText = {
 };
 
 export const ProfilePopover = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
+  const { adminId, moderatorIds } = useAuth();
+
   if (!user) return <>{children}</>;
 
-  const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
-  const isModerator = user.global_role === 'MODERATOR';
+  const isAdmin = user.id === adminId;
+  const isModerator = moderatorIds.includes(user.id);
   const xpNeeded = (user.level || 1) * 5;
   const currentXp = user.xp || 0;
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
@@ -59,7 +64,7 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
               {isAdmin && (
                 <Shield size={16} className="text-red-500 flex-shrink-0" title="Admin" />
               )}
-              {isModerator && (
+              {!isAdmin && isModerator && (
                 <Shield size={16} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />
               )}
             </div>

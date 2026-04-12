@@ -1,7 +1,10 @@
+"use client";
+
 import React from "react";
 import { User } from "@/types/discord";
 import { Crown, Shield } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MemberListProps {
   users: User[];
@@ -24,6 +27,7 @@ const statusText = {
 };
 
 export const MemberList = ({ users, creatorId }: MemberListProps) => {
+  const { adminId, moderatorIds } = useAuth();
   const creator = users.find(u => u.id === creatorId);
   const otherUsers = users.filter(u => u.id !== creatorId).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -31,8 +35,8 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
   const offlineUsers = otherUsers.filter(u => u.status === 'offline');
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
-    const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
-    const isModerator = user.global_role === 'MODERATOR';
+    const isAdmin = user.id === adminId;
+    const isModerator = moderatorIds.includes(user.id);
 
     return (
       <ProfilePopover user={user} side="left" align="start">
@@ -63,7 +67,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
               {isAdmin && (
                 <Shield size={14} className="text-red-500 flex-shrink-0" title="Admin" />
               )}
-              {isModerator && (
+              {!isAdmin && isModerator && (
                 <Shield size={14} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />
               )}
             </div>
