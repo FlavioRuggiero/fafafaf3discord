@@ -596,8 +596,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       audio.setAttribute('data-user-id', userId);
       
       // Applica il dispositivo di uscita selezionato se supportato
-      if (selectedAudioOutputState && typeof (audio as any).setSinkId === 'function') {
-        (audio as any).setSinkId(selectedAudioOutputState).catch(console.error);
+      if (selectedAudioOutput && typeof (audio as any).setSinkId === 'function') {
+        (audio as any).setSinkId(selectedAudioOutput).catch(console.error);
       }
       
       document.body.appendChild(audio);
@@ -639,7 +639,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     if (receivedSignal) peer.signal(receivedSignal);
 
     peersRef.current = [...peersRef.current.filter(p => p.userId !== userId), { peer, userId }];
-  }, [currentUser, selectedAudioOutputState]);
+  }, [currentUser, selectedAudioOutput]);
 
   const leaveVoiceChannel = useCallback(async () => {
     const channelToLeave = activeVoiceChannelIdRef.current;
