@@ -1682,7 +1682,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const isMyMessage = currentUser?.id === msg.user.id;
           
           const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome;
-          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt)) || isServerCreator;
+          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || isServerCreator;
           
           const isEditing = editingMessageId === msg.id;
           const isPopoverOpen = openPopoverId === msg.id;
