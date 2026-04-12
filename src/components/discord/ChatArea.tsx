@@ -1635,6 +1635,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         )}
 
         {!isLoading && displayMessages.map((msg, idx) => {
+          const isSystemWelcome = msg.content === '<system:welcome>';
+          
           const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
           const isReply = !!replyMatch;
           const replyToId = isReply ? replyMatch[1] : null;
@@ -1671,10 +1673,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             }
           }
 
-          const isSameUserAsPrevious = idx > 0 && displayMessages[idx - 1].user.id === msg.user.id && !isReply;
+          const isSameUserAsPrevious = idx > 0 && 
+                                       displayMessages[idx - 1].user.id === msg.user.id && 
+                                       !isReply && 
+                                       displayMessages[idx - 1].content !== '<system:welcome>' && 
+                                       !isSystemWelcome;
           const isMyMessage = currentUser?.id === msg.user.id;
           
-          const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt);
+          const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome;
           const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt)) || isServerCreator;
           
           const isEditing = editingMessageId === msg.id;
@@ -1689,6 +1695,34 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           });
 
           const isMentioned = msg.content.includes(`<@${currentUser?.id}>`);
+
+          if (isSystemWelcome) {
+            return (
+              <div id={`msg-${msg.id}`} key={msg.id} className="group relative flex flex-col items-center justify-center my-4 px-4 py-2">
+                {canDelete && (
+                  <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10">
+                    <button 
+                      className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
+                      title="Elimina" 
+                      onClick={() => setMessageToDelete(msg.id)}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-[#949ba4] bg-[#2b2d31] px-4 py-2 rounded-full border border-[#1e1f22] shadow-sm">
+                  <span className="text-xl">👋</span>
+                  <span>
+                    <ProfilePopover user={msg.user}>
+                      <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline">{msg.user.name}</span>
+                    </ProfilePopover>
+                    {' '}è appena entrato nel server!
+                  </span>
+                  <span className="text-[10px] ml-2 opacity-50">{msg.timestamp}</span>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-yellow-500/10 border-l-2 border-yellow-500 hover:bg-yellow-500/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
@@ -2037,7 +2071,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     <span className="text-xs text-[#949ba4]">{msgToDeleteData.timestamp}</span>
                   </div>
                   <div className="text-[#dbdee1] text-[15px] mt-1 line-clamp-3 overflow-hidden break-words">
-                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
+                    {msgToDeleteData.content === '<system:welcome>' 
+                      ? '👋 Messaggio di benvenuto' 
+                      : msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
                       const member = serverMembers?.find(m => m.id === id);
                       return member ? `@${member.name}` : '@Sconosciuto';
                     }).trim()}

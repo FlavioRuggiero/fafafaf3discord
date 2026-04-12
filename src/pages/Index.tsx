@@ -571,12 +571,12 @@ const Index = () => {
     if (newChannels) {
       setAllChannels([...allChannels, ...newChannels]);
       
-      const welcomeChannel = newChannels.find(c => c.is_welcome_channel) || newChannels.find(c => c.type === 'text');
+      const welcomeChannel = newChannels.find(c => c.is_welcome_channel && c.type === 'text') || newChannels.find(c => c.type === 'text');
       if (welcomeChannel) {
         await supabase.from('messages').insert({
           channel_id: welcomeChannel.id,
           user_id: currentUser.id,
-          content: `🎉 Sono appena entrato nel server! Ciao a tutti! 👋`
+          content: `<system:welcome>`
         });
       }
     }
