@@ -251,11 +251,19 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const availableCommands = useMemo(() => {
     if (!currentUser) return [];
     const cmds = [];
-    if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(currentUser.global_role || '')) {
+    
+    let role = 'USER';
+    if (currentUser.id === adminIdRef.current) {
+        role = 'CREATOR';
+    } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser.id)) {
+        role = 'MODERATOR';
+    }
+
+    if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(role)) {
       cmds.push({ command: '/statusmessage', description: 'Invia un messaggio di stato ufficiale' });
     }
     return cmds;
-  }, [currentUser]);
+  }, [currentUser, currentUserProfile]);
 
   const filteredCommands = useMemo(() => {
     if (!inputValue.startsWith('/')) return [];
@@ -986,7 +994,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setTypingStatus(false); 
 
       // Controllo comandi
-      const canUseCommands = ['ADMIN', 'CREATOR', 'MODERATOR'].includes(currentUser?.global_role || '');
+      let role = 'USER';
+      if (currentUser?.id === adminIdRef.current) {
+          role = 'CREATOR';
+      } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser?.id)) {
+          role = 'MODERATOR';
+      }
+      const canUseCommands = ['ADMIN', 'CREATOR', 'MODERATOR'].includes(role);
+      
       if (finalContent.startsWith('/statusmessage ') && canUseCommands) {
         const statusText = finalContent.replace('/statusmessage ', '').trim();
         if (!statusText) return;
@@ -1023,13 +1038,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
-        
-        let role: User['global_role'] = 'USER';
-        if (currentUser.id === adminIdRef.current) {
-            role = 'CREATOR';
-        } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser.id)) {
-            role = 'MODERATOR';
-        }
         
         const rawDate = new Date().toISOString();
         
