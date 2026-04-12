@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Server, ServerRole } from "@/types/discord";
-import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus } from "lucide-react";
+import { Server, ServerRole, ServerPermissions } from "@/types/discord";
+import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { showError, showSuccess } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -334,9 +334,10 @@ interface ServerSettingsModalProps {
   onUpdate: (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined) => void;
   onDelete: (id: string) => void;
   isUpdating?: boolean;
+  serverPermissions?: ServerPermissions;
 }
 
-export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete, isUpdating = false }: ServerSettingsModalProps) => {
+export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete, isUpdating = false, serverPermissions }: ServerSettingsModalProps) => {
   const [activeTab, setActiveTab] = useState<'main' | 'roles'>('main');
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -360,6 +361,16 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [editRoleName, setEditRoleName] = useState("");
   const [editRoleColor, setEditRoleColor] = useState("#99aab5");
+  
+  // Role Tabs & Permissions
+  const [activeRoleTab, setActiveRoleTab] = useState<'members' | 'permissions'>('members');
+  const [editRolePermissions, setEditRolePermissions] = useState({
+    can_manage_channels: false,
+    can_delete_messages: false,
+    can_use_commands: false,
+    can_manage_server: false,
+    can_manage_roles: false
+  });
 
   useEffect(() => {
     if (server && isOpen) {
@@ -475,7 +486,12 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     const { data, error } = await supabase.from('server_roles').insert({
       server_id: server.id,
       name: 'Nuovo Ruolo',
-      color: '#99aab5'
+      color: '#99aab5',
+      can_manage_channels: false,
+      can_delete_messages: false,
+      can_use_commands: false,
+      can_manage_server: false,
+      can_manage_roles: false
     }).select().single();
     
     if (data) {
@@ -483,6 +499,14 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       setSelectedRoleId(data.id);
       setEditRoleName(data.name);
       setEditRoleColor(data.color);
+      setEditRolePermissions({
+        can_manage_channels: false,
+        can_delete_messages: false,
+        can_use_commands: false,
+        can_manage_server: false,
+        can_manage_roles: false
+      });
+      setActiveRoleTab('members');
     } else {
       showError("Errore creazione ruolo. Hai eseguito lo script SQL?");
     }
@@ -492,12 +516,15 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     if (!selectedRoleId) return;
     const { error } = await supabase.from('server_roles').update({
       name: editRoleName,
-      color: editRoleColor
+      color: editRoleColor,
+      ...editRolePermissions
     }).eq('id', selectedRoleId);
     
     if (!error) {
-      setRoles(roles.map(r => r.id === selectedRoleId ? { ...r, name: editRoleName, color: editRoleColor } : r));
+      setRoles(roles.map(r => r.id === selectedRoleId ? { ...r, name: editRoleName, color: editRoleColor, ...editRolePermissions } : r));
       showSuccess("Ruolo aggiornato!");
+    } else {
+      showError("Errore durante l'aggiornamento del ruolo.");
     }
   };
 
@@ -523,6 +550,14 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     }
   };
 
+  const PERMISSIONS_LIST = [
+    { key: 'can_manage_channels', label: 'Gestione Canali', desc: 'Permette di creare, modificare o eliminare canali.' },
+    { key: 'can_delete_messages', label: 'Elimina Messaggi', desc: 'Permette di eliminare i messaggi degli altri utenti.' },
+    { key: 'can_use_commands', label: 'Usa Comandi', desc: 'Permette di usare comandi speciali come /statusmessage e /mentionseveryone.' },
+    { key: 'can_manage_server', label: 'Gestione Server', desc: 'Permette di modificare le impostazioni generali del server.' },
+    { key: 'can_manage_roles', label: 'Gestione Ruoli', desc: 'Permette di creare, modificare o eliminare ruoli e assegnarli agli utenti.' },
+  ] as const;
+
   return (
     <div 
       className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4"
@@ -534,18 +569,24 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
         <div className="w-[250px] bg-[#2b2d31] flex flex-col flex-shrink-0">
           <div className="p-4 pt-10 flex flex-col gap-1">
             <h3 className="text-xs font-bold text-[#949ba4] uppercase px-2 mb-2 truncate" title={server.name}>{server.name}</h3>
-            <button 
-              onClick={() => setActiveTab('main')} 
-              className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'main' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
-            >
-              Panoramica
-            </button>
-            <button 
-              onClick={() => setActiveTab('roles')} 
-              className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'roles' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
-            >
-              Gestione ruoli
-            </button>
+            
+            {(serverPermissions?.can_manage_server || serverPermissions?.isOwner) && (
+              <button 
+                onClick={() => setActiveTab('main')} 
+                className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'main' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+              >
+                Panoramica
+              </button>
+            )}
+            
+            {(serverPermissions?.can_manage_roles || serverPermissions?.isOwner) && (
+              <button 
+                onClick={() => setActiveTab('roles')} 
+                className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'roles' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+              >
+                Gestione ruoli
+              </button>
+            )}
           </div>
         </div>
 
@@ -743,6 +784,14 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                             setSelectedRoleId(role.id);
                             setEditRoleName(role.name);
                             setEditRoleColor(role.color);
+                            setEditRolePermissions({
+                              can_manage_channels: role.can_manage_channels || false,
+                              can_delete_messages: role.can_delete_messages || false,
+                              can_use_commands: role.can_use_commands || false,
+                              can_manage_server: role.can_manage_server || false,
+                              can_manage_roles: role.can_manage_roles || false,
+                            });
+                            setActiveRoleTab('members');
                           }}
                           className={`w-full flex items-center px-3 py-2 rounded text-sm transition-colors ${selectedRoleId === role.id ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
                         >
@@ -789,29 +838,70 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                         </div>
 
                         <div className="pt-6 border-t border-[#1f2023]">
-                          <h3 className="text-[#b5bac1] text-xs font-bold uppercase mb-4">Membri con questo ruolo</h3>
-                          <div className="space-y-2">
-                            {members.map(member => {
-                              const hasRole = memberRoles.some(mr => mr.user_id === member.id && mr.role_id === selectedRoleId);
-                              return (
-                                <div key={member.id} className="flex items-center justify-between bg-[#2b2d31] p-2 rounded border border-[#1e1f22]">
-                                  <div className="flex items-center gap-3">
-                                    <img src={member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`} className="w-8 h-8 rounded-full object-cover" />
-                                    <span className="text-[#dbdee1] text-sm font-medium">{member.first_name || 'Utente'}</span>
+                          <div className="flex gap-6 mb-6 border-b border-[#1f2023]">
+                            <button
+                              onClick={() => setActiveRoleTab('members')}
+                              className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${activeRoleTab === 'members' ? 'text-white border-brand' : 'text-[#b5bac1] border-transparent hover:text-[#dbdee1]'}`}
+                            >
+                              <Users size={16} /> Membri
+                            </button>
+                            <button
+                              onClick={() => setActiveRoleTab('permissions')}
+                              className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${activeRoleTab === 'permissions' ? 'text-white border-brand' : 'text-[#b5bac1] border-transparent hover:text-[#dbdee1]'}`}
+                            >
+                              <Key size={16} /> Permessi
+                            </button>
+                          </div>
+
+                          {activeRoleTab === 'members' ? (
+                            <div className="animate-in fade-in duration-200">
+                              <h3 className="text-[#b5bac1] text-xs font-bold uppercase mb-4">Membri con questo ruolo</h3>
+                              <div className="space-y-2">
+                                {members.map(member => {
+                                  const hasRole = memberRoles.some(mr => mr.user_id === member.id && mr.role_id === selectedRoleId);
+                                  return (
+                                    <div key={member.id} className="flex items-center justify-between bg-[#2b2d31] p-2 rounded border border-[#1e1f22]">
+                                      <div className="flex items-center gap-3">
+                                        <img src={member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`} className="w-8 h-8 rounded-full object-cover" />
+                                        <span className="text-[#dbdee1] text-sm font-medium">{member.first_name || 'Utente'}</span>
+                                      </div>
+                                      <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                          type="checkbox" 
+                                          className="sr-only peer" 
+                                          checked={hasRole}
+                                          onChange={() => handleToggleMemberRole(member.id, hasRole)}
+                                        />
+                                        <div className="w-9 h-5 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#23a559]"></div>
+                                      </label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="animate-in fade-in duration-200 space-y-6">
+                              <h3 className="text-[#b5bac1] text-xs font-bold uppercase mb-4">Permessi del ruolo</h3>
+                              
+                              {PERMISSIONS_LIST.map(perm => (
+                                <div key={perm.key} className="flex items-center justify-between bg-[#2b2d31] p-4 rounded border border-[#1e1f22]">
+                                  <div className="pr-4">
+                                    <div className="text-white font-medium mb-1">{perm.label}</div>
+                                    <div className="text-xs text-[#b5bac1]">{perm.desc}</div>
                                   </div>
-                                  <label className="relative inline-flex items-center cursor-pointer">
+                                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                                     <input 
                                       type="checkbox" 
                                       className="sr-only peer" 
-                                      checked={hasRole}
-                                      onChange={() => handleToggleMemberRole(member.id, hasRole)}
+                                      checked={editRolePermissions[perm.key as keyof typeof editRolePermissions]}
+                                      onChange={(e) => setEditRolePermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
                                     />
-                                    <div className="w-9 h-5 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#23a559]"></div>
+                                    <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
                                   </label>
                                 </div>
-                              );
-                            })}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : (
