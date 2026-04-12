@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, ShoppingCart } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -580,7 +580,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             onClick={() => setShowShopAlert(true)}
             className="w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] transition-colors"
           >
-            <ShoppingCart size={20} className="mr-3" />
+            <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain" />
             <span className="font-medium">Cardi E-Shop</span>
           </button>
         </div>
@@ -591,7 +591,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             <div className="bg-[#313338] rounded-md w-[440px] shadow-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
               <div className="p-4 border-b border-[#1e1f22]">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <ShoppingCart size={24} className="text-[#23a559]" />
+                  <img src="/digitalcardus.png" alt="dc" className="w-6 h-6 object-contain" />
                   Cardi E-Shop
                 </h2>
               </div>
