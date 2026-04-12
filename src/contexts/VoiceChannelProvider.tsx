@@ -450,7 +450,19 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       if (document.querySelector(`audio[data-user-id="${userId}"]`)) return;
       
+      // 1. Creiamo l'elemento audio HTML ma lo teniamo mutato. 
+      // Questo è un workaround necessario per Chrome per mantenere vivo il flusso WebRTC.
+      const audio = document.createElement('audio');
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+      audio.muted = true; // Muto perché l'audio vero uscirà dall'AudioContext
+      audio.setAttribute('data-user-id', userId);
+      document.body.appendChild(audio);
+
+      // 2. Usiamo AudioContext per controllare il volume e analizzare la voce
       const audioContext = new AudioContext();
+      audioContext.resume(); // Assicuriamoci che sia in esecuzione
+      
       const source = audioContext.createMediaStreamSource(remoteStream);
       
       // Creazione del GainNode per il controllo del volume (fino al 200%)
@@ -458,18 +470,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       gainNode.gain.value = (userVolumesRef.current[userId] ?? 100) / 100;
       gainNodesRef.current[userId] = gainNode;
       
-      const destination = audioContext.createMediaStreamDestination();
+      // Colleghiamo la sorgente al GainNode e il GainNode agli altoparlanti
       source.connect(gainNode);
-      gainNode.connect(destination);
+      gainNode.connect(audioContext.destination);
 
-      const audio = document.createElement('audio');
-      audio.srcObject = destination.stream;
-      audio.autoplay = true;
-      audio.setAttribute('data-user-id', userId);
-      document.body.appendChild(audio);
-
+      // Analizzatore per l'indicatore di chi sta parlando
       const analyser = audioContext.createAnalyser();
-      source.connect(analyser); // Connettiamo la sorgente originale all'analizzatore per rilevare la voce anche se il volume è a 0
+      source.connect(analyser); 
       analyser.fftSize = 256;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
