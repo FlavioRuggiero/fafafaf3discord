@@ -638,15 +638,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           </button>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-          <button 
-            onClick={() => onChannelSelect({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 ${activeChannelId === 'friends' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
-          >
-            <Users size={20} className="mr-3 flex-shrink-0" />
-            <span className="font-medium">Amici</span>
-          </button>
-          
-          <div className="flex justify-between items-center mt-4 mb-1 px-2 group">
+          <div className="flex justify-between items-center mt-2 mb-1 px-2 group">
             <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider hover:text-[#dbdee1] cursor-pointer">
               Messaggi Diretti
             </h3>
