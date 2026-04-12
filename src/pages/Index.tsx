@@ -185,6 +185,7 @@ const Index = () => {
     can_use_commands: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_use_commands) ?? false),
     can_manage_server: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_server) ?? false),
     can_manage_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_roles) ?? false),
+    can_bypass_restrictions: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_bypass_restrictions) ?? false),
   };
 
   // Gestione Supabase Presence

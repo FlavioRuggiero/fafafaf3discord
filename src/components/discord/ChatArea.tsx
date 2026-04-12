@@ -17,8 +17,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
-const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔", "👎", "💯", "✨", "💀"];
-
 const StreamPlayer = ({ stream, isLocal, className, volume = 1, isDeafened = false }: { stream: MediaStream; isLocal?: boolean; className?: string; volume?: number; isDeafened?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -247,7 +245,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const lastTypingStatus = useRef(false);
 
   const isServerCreator = currentUser?.id === serverCreatorId;
-  const isLocked = channel.is_locked && !isServerCreator;
+  const isLocked = channel.is_locked && !isServerCreator && !serverPermissions?.can_bypass_restrictions;
 
   // Helper per aggiungere i ruoli all'utente
   const getUserWithRoles = (baseUser: User) => {
@@ -350,7 +348,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Cooldown Logic
   useEffect(() => {
-    if (!channel.cooldown || channel.cooldown === 0 || isServerCreator || !currentUser) {
+    if (!channel.cooldown || channel.cooldown === 0 || isServerCreator || !currentUser || serverPermissions?.can_bypass_restrictions) {
       setCooldownRemaining(0);
       return;
     }
@@ -377,7 +375,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [realMessages, channel.cooldown, currentUser?.id, isServerCreator]);
+  }, [realMessages, channel.cooldown, currentUser?.id, isServerCreator, serverPermissions?.can_bypass_restrictions]);
 
   useEffect(() => {
     if (channel?.type !== 'voice') {
@@ -1166,7 +1164,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     
     if (error) {
       console.error("Errore eliminazione messaggio:", error);
-      showError("Impossibile eliminare il messaggio. Hai eseguito lo script SQL?");
+      showError("Permesso negato.");
       setRealMessages(previousMessages);
     }
   };
@@ -1245,13 +1243,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     const now = new Date().toISOString();
     
+    const previousMessages = [...realMessages];
     setRealMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent, updatedAt: now } : m));
     setEditingMessageId(null);
 
     const { error } = await supabase.from('messages').update({ content: finalContent, updated_at: now }).eq('id', msgId);
     if (error) {
       console.error("Errore salvataggio modifica:", error);
-      showError("Errore durante il salvataggio della modifica.");
+      showError("Permesso negato.");
+      setRealMessages(previousMessages);
     }
   };
 

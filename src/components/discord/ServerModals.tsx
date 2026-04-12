@@ -369,7 +369,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     can_delete_messages: false,
     can_use_commands: false,
     can_manage_server: false,
-    can_manage_roles: false
+    can_manage_roles: false,
+    can_bypass_restrictions: false
   });
 
   useEffect(() => {
@@ -491,7 +492,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       can_delete_messages: false,
       can_use_commands: false,
       can_manage_server: false,
-      can_manage_roles: false
+      can_manage_roles: false,
+      can_bypass_restrictions: false
     }).select().single();
     
     if (data) {
@@ -504,11 +506,12 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
         can_delete_messages: false,
         can_use_commands: false,
         can_manage_server: false,
-        can_manage_roles: false
+        can_manage_roles: false,
+        can_bypass_restrictions: false
       });
       setActiveRoleTab('members');
     } else {
-      showError("Permesso negato: non puoi gestire i ruoli.");
+      showError("Errore creazione ruolo. Hai eseguito lo script SQL?");
     }
   };
 
@@ -524,7 +527,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       setRoles(roles.map(r => r.id === selectedRoleId ? { ...r, name: editRoleName, color: editRoleColor, ...editRolePermissions } : r));
       showSuccess("Ruolo aggiornato!");
     } else {
-      showError("Permesso negato: non puoi gestire i ruoli.");
+      showError("Errore durante l'aggiornamento del ruolo.");
     }
   };
 
@@ -566,6 +569,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     { key: 'can_use_commands', label: 'Usa Comandi', desc: 'Permette di usare comandi speciali come /statusmessage e /mentionseveryone.' },
     { key: 'can_manage_server', label: 'Gestione Server', desc: 'Permette di modificare le impostazioni generali del server.' },
     { key: 'can_manage_roles', label: 'Gestione Ruoli', desc: 'Permette di creare, modificare o eliminare ruoli e assegnarli agli utenti.' },
+    { key: 'can_bypass_restrictions', label: 'Bypass Restrizioni', desc: 'Permette di ignorare il cooldown (slowmode) e di scrivere nei canali bloccati.' },
   ] as const;
 
   return (
@@ -802,6 +806,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                               can_use_commands: role.can_use_commands || false,
                               can_manage_server: role.can_manage_server || false,
                               can_manage_roles: role.can_manage_roles || false,
+                              can_bypass_restrictions: role.can_bypass_restrictions || false,
                             });
                             setActiveRoleTab('members');
                           }}
