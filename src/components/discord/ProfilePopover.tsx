@@ -1,6 +1,7 @@
 import React from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
+import { Shield } from "lucide-react";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -56,14 +57,10 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
             <div className="flex items-center flex-wrap gap-2 mb-1">
               <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
               {isAdmin && (
-                <span className="text-[10px] font-bold text-white border border-[#f23f43] rounded px-1.5 py-[2px] leading-none tracking-wide">
-                  ADMIN
-                </span>
+                <Shield size={16} className="text-red-500 flex-shrink-0" title="Admin" />
               )}
               {isModerator && (
-                <span className="text-[10px] font-bold text-yellow-300 border border-yellow-600 bg-yellow-600/20 rounded px-1.5 py-[2px] leading-none tracking-wide">
-                  MODERATORE
-                </span>
+                <Shield size={16} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />
               )}
             </div>
 

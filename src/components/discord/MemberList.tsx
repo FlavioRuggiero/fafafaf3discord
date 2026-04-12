@@ -1,6 +1,6 @@
 import React from "react";
 import { User } from "@/types/discord";
-import { Crown } from "lucide-react";
+import { Crown, Shield } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
 
 interface MemberListProps {
@@ -61,14 +61,10 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
                 {user.name}
               </span>
               {isAdmin && (
-                <span className="text-[9px] font-bold text-white border border-[#f23f43] rounded px-1 py-[2px] leading-none tracking-wide flex-shrink-0">
-                  ADMIN
-                </span>
+                <Shield size={14} className="text-red-500 flex-shrink-0" title="Admin" />
               )}
               {isModerator && (
-                <span className="text-[9px] font-bold text-yellow-300 border border-yellow-600 bg-yellow-600/20 rounded px-1 py-[2px] leading-none tracking-wide flex-shrink-0">
-                  MODERATORE
-                </span>
+                <Shield size={14} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />
               )}
             </div>
             {user.customStatus && (

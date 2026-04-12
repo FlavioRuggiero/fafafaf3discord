@@ -4,9 +4,10 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Search, Shield, Coins, Plus, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Profile } from "@/types/discord";
+import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { ProfilePopover } from "./ProfilePopover";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -18,7 +19,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [amount, setAmount] = useState<string>('');
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -41,7 +42,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   }, [searchQuery]);
 
   const handleUpdateDC = async (userId: string, currentDC: number, isAdding: boolean) => {
-    const numAmount = parseInt(amount);
+    const numAmount = parseInt(amounts[userId] || '0');
     if (isNaN(numAmount) || numAmount <= 0) {
       return showError("Inserisci un importo valido");
     }
@@ -55,7 +56,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     } else {
       showSuccess(`DigitalCardus ${isAdding ? 'aggiunti' : 'rimossi'} con successo!`);
       setUsers(users.map(u => u.id === userId ? { ...u, digitalcardus: newDC } : u));
-      setAmount('');
+      setAmounts(prev => ({ ...prev, [userId]: '' }));
     }
   };
 
@@ -136,33 +137,49 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                 const isAdmin = user.id === adminId;
                 const isMod = userRole === 'moderator';
                 
+                const userForCard: User = {
+                  id: user.id,
+                  name: user.first_name || 'Utente',
+                  avatar: user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+                  status: 'online',
+                  bio: user.bio || undefined,
+                  banner_color: user.banner_color || undefined,
+                  banner_url: user.banner_url || undefined,
+                  level: user.level || 1,
+                  digitalcardus: user.digitalcardus ?? 25,
+                  xp: user.xp || 0,
+                  global_role: isAdmin ? 'CREATOR' : isMod ? 'MODERATOR' : 'USER',
+                };
+                
                 return (
                   <div key={user.id} className="bg-[#2b2d31] p-3 rounded flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img 
-                        src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} 
-                        alt="avatar" 
-                        className="w-10 h-10 rounded-full bg-[#1e1f22] object-cover"
-                      />
-                      <div>
-                        <div className="text-white font-medium flex items-center gap-1.5">
-                          {user.first_name || 'Utente Sconosciuto'}
-                          {isAdmin && <Shield size={14} className="text-red-500" title="Admin" />}
-                          {!isAdmin && isMod && <Shield size={14} className="text-blue-400" title="Moderatore Ufficiale" />}
-                        </div>
-                        <div className="text-xs text-[#949ba4]">
-                          {activeTab === 'dc' ? `${user.digitalcardus ?? 0} DC` : `Ruolo: ${isAdmin ? 'admin' : userRole}`}
+                    <ProfilePopover user={userForCard} side="right" align="center">
+                      <div className="flex items-center gap-3 cursor-pointer hover:bg-[#35373c] p-1.5 rounded transition-colors">
+                        <img 
+                          src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} 
+                          alt="avatar" 
+                          className="w-10 h-10 rounded-full bg-[#1e1f22] object-cover"
+                        />
+                        <div>
+                          <div className="text-white font-medium flex items-center gap-1.5">
+                            {(user as any).email || user.first_name || 'Utente Sconosciuto'}
+                            {isAdmin && <Shield size={14} className="text-red-500" title="Admin" />}
+                            {!isAdmin && isMod && <Shield size={14} className="text-blue-400" title="Moderatore Ufficiale" />}
+                          </div>
+                          <div className="text-xs text-[#949ba4]">
+                            {activeTab === 'dc' ? `${user.digitalcardus ?? 0} DC` : `Ruolo: ${isAdmin ? 'admin' : userRole}`}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </ProfilePopover>
 
                     {activeTab === 'dc' ? (
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
                           placeholder="Importo"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
+                          value={amounts[user.id] || ''}
+                          onChange={(e) => setAmounts(prev => ({ ...prev, [user.id]: e.target.value }))}
                           className="w-24 bg-[#1e1f22] text-white rounded p-1.5 text-sm focus:outline-none"
                         />
                         <button
