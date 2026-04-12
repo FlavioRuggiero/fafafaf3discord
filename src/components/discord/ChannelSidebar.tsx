@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { UserPanel } from "./UserPanel";
 import { playSound } from "@/utils/sounds";
 import { ProfilePopover } from "./ProfilePopover";
+import { AdminPanel } from "./AdminPanel";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -54,6 +55,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const prevMembersRef = useRef<ServerMemberWithProfile[]>([]);
   
   const [showShopAlert, setShowShopAlert] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const { 
     joinVoiceChannel, 
@@ -567,7 +569,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             Trova o inizia una conversazione
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 flex flex-col">
           <button
             onClick={() => onChannelSelect({ id: 'home', name: 'Benvenuto', type: 'text', category: '', server_id: null })}
             className="w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 bg-[#404249] text-white"
@@ -583,8 +585,22 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain" />
             <span className="font-medium">Cardi E-Shop</span>
           </button>
+
+          {currentUser?.id === adminId && (
+            <div className="mt-auto pt-4">
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                className="w-full flex items-center px-3 py-2 rounded cursor-pointer text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] transition-colors"
+              >
+                <Shield size={20} className="mr-3 text-yellow-500" />
+                <span className="font-medium">Pannello Admin</span>
+              </button>
+            </div>
+          )}
         </div>
         <UserPanel currentUser={currentUser} onOpenUserSettings={onOpenUserSettings} />
+
+        {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
 
         {showShopAlert && typeof document !== 'undefined' && createPortal(
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={() => setShowShopAlert(false)}>
