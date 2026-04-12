@@ -400,6 +400,7 @@ const Index = () => {
     };
   }, [activeServerId]);
 
+  // AGGIORNAMENTO: Sincronizza istantaneamente il canale attivo quando allChannels cambia
   useEffect(() => {
     if (activeServerId !== 'home') {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
@@ -408,10 +409,12 @@ const Index = () => {
           if (!current || current.server_id !== activeServerId) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
-          if (!newServerChannels.some(c => c.id === current.id)) {
+          // Trova il canale aggiornato per riflettere le nuove impostazioni (cooldown, is_locked)
+          const updatedCurrent = newServerChannels.find(c => c.id === current.id);
+          if (!updatedCurrent) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
-          return current;
+          return updatedCurrent;
         });
       } else {
         setActiveChannel(null);

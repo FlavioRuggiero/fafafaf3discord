@@ -981,6 +981,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         if (error) {
           console.error("Errore durante l'invio:", error);
           setRealMessages(prev => prev.filter(m => m.id !== tempId));
+          showError(error.message || "Errore durante l'invio del messaggio.");
         } else if (data) {
           setRealMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id, rawCreatedAt: data.created_at, updatedAt: data.updated_at } : m));
         }
