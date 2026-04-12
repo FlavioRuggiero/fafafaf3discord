@@ -384,7 +384,7 @@ const Index = () => {
 
     fetchServerData();
 
-    // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
+    // Listener per unione/uscita dal server e aggiornamento ruoli in tempo reale
     const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
       .on('postgres_changes', {
         event: '*',
@@ -411,8 +411,27 @@ const Index = () => {
           setServerProfiles(prev => prev.filter(p => p.id !== deletedUserId));
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_member_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, (payload) => {
+        if (!isMounted) return;
+        if (payload.eventType === 'INSERT') {
+          setServerRoles(prev => [...prev, payload.new as ServerRole]);
+        } else if (payload.eventType === 'UPDATE') {
+          setServerRoles(prev => prev.map(r => r.id === payload.new.id ? payload.new as ServerRole : r));
+        } else if (payload.eventType === 'DELETE') {
+          setServerRoles(prev => prev.filter(r => r.id !== payload.old.id));
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_member_roles', filter: `server_id=eq.${activeServerId}` }, (payload) => {
+        if (!isMounted) return;
+        if (payload.eventType === 'INSERT') {
+          setMemberRoles(prev => {
+            if (prev.some(mr => mr.user_id === payload.new.user_id && mr.role_id === payload.new.role_id)) return prev;
+            return [...prev, { user_id: payload.new.user_id, role_id: payload.new.role_id }];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setMemberRoles(prev => prev.filter(mr => !(mr.user_id === payload.old.user_id && mr.role_id === payload.old.role_id)));
+        }
+      })
       .subscribe();
 
     return () => {
