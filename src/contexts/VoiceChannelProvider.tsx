@@ -31,6 +31,8 @@ interface VoiceChannelContextType {
   remoteScreenStreams: Record<string, MediaStream>;
   startScreenShare: (sourceId?: string) => Promise<void>;
   stopScreenShare: () => void;
+  userVolumes: Record<string, number>;
+  setUserVolume: (userId: string, volume: number) => void;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -60,6 +62,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   
+  // Volume States
+  const [userVolumes, setUserVolumes] = useState<Record<string, number>>({});
+  const userVolumesRef = useRef(userVolumes);
+  useEffect(() => { userVolumesRef.current = userVolumes; }, [userVolumes]);
+  const gainNodesRef = useRef<Record<string, GainNode>>({});
+
   const localStreamRef = useRef<MediaStream | null>(null);
   const localScreenStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<PeerData[]>([]);
@@ -307,10 +315,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       let stream: MediaStream | null = null;
       let lastError: any = null;
       
-      // 1. Desktop Capturer (Se sourceId è valido e fornito dal wrapper desktop)
       if (sourceId && sourceId !== 'native-browser') {
         try {
-          // Tentativo primario: CATTURA AUDIO + VIDEO SCHERMO
           stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               mandatory: {
@@ -327,7 +333,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         } catch (e) {
           console.warn("Cattura audio+video desktop fallita. Ritento solo con video.", e);
           try {
-            // Fallback secondario: CATTURA SOLO VIDEO SCHERMO
             stream = await navigator.mediaDevices.getUserMedia({
               audio: false,
               video: {
@@ -344,7 +349,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         }
       }
       
-      // 2. Fallback Web Standard (Browser Picker Nativo)
       if (!stream) {
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -357,7 +361,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       }
 
       if (!stream) {
-        // Se non è l'utente che ha annullato la scelta, mostra l'errore
         if (lastError?.name !== 'NotAllowedError') {
           showError("Permessi negati o API di sistema non supportata in questo ambiente.");
         }
@@ -371,7 +374,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       localScreenStreamRef.current = stream;
       setLocalScreenStream(stream);
       
-      // Invio lo stream dello schermo (che ora include anche l'audio di sistema se supportato) ai peer
       peersRef.current.forEach(({ peer }) => {
         try { peer.addStream(stream!); } catch (e) { console.error(e) }
       });
@@ -380,6 +382,13 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       showError("Si è verificato un errore durante l'avvio della condivisione.");
     }
   }, [currentUser, stopScreenShare]);
+
+  const setUserVolume = useCallback((userId: string, volume: number) => {
+    setUserVolumes(prev => ({ ...prev, [userId]: volume }));
+    if (gainNodesRef.current[userId]) {
+      gainNodesRef.current[userId].gain.value = volume / 100;
+    }
+  }, []);
 
   const removePeer = (userId: string) => {
     const audioEl = document.querySelector(`audio[data-user-id="${userId}"]`);
@@ -392,6 +401,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       analysis.close();
       delete audioAnalysisRefs.current[userId];
     }
+    
+    delete gainNodesRef.current[userId];
+
     setSpeakingStates(prev => {
       const next = { ...prev };
       delete next[userId];
@@ -437,16 +449,27 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       }
 
       if (document.querySelector(`audio[data-user-id="${userId}"]`)) return;
+      
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(remoteStream);
+      
+      // Creazione del GainNode per il controllo del volume (fino al 200%)
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = (userVolumesRef.current[userId] ?? 100) / 100;
+      gainNodesRef.current[userId] = gainNode;
+      
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(gainNode);
+      gainNode.connect(destination);
+
       const audio = document.createElement('audio');
-      audio.srcObject = remoteStream;
+      audio.srcObject = destination.stream;
       audio.autoplay = true;
       audio.setAttribute('data-user-id', userId);
       document.body.appendChild(audio);
 
-      const audioContext = new AudioContext();
       const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(remoteStream);
-      source.connect(analyser);
+      source.connect(analyser); // Connettiamo la sorgente originale all'analizzatore per rilevare la voce anche se il volume è a 0
       analyser.fftSize = 256;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
@@ -512,6 +535,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       analysis.close();
     });
     audioAnalysisRefs.current = {};
+    gainNodesRef.current = {};
 
     document.querySelectorAll('audio[data-user-id]').forEach(el => el.remove());
 
@@ -699,6 +723,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     remoteScreenStreams,
     startScreenShare,
     stopScreenShare,
+    userVolumes,
+    setUserVolume,
   };
 
   return (

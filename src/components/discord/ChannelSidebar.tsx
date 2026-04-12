@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield } from "lucide-react";
+import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -62,7 +63,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     joinVoiceChannel, 
     leaveVoiceChannel, 
     activeVoiceChannelId,
-    speakingStates
+    speakingStates,
+    userVolumes,
+    setUserVolume
   } = useVoiceChannel();
 
   const activeChannelIdRef = useRef(activeChannelId);
@@ -844,41 +847,63 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 } : null;
 
                                 return (
-                                  <ProfilePopover key={member.user_id} user={userForCard} side="right" align="center">
-                                    <div className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300 cursor-pointer">
-                                      <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
-                                        <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
-                                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                  <ContextMenu.Root key={member.user_id}>
+                                    <ContextMenu.Trigger asChild>
+                                      <div className="w-full">
+                                        <ProfilePopover user={userForCard} side="right" align="center">
+                                          <div className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300 cursor-pointer">
+                                            <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
+                                              <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
+                                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                            </div>
+                                            <div className="ml-2 flex items-center gap-1 flex-1 min-w-0">
+                                              <span className="text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>
+                                              {isAdmin && (
+                                                <Tooltip delayDuration={0}>
+                                                  <TooltipTrigger asChild>
+                                                    <div className="cursor-help flex items-center"><Shield size={12} className="text-red-500 flex-shrink-0" /></div>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                                    admin di discord canary 2
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              )}
+                                              {!isAdmin && isMod && (
+                                                <Tooltip delayDuration={0}>
+                                                  <TooltipTrigger asChild>
+                                                    <div className="cursor-help flex items-center"><Shield size={12} className="text-blue-400 flex-shrink-0" /></div>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                                    moderatore ufficiale
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              )}
+                                            </div>
+                                            <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
+                                              {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
+                                              {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
+                                            </div>
+                                          </div>
+                                        </ProfilePopover>
                                       </div>
-                                      <div className="ml-2 flex items-center gap-1 flex-1 min-w-0">
-                                        <span className="text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>
-                                        {isAdmin && (
-                                          <Tooltip delayDuration={0}>
-                                            <TooltipTrigger asChild>
-                                              <div className="cursor-help flex items-center"><Shield size={12} className="text-red-500 flex-shrink-0" /></div>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                                              admin di discord canary 2
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        )}
-                                        {!isAdmin && isMod && (
-                                          <Tooltip delayDuration={0}>
-                                            <TooltipTrigger asChild>
-                                              <div className="cursor-help flex items-center"><Shield size={12} className="text-blue-400 flex-shrink-0" /></div>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                                              moderatore ufficiale
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        )}
-                                      </div>
-                                      <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
-                                        {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
-                                        {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
-                                      </div>
-                                    </div>
-                                  </ProfilePopover>
+                                    </ContextMenu.Trigger>
+                                    <ContextMenu.Portal>
+                                      <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-3 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">
+                                        <div className="flex justify-between items-center mb-2">
+                                          <span className="text-xs font-bold text-[#b5bac1] uppercase">Volume Utente</span>
+                                          <span className="text-xs font-medium text-brand">{userVolumes[member.user_id] ?? 100}%</span>
+                                        </div>
+                                        <input 
+                                          type="range" 
+                                          min="0" 
+                                          max="200" 
+                                          value={userVolumes[member.user_id] ?? 100}
+                                          onChange={(e) => setUserVolume(member.user_id, parseInt(e.target.value))}
+                                          className="w-full h-1.5 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
+                                        />
+                                      </ContextMenu.Content>
+                                    </ContextMenu.Portal>
+                                  </ContextMenu.Root>
                                 );
                               })}
                             </div>
