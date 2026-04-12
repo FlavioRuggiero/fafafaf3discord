@@ -158,6 +158,19 @@ interface ChatAreaProps {
 
 export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId }: ChatAreaProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
+  
+  // Refs per evitare stale closures negli eventi realtime
+  const adminIdRef = useRef(adminId);
+  const moderatorIdsRef = useRef(moderatorIds);
+
+  useEffect(() => {
+    adminIdRef.current = adminId;
+  }, [adminId]);
+
+  useEffect(() => {
+    moderatorIdsRef.current = moderatorIds;
+  }, [moderatorIds]);
+
   const [inputValue, setInputValue] = useState("");
   const [realMessages, setRealMessages] = useState<LocalMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
@@ -242,7 +255,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setCurrentUser(session.user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp')
+          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role')
           .eq('id', session.user.id)
           .single();
         setCurrentUserProfile(profile);
@@ -282,7 +295,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         const userIds = membersData.map((m: any) => m.user_id);
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url')
+          .select('id, first_name, last_name, avatar_url, role')
           .in('id', userIds);
 
         const combinedData = membersData.map((m: any) => ({
@@ -334,7 +347,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           created_at,
           updated_at,
           user_id,
-          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp)
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
@@ -347,7 +360,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             content,
             created_at,
             user_id,
-            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp)
+            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role)
           `)
           .eq('channel_id', channel.id)
           .order('created_at', { ascending: true });
@@ -368,9 +381,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const name = m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente';
           
           let role: User['global_role'] = 'USER';
-          if (m.user_id === adminId) {
+          if (m.user_id === adminIdRef.current) {
               role = 'CREATOR';
-          } else if (moderatorIds.includes(m.user_id)) {
+          } else if (m.profiles?.role === 'moderator' || moderatorIdsRef.current.includes(m.user_id)) {
               role = 'MODERATOR';
           }
           
@@ -437,16 +450,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role')
           .eq('id', payload.new.user_id)
           .single();
           
         const name = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Utente' : 'Utente';
         
         let role: User['global_role'] = 'USER';
-        if (payload.new.user_id === adminId) {
+        if (payload.new.user_id === adminIdRef.current) {
             role = 'CREATOR';
-        } else if (moderatorIds.includes(payload.new.user_id)) {
+        } else if (profileData?.role === 'moderator' || moderatorIdsRef.current.includes(payload.new.user_id)) {
             role = 'MODERATOR';
         }
 
@@ -522,9 +535,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setRealMessages(prev => prev.map(m => {
           if (m.user.id === updatedProfile.id) {
             let role: User['global_role'] = 'USER';
-            if (updatedProfile.id === adminId) {
+            if (updatedProfile.id === adminIdRef.current) {
                 role = 'CREATOR';
-            } else if (moderatorIds.includes(updatedProfile.id)) {
+            } else if (updatedProfile.role === 'moderator' || moderatorIdsRef.current.includes(updatedProfile.id)) {
                 role = 'MODERATOR';
             }
             return {
@@ -558,7 +571,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     return () => {
       supabase.removeChannel(channelSubscription);
     };
-  }, [channel?.id, channel?.type, tableExists, adminId, moderatorIds, authUser?.id]);
+  }, [channel?.id, channel?.type, tableExists, authUser?.id]);
 
   useEffect(() => {
     if (!channel?.id || !currentUser?.id || channel?.type === 'voice') return;
@@ -646,9 +659,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
         
         let role: User['global_role'] = 'USER';
-        if (currentUser.id === adminId) {
+        if (currentUser.id === adminIdRef.current) {
             role = 'CREATOR';
-        } else if (moderatorIds.includes(currentUser.id)) {
+        } else if (currentUserProfile?.role === 'moderator' || moderatorIdsRef.current.includes(currentUser.id)) {
             role = 'MODERATOR';
         }
         

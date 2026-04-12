@@ -18,6 +18,18 @@ const Index = () => {
   const { user, adminId, moderatorIds } = useAuth();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Refs per evitare stale closures negli eventi realtime
+  const adminIdRef = useRef(adminId);
+  const moderatorIdsRef = useRef(moderatorIds);
+
+  useEffect(() => {
+    adminIdRef.current = adminId;
+  }, [adminId]);
+
+  useEffect(() => {
+    moderatorIdsRef.current = moderatorIds;
+  }, [moderatorIds]);
+
   // States per Server e Canali dal DB
   const [servers, setServers] = useState<Server[]>([]);
   const [publicServers, setPublicServers] = useState<Server[]>([]);
@@ -53,7 +65,7 @@ const Index = () => {
     let role: User['global_role'] = 'USER';
     if (p.id === adminId) {
         role = 'CREATOR';
-    } else if (moderatorIds.includes(p.id)) {
+    } else if (p.role === 'moderator' || moderatorIds.includes(p.id)) {
         role = 'MODERATOR';
     }
 
@@ -124,9 +136,9 @@ const Index = () => {
           if (!prev || prev.id !== updatedProfile.id) return prev;
           
           let role: User['global_role'] = 'USER';
-          if (updatedProfile.id === adminId) {
+          if (updatedProfile.id === adminIdRef.current) {
               role = 'CREATOR';
-          } else if (moderatorIds.includes(updatedProfile.id)) {
+          } else if (updatedProfile.role === 'moderator' || moderatorIdsRef.current.includes(updatedProfile.id)) {
               role = 'MODERATOR';
           }
 
@@ -161,7 +173,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(profileSubscription);
     };
-  }, [adminId, moderatorIds, user?.id]);
+  }, [user?.id]);
 
   // Caricamento dati iniziali e premi giornalieri
   const hasInitializedRef = useRef(false);
@@ -198,7 +210,7 @@ const Index = () => {
       let role: User['global_role'] = 'USER';
       if (user.id === adminId) {
         role = 'CREATOR';
-      } else if (moderatorIds.includes(user.id)) {
+      } else if (profile?.role === 'moderator' || moderatorIds.includes(user.id)) {
         role = 'MODERATOR';
       }
 
