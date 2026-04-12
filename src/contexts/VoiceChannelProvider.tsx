@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Peer from 'simple-peer';
 import { User } from '@/types/discord';
 import { playSound } from '@/utils/sounds';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 
 interface PeerData {
   peer: Peer.Instance;
@@ -20,7 +20,7 @@ interface VoiceState {
 interface VoiceChannelContextType {
   joinVoiceChannel: (channelId: string, serverId: string) => void;
   leaveVoiceChannel: () => void;
-  kickFromVoiceChannel: (userId: string) => void;
+  kickFromVoiceChannel: (userId: string) => Promise<void>;
   isMuted: boolean;
   isDeafened: boolean;
   toggleMute: () => void;
@@ -749,15 +749,46 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
   }, [currentUser]);
 
-  const kickFromVoiceChannel = useCallback((userId: string) => {
-    if (signalingChannelRef.current) {
-      signalingChannelRef.current.send({
-        type: 'broadcast',
-        event: 'force-disconnect',
-        payload: { userId }
-      });
+  // NUOVA LOGICA DI KICK: Aggiorna direttamente il database
+  const kickFromVoiceChannel = useCallback(async (userId: string) => {
+    const { error } = await supabase
+      .from('server_members')
+      .update({ voice_channel_id: null })
+      .eq('user_id', userId)
+      .not('voice_channel_id', 'is', null);
+      
+    if (error) {
+      console.error("Errore kick:", error);
+      showError("Errore durante la disconnessione dell'utente.");
+    } else {
+      showSuccess("Utente disconnesso dal canale vocale.");
     }
   }, []);
+
+  // LISTENER PER KICK: Ascolta se il proprio voice_channel_id viene impostato a null dal database
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const sub = supabase.channel(`kick_listener_${currentUser.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'server_members',
+        filter: `user_id=eq.${currentUser.id}`
+      }, (payload) => {
+        const newRecord = payload.new as any;
+        // Se il database dice che non siamo in nessun canale, ma localmente lo siamo:
+        if (newRecord.voice_channel_id === null && activeVoiceChannelIdRef.current !== null) {
+          leaveVoiceChannel();
+          showError("Sei stato disconnesso dal canale vocale da un moderatore.");
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [currentUser, leaveVoiceChannel]);
 
   const joinVoiceChannel = useCallback(async (channelId: string, serverId: string) => {
     if (!currentUser || isJoiningRef.current) return;
@@ -865,13 +896,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
           delete next[payload.userId];
           return next;
         });
-      });
-
-      channel.on('broadcast', { event: 'force-disconnect' }, ({ payload }) => {
-        if (payload.userId === currentUser.id) {
-          leaveVoiceChannel();
-          showError("Sei stato disconnesso dal canale vocale dal proprietario del server.");
-        }
       });
 
       channel.subscribe(async (status) => {
