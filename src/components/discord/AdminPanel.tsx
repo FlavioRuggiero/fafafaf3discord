@@ -27,7 +27,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       let query = supabase.from('profiles').select('*').limit(50);
       
       if (searchQuery.trim()) {
-        query = query.ilike('first_name', `%${searchQuery}%`);
+        // Cerca sia per nome che per email
+        query = query.or(`first_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
       }
       
       const { data, error } = await query;
@@ -118,7 +119,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             </div>
             <input
               type="text"
-              placeholder="Cerca utente per nome..."
+              placeholder="Cerca utente per nome o email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#1e1f22] text-white rounded p-2 pl-10 focus:outline-none placeholder-[#949ba4]"
