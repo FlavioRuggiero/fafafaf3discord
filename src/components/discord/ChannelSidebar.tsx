@@ -10,7 +10,6 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserPanel } from "./UserPanel";
-import { playSound } from "@/utils/sounds";
 import { ProfilePopover } from "./ProfilePopover";
 import { AdminPanel } from "./AdminPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -61,7 +60,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [userDragOverId, setUserDragOverId] = useState<string | null>(null);
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
-  const prevMembersRef = useRef<ServerMemberWithProfile[]>([]);
   
   const [showShopAlert, setShowShopAlert] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -215,22 +213,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         if (payload.eventType === 'UPDATE') {
           const updatedMember = payload.new as ServerMember;
           setMembers(prev => prev.map(m => m.user_id === updatedMember.user_id ? { ...m, ...updatedMember } : m));
-
-          // Se l'utente corrente è stato spostato o disconnesso da qualcun altro
-          if (updatedMember.user_id === currentUser.id) {
-            const currentVoiceId = activeVoiceChannelIdRef.current;
-            const newVoiceId = updatedMember.voice_channel_id;
-
-            if (newVoiceId !== currentVoiceId) {
-              if (newVoiceId === null) {
-                leaveVoiceChannel(true);
-                showError("Sei stato disconnesso dal canale vocale.");
-              } else {
-                joinVoiceChannel(newVoiceId, activeServer.id, true);
-                showSuccess("Sei stato spostato in un altro canale.");
-              }
-            }
-          }
         } else if (payload.eventType === 'INSERT') {
           const newMember = payload.new as ServerMember;
           const { data: profileData } = await supabase
@@ -247,10 +229,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         } else if (payload.eventType === 'DELETE') {
           const deletedMember = payload.old as { user_id: string };
           setMembers(prev => prev.filter(m => m.user_id !== deletedMember.user_id));
-
-          if (deletedMember.user_id === currentUser.id && activeVoiceChannelIdRef.current) {
-            leaveVoiceChannel(true);
-          }
         }
       })
       .subscribe();
@@ -259,37 +237,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       isMounted = false;
       supabase.removeChannel(memberSub);
     };
-  }, [activeServer?.id, currentUser.id, leaveVoiceChannel, joinVoiceChannel]);
-
-  useEffect(() => {
-    if (!activeVoiceChannelId || !currentUser) return;
-
-    const currentVCUserIds = new Set(
-      members
-        .filter(m => m.voice_channel_id === activeVoiceChannelId)
-        .map(m => m.user_id)
-    );
-    
-    const prevVCUserIds = new Set(
-      prevMembersRef.current
-        .filter(m => m.voice_channel_id === activeVoiceChannelId)
-        .map(m => m.user_id)
-    );
-
-    currentVCUserIds.forEach(userId => {
-      if (!prevVCUserIds.has(userId) && userId !== currentUser.id) {
-        playSound('/enter.mp3');
-      }
-    });
-
-    prevVCUserIds.forEach(userId => {
-      if (!currentVCUserIds.has(userId) && userId !== currentUser.id) {
-        playSound('/exit.mp3');
-      }
-    });
-
-    prevMembersRef.current = members;
-  }, [members, activeVoiceChannelId, currentUser]);
+  }, [activeServer?.id]);
 
   const displayChannels = useMemo(() => {
     return [...localChannels]

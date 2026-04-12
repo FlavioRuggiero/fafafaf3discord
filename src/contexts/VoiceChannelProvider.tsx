@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Peer from 'simple-peer';
 import { User } from '@/types/discord';
 import { playSound } from '@/utils/sounds';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 
 interface PeerData {
   peer: Peer.Instance;
@@ -196,6 +196,39 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // LISTENER GLOBALE PER SPOSTAMENTI ED ESPULSIONI
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const sub = supabase.channel('global_voice_state')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'server_members',
+        filter: `user_id=eq.${currentUser.id}`
+      }, (payload) => {
+        const newVoiceId = payload.new.voice_channel_id;
+        const currentVoiceId = activeVoiceChannelIdRef.current;
+        const serverId = payload.new.server_id;
+
+        // Se siamo in un canale vocale e il database dice che siamo stati spostati/disconnessi
+        if (currentVoiceId && newVoiceId !== currentVoiceId) {
+          if (newVoiceId === null) {
+            leaveVoiceChannel(true);
+            showError("Sei stato disconnesso dal canale vocale.");
+          } else {
+            joinVoiceChannel(newVoiceId, serverId, true);
+            showSuccess("Sei stato spostato in un altro canale.");
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [currentUser]);
 
   const requestMicrophone = useCallback(async (playSounds = true) => {
     try {
@@ -805,6 +838,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       channel.on('presence', { event: 'join' }, ({ key }) => {
         if (key !== currentUser?.id) {
+          playSound('/enter.mp3');
           if (currentUser) {
             channel.send({
               type: 'broadcast',
@@ -819,6 +853,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       });
       
       channel.on('presence', { event: 'leave' }, ({ key }) => {
+        if (key !== currentUser?.id) {
+          playSound('/exit.mp3');
+        }
         const peerData = peersRef.current.find(p => p.userId === key);
         if (peerData) {
           peerData.peer.destroy();
