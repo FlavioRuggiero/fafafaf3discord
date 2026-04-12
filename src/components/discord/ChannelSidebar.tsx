@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, ShoppingCart } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -572,6 +572,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           >
             <Home size={20} className="mr-3" />
             <span className="font-medium">Benvenuto</span>
+          </button>
+          
+          <button
+            onClick={() => alert("Questa funzione arriverà prossimamente!")}
+            className="w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] transition-colors"
+          >
+            <ShoppingCart size={20} className="mr-3" />
+            <span className="font-medium">Cardi E-Shop</span>
           </button>
         </div>
         <UserPanel currentUser={currentUser} onOpenUserSettings={onOpenUserSettings} />
