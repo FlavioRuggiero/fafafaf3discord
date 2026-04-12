@@ -35,6 +35,7 @@ export type User = {
   digitalcardus?: number;
   xp?: number;
   server_roles?: ServerRole[];
+  last_reward_date?: string | null;
 };
 
 export type Server = {

@@ -257,7 +257,8 @@ const Index = () => {
             level: updatedProfile.level || 1,
             digitalcardus: updatedProfile.digitalcardus ?? 25,
             xp: updatedProfile.xp || 0,
-            global_role: role
+            global_role: role,
+            last_reward_date: updatedProfile.last_reward_date || prev.last_reward_date
           };
         });
       })
@@ -287,7 +288,7 @@ const Index = () => {
     const loadInitialData = async () => {
       if (!user) return;
       
-      // Eseguiamo la pulizia e i premi solo una volta per sessione
+      // Eseguiamo la pulizia solo una volta per sessione
       if (!hasInitializedRef.current) {
         hasInitializedRef.current = true;
         
@@ -296,16 +297,6 @@ const Index = () => {
         
         // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
         await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
-        
-        // Controllo del premio giornaliero
-        const { data: rewardData } = await supabase.rpc('claim_daily_reward', { user_id_param: user.id });
-        
-        if (rewardData && rewardData.rewarded) {
-          showSuccess('Accesso giornaliero: +5 XP, +3 Digitalcardus!');
-          if (rewardData.leveled_up) {
-            setTimeout(() => showSuccess(`🎉 Sei salito al livello ${rewardData.new_level}!`), 1500);
-          }
-        }
       }
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
@@ -330,7 +321,8 @@ const Index = () => {
         banner_url: profile?.banner_url || undefined,
         level: profile?.level || 1,
         digitalcardus: profile?.digitalcardus ?? 25,
-        xp: profile?.xp || 0
+        xp: profile?.xp || 0,
+        last_reward_date: profile?.last_reward_date || null
       };
       
       setCurrentUser(loadedUser);
