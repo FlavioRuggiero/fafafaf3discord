@@ -239,14 +239,29 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
   
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
 
   const isServerCreator = currentUser?.id === serverCreatorId;
   const isLocked = channel.is_locked && !isServerCreator;
+
+  // Auto-resize textareas
+  useEffect(() => {
+    if (chatInputRef.current) {
+      chatInputRef.current.style.height = 'auto';
+      chatInputRef.current.style.height = `${Math.min(chatInputRef.current.scrollHeight, 300)}px`;
+    }
+  }, [inputValue]);
+
+  useEffect(() => {
+    if (editInputRef.current) {
+      editInputRef.current.style.height = 'auto';
+      editInputRef.current.style.height = `${Math.min(editInputRef.current.scrollHeight, 300)}px`;
+    }
+  }, [editContent]);
 
   // Commands Logic
   const availableCommands = useMemo(() => {
@@ -298,6 +313,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   useEffect(() => {
     if (editingMessageId && editInputRef.current) {
       editInputRef.current.focus();
+      // Posiziona il cursore alla fine
+      editInputRef.current.selectionStart = editInputRef.current.value.length;
+      editInputRef.current.selectionEnd = editInputRef.current.value.length;
     }
   }, [editingMessageId]);
 
@@ -720,7 +738,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInputValue(value);
     
@@ -753,7 +771,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setEditContent(value);
     
@@ -874,7 +892,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (isUploading || channel?.type === 'voice') return;
     
     const items = e.clipboardData?.items;
@@ -937,7 +955,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
   };
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showCommandMenu) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1192,7 +1210,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, msgId: string) => {
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, msgId: string) => {
     if (showMentions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1216,7 +1234,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
 
     if (e.key === 'Escape') cancelEditing();
-    else if (e.key === 'Enter') saveEdit(msgId);
+    else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      saveEdit(msgId);
+    }
   };
 
   const toggleReaction = async (messageId: string, emoji: string) => {
@@ -1973,13 +1994,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   {isEditing ? (
                     <div className="mt-1 mr-4">
                       <div className="bg-[#383a40] p-2.5 rounded-md border border-[#1f2023]">
-                        <input
+                        <textarea
                           ref={editInputRef}
-                          type="text"
                           value={editContent}
                           onChange={handleEditInputChange}
                           onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
-                          className="w-full bg-transparent border-none outline-none text-[#dbdee1]"
+                          rows={1}
+                          className="w-full bg-transparent border-none outline-none text-[#dbdee1] resize-none custom-scrollbar"
                         />
                       </div>
                       <div className="text-[11px] text-[#b5bac1] mt-1.5">
@@ -2140,9 +2161,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           </div>
         )}
 
-        <div className={`bg-[#383a40] flex items-center px-4 py-2.5 min-w-0 z-20 relative ${hasTopAttachment ? 'rounded-b-lg rounded-t-none border-x border-b border-[#1f2023]' : 'rounded-lg'}`}>
+        <div className={`bg-[#383a40] flex items-end px-4 py-2.5 min-w-0 z-20 relative ${hasTopAttachment ? 'rounded-b-lg rounded-t-none border-x border-b border-[#1f2023]' : 'rounded-lg'}`}>
           {isRecordingAudio ? (
-            <div className="flex-1 flex items-center justify-between text-[#dbdee1]">
+            <div className="flex-1 flex items-center justify-between text-[#dbdee1] mb-1">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-[#f23f43] animate-pulse" />
                 <span className="font-medium">Registrazione in corso... {recordingTime}s / 15s</span>
@@ -2156,7 +2177,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isInputDisabled}
-                className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors mr-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
+                className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors mr-2 flex-shrink-0 focus:outline-none disabled:opacity-50 mb-1" 
                 title="Carica un file"
               >
                 <PlusCircle size={24} />
@@ -2169,20 +2190,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 onChange={handleFileSelect} 
               />
               
-              <input
+              <textarea
                 ref={chatInputRef}
-                type="text"
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 disabled={isInputDisabled}
                 placeholder={placeholderText}
-                className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
+                rows={1}
+                className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50 resize-none custom-scrollbar py-1.5"
               />
               <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
                 <Popover.Trigger asChild>
-                  <button disabled={isInputDisabled} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" title="Scegli Emoji">
+                  <button disabled={isInputDisabled} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50 mb-1" title="Scegli Emoji">
                     <SmilePlus size={24} />
                   </button>
                 </Popover.Trigger>
@@ -2206,7 +2227,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <button 
                 disabled={isInputDisabled} 
                 onClick={startRecording} 
-                className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
+                className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50 mb-1" 
                 title="Registra Audio"
               >
                 <Mic size={24} />
