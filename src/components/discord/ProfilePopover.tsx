@@ -62,10 +62,10 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
             <div className="flex items-center flex-wrap gap-2 mb-1">
               <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
               {isAdmin && (
-                <Shield size={16} className="text-red-500 flex-shrink-0" title="Admin" />
+                <Shield size={16} className="text-red-500 flex-shrink-0" title="admin di discord canary 2" />
               )}
               {!isAdmin && isModerator && (
-                <Shield size={16} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />
+                <Shield size={16} className="text-blue-400 flex-shrink-0" title="moderatore ufficiale" />
               )}
             </div>
 

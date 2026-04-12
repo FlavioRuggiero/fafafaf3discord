@@ -27,7 +27,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       let query = supabase.from('profiles').select('*').limit(50);
       
       if (searchQuery.trim()) {
-        // Cerca sia per nome che per email
         query = query.or(`first_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
       }
       
@@ -164,8 +163,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         <div className="flex flex-col min-w-0">
                           <div className="text-white font-medium flex items-center gap-1.5 truncate">
                             <span className="truncate">{user.first_name || 'Utente Sconosciuto'}</span>
-                            {isAdmin && <Shield size={14} className="text-red-500 flex-shrink-0" title="Admin" />}
-                            {!isAdmin && isMod && <Shield size={14} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />}
+                            {isAdmin && <Shield size={14} className="text-red-500 flex-shrink-0" title="admin di discord canary 2" />}
+                            {!isAdmin && isMod && <Shield size={14} className="text-blue-400 flex-shrink-0" title="moderatore ufficiale" />}
                           </div>
                           <div className="text-[11px] text-[#b5bac1] truncate">
                             {(user as any).email || 'Email non disponibile'}

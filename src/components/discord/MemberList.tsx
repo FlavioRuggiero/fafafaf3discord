@@ -65,10 +65,10 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
                 {user.name}
               </span>
               {isAdmin && (
-                <Shield size={14} className="text-red-500 flex-shrink-0" title="Admin" />
+                <Shield size={14} className="text-red-500 flex-shrink-0" title="admin di discord canary 2" />
               )}
               {!isAdmin && isModerator && (
-                <Shield size={14} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />
+                <Shield size={14} className="text-blue-400 flex-shrink-0" title="moderatore ufficiale" />
               )}
             </div>
             {user.customStatus && (
