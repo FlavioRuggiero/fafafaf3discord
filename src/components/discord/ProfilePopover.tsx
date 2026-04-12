@@ -44,7 +44,7 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
           align={align} 
           sideOffset={16} 
           collisionPadding={20}
-          className="w-[300px] p-0 bg-[#111214] border border-[#1e1f22] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          className={`w-[300px] p-0 bg-[#111214] text-[#dbdee1] shadow-2xl overflow-hidden rounded-lg z-[99999] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 ${isAdmin ? 'electrified-border' : 'border border-[#1e1f22]'}`}
         >
           <div 
             className="h-[60px] relative flex-shrink-0 bg-cover bg-center"
