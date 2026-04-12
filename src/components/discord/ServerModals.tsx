@@ -722,40 +722,42 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                   </div>
                 </form>
 
-                <div className="mt-8 pt-6 border-t border-[#1f2023]">
-                  <h3 className="text-[#f23f43] font-bold text-sm uppercase mb-2">Zona Pericolosa</h3>
-                  {!confirmDelete ? (
-                    <button 
-                      type="button" 
-                      onClick={() => setConfirmDelete(true)}
-                      disabled={isUpdating}
-                      className="w-full flex items-center justify-center bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-2 rounded transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 size={16} className="mr-2" />
-                      Elimina Server
-                    </button>
-                  ) : (
-                    <div className="bg-[#f23f43]/10 p-3 rounded border border-[#f23f43]/30">
-                      <p className="text-white text-sm font-medium mb-3">Sei sicuro? Questa azione non può essere annullata.</p>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setConfirmDelete(false)}
-                          disabled={isUpdating}
-                          className="flex-1 bg-[#35373c] hover:bg-[#404249] text-white py-1.5 rounded text-sm transition-colors disabled:opacity-50"
-                        >
-                          Annulla
-                        </button>
-                        <button 
-                          onClick={() => onDelete(server.id)}
-                          disabled={isUpdating}
-                          className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white py-1.5 rounded text-sm transition-colors disabled:opacity-50"
-                        >
-                          Sì, elimina
-                        </button>
+                {serverPermissions?.isOwner && (
+                  <div className="mt-8 pt-6 border-t border-[#1f2023]">
+                    <h3 className="text-[#f23f43] font-bold text-sm uppercase mb-2">Zona Pericolosa</h3>
+                    {!confirmDelete ? (
+                      <button 
+                        type="button" 
+                        onClick={() => setConfirmDelete(true)}
+                        disabled={isUpdating}
+                        className="w-full flex items-center justify-center bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-2 rounded transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 size={16} className="mr-2" />
+                        Elimina Server
+                      </button>
+                    ) : (
+                      <div className="bg-[#f23f43]/10 p-3 rounded border border-[#f23f43]/30">
+                        <p className="text-white text-sm font-medium mb-3">Sei sicuro? Questa azione non può essere annullata.</p>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setConfirmDelete(false)}
+                            disabled={isUpdating}
+                            className="flex-1 bg-[#35373c] hover:bg-[#404249] text-white py-1.5 rounded text-sm transition-colors disabled:opacity-50"
+                          >
+                            Annulla
+                          </button>
+                          <button 
+                            onClick={() => onDelete(server.id)}
+                            disabled={isUpdating}
+                            className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white py-1.5 rounded text-sm transition-colors disabled:opacity-50"
+                          >
+                            Sì, elimina
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-8 flex justify-end">
                   <button type="submit" form="server-settings-form" disabled={isUpdating} className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
