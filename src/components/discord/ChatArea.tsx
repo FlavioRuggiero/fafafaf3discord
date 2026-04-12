@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command, Shield } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { BombParty } from "./BombParty";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
@@ -1779,11 +1780,31 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 )}
                 <div className="flex items-center gap-2 text-[#949ba4] bg-[#2b2d31] px-4 py-2 rounded-full border border-[#1e1f22] shadow-sm">
                   <span className="text-xl">👋</span>
-                  <span>
+                  <span className="flex items-center">
                     <ProfilePopover user={msg.user}>
-                      <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline">{msg.user.name}</span>
+                      <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline mr-1.5">{msg.user.name}</span>
                     </ProfilePopover>
-                    {' '}è appena entrato nel server!
+                    {msg.user.id === adminId && (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                          admin di discord canary 2
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                          moderatore ufficiale
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <span>è appena entrato nel server!</span>
                   </span>
                   <span className="text-[10px] ml-2 opacity-50">{msg.timestamp}</span>
                 </div>
@@ -1807,8 +1828,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   </div>
                 )}
                 <div className="flex flex-col items-center text-center text-white bg-yellow-500/10 px-6 py-3 rounded-lg border border-yellow-600 shadow-sm max-w-3xl">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-[11px] text-[#949ba4] uppercase tracking-wider">da {msg.user.name} • {msg.timestamp}</span>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[11px] text-[#949ba4] uppercase tracking-wider flex items-center">
+                      da {msg.user.name}
+                      {msg.user.id === adminId && <Shield size={10} className="text-red-500 ml-1" />}
+                      {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && <Shield size={10} className="text-blue-400 ml-1" />}
+                      <span className="ml-1.5">• {msg.timestamp}</span>
+                    </span>
                   </div>
                   <div className="text-[15px] text-[#dbdee1] leading-relaxed whitespace-pre-wrap break-words">
                     {renderContentWithMentions(statusText)}
@@ -1916,10 +1942,30 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 
                 <div className="flex-1 min-w-0">
                   {(!isSameUserAsPrevious || isEditing) && (
-                    <div className="flex items-baseline min-w-0 mb-0.5">
+                    <div className="flex items-center min-w-0 mb-0.5">
                       <ProfilePopover user={msg.user}>
-                        <span className="font-medium text-[#dbdee1] mr-2 cursor-pointer hover:underline truncate">{msg.user.name}</span>
+                        <span className="font-medium text-[#dbdee1] mr-1.5 cursor-pointer hover:underline truncate">{msg.user.name}</span>
                       </ProfilePopover>
+                      {msg.user.id === adminId && (
+                        <Tooltip delayDuration={0}>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                            admin di discord canary 2
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && (
+                        <Tooltip delayDuration={0}>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                            moderatore ufficiale
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                       <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
                     </div>
                   )}
