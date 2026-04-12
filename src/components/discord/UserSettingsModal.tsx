@@ -34,7 +34,13 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
     selectedAudioInput, 
     selectedAudioOutput, 
     setSelectedAudioInput, 
-    setSelectedAudioOutput 
+    setSelectedAudioOutput,
+    noiseSuppression,
+    setNoiseSuppression,
+    autoSensitivity,
+    setAutoSensitivity,
+    sensitivityThreshold,
+    setSensitivityThreshold
   } = useVoiceChannel();
 
   useEffect(() => {
@@ -242,49 +248,112 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
                 </h2>
 
                 <div className="space-y-8">
-                  <div>
-                    <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-                      Dispositivo di Ingresso (Microfono)
-                    </label>
-                    <select
-                      value={selectedAudioInput || ''}
-                      onChange={(e) => setSelectedAudioInput(e.target.value)}
-                      className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand cursor-pointer"
-                    >
-                      <option value="">Predefinito</option>
-                      {audioInputDevices.map(device => (
-                        <option key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Microfono ${device.deviceId.slice(0, 5)}`}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[#949ba4] text-xs mt-2">
-                      Seleziona il microfono che desideri utilizzare per parlare nei canali vocali.
-                    </p>
+                  {/* Dispositivi */}
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                        Dispositivo di Ingresso (Microfono)
+                      </label>
+                      <select
+                        value={selectedAudioInput || ''}
+                        onChange={(e) => setSelectedAudioInput(e.target.value)}
+                        className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                      >
+                        <option value="">Predefinito</option>
+                        {audioInputDevices.map(device => (
+                          <option key={device.deviceId} value={device.deviceId}>
+                            {device.label || `Microfono ${device.deviceId.slice(0, 5)}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
+                        Dispositivo di Uscita (Altoparlanti)
+                      </label>
+                      <select
+                        value={selectedAudioOutput || ''}
+                        onChange={(e) => setSelectedAudioOutput(e.target.value)}
+                        className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                      >
+                        <option value="">Predefinito</option>
+                        {audioOutputDevices.map(device => (
+                          <option key={device.deviceId} value={device.deviceId}>
+                            {device.label || `Altoparlante ${device.deviceId.slice(0, 5)}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="h-[1px] bg-[#3f4147] w-full"></div>
 
+                  {/* Sensibilità di ingresso */}
                   <div>
-                    <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
-                      Dispositivo di Uscita (Altoparlanti)
-                    </label>
-                    <select
-                      value={selectedAudioOutput || ''}
-                      onChange={(e) => setSelectedAudioOutput(e.target.value)}
-                      className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 px-3 outline-none focus:ring-1 focus:ring-brand cursor-pointer"
-                    >
-                      <option value="">Predefinito</option>
-                      {audioOutputDevices.map(device => (
-                        <option key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Altoparlante ${device.deviceId.slice(0, 5)}`}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[#949ba4] text-xs mt-2">
-                      Seleziona il dispositivo da cui desideri ascoltare l'audio degli altri utenti.
-                    </p>
+                    <h3 className="text-[#b5bac1] uppercase text-xs font-bold mb-4">Sensibilità di ingresso</h3>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="text-white font-medium">Determina automaticamente la sensibilità di ingresso</div>
+                        <div className="text-[#949ba4] text-sm mt-1">Se disattivato, il microfono si attiverà solo quando il volume supera la soglia impostata.</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={autoSensitivity}
+                          onChange={(e) => setAutoSensitivity(e.target.checked)}
+                        />
+                        <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                      </label>
+                    </div>
+
+                    {!autoSensitivity && (
+                      <div className="mt-6 bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22]">
+                        <div className="flex justify-between text-xs font-bold text-[#b5bac1] uppercase mb-2">
+                          <span>Soglia manuale</span>
+                          <span className="text-white">{sensitivityThreshold}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={sensitivityThreshold}
+                          onChange={(e) => setSensitivityThreshold(parseInt(e.target.value))}
+                          className="w-full h-2 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
+                        />
+                        <div className="flex justify-between text-[10px] text-[#949ba4] mt-2">
+                          <span>Più sensibile (cattura tutto)</span>
+                          <span>Meno sensibile (solo voci forti)</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  <div className="h-[1px] bg-[#3f4147] w-full"></div>
+
+                  {/* Elaborazione Voce */}
+                  <div>
+                    <h3 className="text-[#b5bac1] uppercase text-xs font-bold mb-4">Elaborazione Voce</h3>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-white font-medium">Riduzione del rumore</div>
+                        <div className="text-[#949ba4] text-sm mt-1">Filtra i rumori di fondo dal tuo microfono (es. tastiera, ventole).</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={noiseSuppression}
+                          onChange={(e) => setNoiseSuppression(e.target.checked)}
+                        />
+                        <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                      </label>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}

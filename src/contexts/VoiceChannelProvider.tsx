@@ -34,13 +34,20 @@ interface VoiceChannelContextType {
   userVolumes: Record<string, number>;
   setUserVolume: (userId: string, volume: number) => void;
   
-  // Audio Devices
+  // Audio Devices & Settings
   audioInputDevices: MediaDeviceInfo[];
   audioOutputDevices: MediaDeviceInfo[];
   selectedAudioInput: string | null;
   selectedAudioOutput: string | null;
   setSelectedAudioInput: (id: string) => void;
   setSelectedAudioOutput: (id: string) => void;
+  
+  noiseSuppression: boolean;
+  setNoiseSuppression: (val: boolean) => void;
+  autoSensitivity: boolean;
+  setAutoSensitivity: (val: boolean) => void;
+  sensitivityThreshold: number;
+  setSensitivityThreshold: (val: number) => void;
 }
 
 const VoiceChannelContext = createContext<VoiceChannelContextType | null>(null);
@@ -73,6 +80,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   // Audio Devices States
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  
   const [selectedAudioInput, setSelectedAudioInputState] = useState<string | null>(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('discord-audio-input');
     return null;
@@ -81,20 +89,46 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     if (typeof window !== 'undefined') return localStorage.getItem('discord-audio-output');
     return null;
   });
+
+  // Advanced Audio Settings
+  const [noiseSuppression, setNoiseSuppressionState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('discord-noise-suppression');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+  const [autoSensitivity, setAutoSensitivityState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('discord-auto-sensitivity');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+  const [sensitivityThreshold, setSensitivityThresholdState] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('discord-sensitivity-threshold');
+      return saved !== null ? parseInt(saved, 10) : 50;
+    }
+    return 50;
+  });
   
   const selectedAudioInputRef = useRef(selectedAudioInput);
+  const noiseSuppressionRef = useRef(noiseSuppression);
+  const autoSensitivityRef = useRef(autoSensitivity);
+  const sensitivityThresholdRef = useRef(sensitivityThreshold);
+
   useEffect(() => { selectedAudioInputRef.current = selectedAudioInput; }, [selectedAudioInput]);
+  useEffect(() => { noiseSuppressionRef.current = noiseSuppression; }, [noiseSuppression]);
+  useEffect(() => { autoSensitivityRef.current = autoSensitivity; }, [autoSensitivity]);
+  useEffect(() => { sensitivityThresholdRef.current = sensitivityThreshold; }, [sensitivityThreshold]);
 
   // Volume States
   const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('discord-user-volumes');
       if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse saved volumes', e);
-        }
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
       }
     }
     return {};
@@ -141,7 +175,6 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
   }, []);
 
-  // Effetto per applicare il sordomutato a tutti i GainNode attivi
   useEffect(() => {
     Object.entries(gainNodesRef.current).forEach(([userId, gainNode]) => {
       const baseVolume = (userVolumesRef.current[userId] ?? 100) / 100;
@@ -166,15 +199,20 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
   const requestMicrophone = useCallback(async (playSounds = true) => {
     try {
-      const audioConstraints: MediaTrackConstraints | boolean = selectedAudioInputRef.current
-        ? { deviceId: { exact: selectedAudioInputRef.current } }
-        : true;
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: noiseSuppressionRef.current,
+        autoGainControl: true,
+      };
+      
+      if (selectedAudioInputRef.current) {
+        audioConstraints.deviceId = { exact: selectedAudioInputRef.current };
+      }
 
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: audioConstraints });
       } catch (e) {
-        // Fallback se il dispositivo specifico fallisce
         stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
       }
       
@@ -202,15 +240,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
   }, [currentUser]);
 
-  const setSelectedAudioInput = useCallback(async (id: string) => {
-    setSelectedAudioInputState(id);
-    if (typeof window !== 'undefined') localStorage.setItem('discord-audio-input', id);
-
-    if (activeVoiceChannelIdRef.current && !isMutedRef.current && localStreamRef.current) {
+  const replaceAudioTrack = useCallback(async (constraints: MediaTrackConstraints) => {
+    if (activeVoiceChannelIdRef.current && localStreamRef.current) {
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({
           video: false,
-          audio: { deviceId: { exact: id } }
+          audio: constraints
         });
         const newTrack = newStream.getAudioTracks()[0];
         const oldTrack = localStreamRef.current.getAudioTracks()[0];
@@ -227,9 +262,41 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
           }
         });
       } catch (e) {
-        console.error("Failed to switch audio input", e);
+        console.error("Failed to replace audio track", e);
       }
     }
+  }, []);
+
+  const setSelectedAudioInput = useCallback((id: string) => {
+    setSelectedAudioInputState(id);
+    if (typeof window !== 'undefined') localStorage.setItem('discord-audio-input', id);
+    replaceAudioTrack({
+      deviceId: { exact: id },
+      noiseSuppression: noiseSuppressionRef.current,
+      echoCancellation: true,
+      autoGainControl: true,
+    });
+  }, [replaceAudioTrack]);
+
+  const setNoiseSuppression = useCallback((val: boolean) => {
+    setNoiseSuppressionState(val);
+    if (typeof window !== 'undefined') localStorage.setItem('discord-noise-suppression', String(val));
+    replaceAudioTrack({
+      deviceId: selectedAudioInputRef.current ? { exact: selectedAudioInputRef.current } : undefined,
+      noiseSuppression: val,
+      echoCancellation: true,
+      autoGainControl: true,
+    });
+  }, [replaceAudioTrack]);
+
+  const setAutoSensitivity = useCallback((val: boolean) => {
+    setAutoSensitivityState(val);
+    if (typeof window !== 'undefined') localStorage.setItem('discord-auto-sensitivity', String(val));
+  }, []);
+
+  const setSensitivityThreshold = useCallback((val: number) => {
+    setSensitivityThresholdState(val);
+    if (typeof window !== 'undefined') localStorage.setItem('discord-sensitivity-threshold', String(val));
   }, []);
 
   const setSelectedAudioOutput = useCallback((id: string) => {
@@ -270,8 +337,9 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     };
   }, [requestMicrophone, currentUser]);
 
+  // VAD (Voice Activity Detection) Loop
   useEffect(() => {
-    if (!activeVoiceChannelId || !localStreamRef.current || !currentUser || isMuted) {
+    if (!activeVoiceChannelId || !localStreamRef.current || !currentUser) {
       if (currentUser && speakingStates[currentUser.id]) {
         setSpeakingStates(prev => {
           const next = { ...prev };
@@ -283,20 +351,50 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     }
 
     const stream = localStreamRef.current;
+    
+    // Cloniamo la traccia per l'analisi, così possiamo disabilitare la traccia principale (per mutare)
+    // senza interrompere il flusso di dati verso l'analizzatore.
+    const analysisTrack = stream.getAudioTracks()[0].clone();
+    const analysisStream = new MediaStream([analysisTrack]);
+    
     const audioContext = new AudioContext();
     const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
+    const source = audioContext.createMediaStreamSource(analysisStream);
     source.connect(analyser);
     analyser.fftSize = 256;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
+    
     let animationFrameId: number;
+    let holdTimeout: NodeJS.Timeout | null = null;
+    let currentlySpeaking = false;
 
     const checkVolume = () => {
       analyser.getByteFrequencyData(dataArray);
       const sum = dataArray.reduce((a, b) => a + b, 0);
       const avg = bufferLength > 0 ? sum / bufferLength : 0;
-      const isSpeaking = avg > 30;
+      
+      // Mappiamo la soglia (0-100) al valore dell'analizzatore (0-255)
+      const thresholdValue = autoSensitivityRef.current ? 30 : (sensitivityThresholdRef.current / 100) * 255;
+      const isOverThreshold = avg > thresholdValue;
+
+      if (isOverThreshold) {
+        currentlySpeaking = true;
+        if (holdTimeout) clearTimeout(holdTimeout);
+        // Mantiene lo stato "parlando" per 500ms dopo che il volume scende sotto la soglia
+        holdTimeout = setTimeout(() => {
+          currentlySpeaking = false;
+        }, 500);
+      }
+
+      const isSpeaking = currentlySpeaking;
+
+      // Applica il VAD alla traccia principale (Gating)
+      if (localStreamRef.current && localStreamRef.current.getAudioTracks()[0]) {
+        const mainTrack = localStreamRef.current.getAudioTracks()[0];
+        // La traccia è abilitata solo se l'utente sta parlando E non è mutato manualmente E non è deafened
+        mainTrack.enabled = isSpeaking && !isMutedRef.current && !isDeafenedRef.current;
+      }
 
       setSpeakingStates(prev => {
         if (!!prev[currentUser.id] === isSpeaking) return prev;
@@ -310,6 +408,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      if (holdTimeout) clearTimeout(holdTimeout);
+      analysisTrack.stop();
       if (audioContext.state !== 'closed') {
         audioContext.close();
       }
@@ -324,7 +424,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         });
       }
     };
-  }, [activeVoiceChannelId, currentUser, isMuted]);
+  }, [activeVoiceChannelId, currentUser]);
 
   const toggleMute = useCallback(async () => {
     if (!currentUser) return;
@@ -336,29 +436,23 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       return;
     }
 
-    const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length > 0) {
-      const isCurrentlyEnabled = audioTracks[0].enabled;
-      audioTracks[0].enabled = !isCurrentlyEnabled;
-      const newMutedState = isCurrentlyEnabled;
-      setIsMuted(newMutedState);
-      
-      if (newMutedState) playSound('/mute.mp3');
-      else playSound('/unmute.mp3');
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    
+    if (newMutedState) playSound('/mute.mp3');
+    else playSound('/unmute.mp3');
 
-      setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: newMutedState } }));
-      
-      supabase.from('server_members').update({ is_muted: newMutedState }).eq('user_id', currentUser.id).then();
+    setMemberStates(prev => ({ ...prev, [currentUser.id]: { ...prev[currentUser.id], isMuted: newMutedState } }));
+    supabase.from('server_members').update({ is_muted: newMutedState }).eq('user_id', currentUser.id).then();
 
-      if (signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: 'broadcast',
-          event: 'state-update',
-          payload: { userId: currentUser.id, state: { isMuted: newMutedState } },
-        });
-      }
+    if (signalingChannelRef.current) {
+      signalingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'state-update',
+        payload: { userId: currentUser.id, state: { isMuted: newMutedState } },
+      });
     }
-  }, [currentUser, requestMicrophone]);
+  }, [currentUser, requestMicrophone, isMuted]);
 
   const toggleDeafen = useCallback(() => {
     if (!currentUser) return;
@@ -371,27 +465,18 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       playSound('/deafen.mp3');
       wasMutedBeforeDeafen.current = isMuted;
       if (!isMuted) {
-        const stream = localStreamRef.current;
-        if (stream?.getAudioTracks()[0]) {
-          stream.getAudioTracks()[0].enabled = false;
-          setIsMuted(true);
-          finalMuteState = true;
-        }
+        setIsMuted(true);
+        finalMuteState = true;
       }
     } else {
       playSound('/undeafen.mp3');
       if (!wasMutedBeforeDeafen.current && isMuted) {
-        const stream = localStreamRef.current;
-        if (stream?.getAudioTracks()[0]) {
-          stream.getAudioTracks()[0].enabled = true;
-          setIsMuted(false);
-          finalMuteState = false;
-        }
+        setIsMuted(false);
+        finalMuteState = false;
       }
     }
     
     setMemberStates(prev => ({ ...prev, [currentUser.id]: { isMuted: finalMuteState, isDeafened: newDeafenState } }));
-
     supabase.from('server_members').update({ is_muted: finalMuteState, is_deafened: newDeafenState }).eq('user_id', currentUser.id).then();
 
     if (signalingChannelRef.current) {
@@ -435,32 +520,16 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       if (sourceId && sourceId !== 'native-browser') {
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              mandatory: {
-                chromeMediaSource: 'desktop',
-              }
-            } as any,
-            video: {
-              mandatory: {
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: sourceId
-              }
-            } as any
+            audio: { mandatory: { chromeMediaSource: 'desktop' } } as any,
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId } } as any
           });
         } catch (e) {
-          console.warn("Cattura audio+video desktop fallita. Ritento solo con video.", e);
           try {
             stream = await navigator.mediaDevices.getUserMedia({
               audio: false,
-              video: {
-                mandatory: {
-                  chromeMediaSource: 'desktop',
-                  chromeMediaSourceId: sourceId
-                }
-              } as any
+              video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId } } as any
             });
           } catch (vidErr) {
-            console.error("Fallita anche la cattura solo video.", vidErr);
             lastError = vidErr;
           }
         }
@@ -468,10 +537,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       
       if (!stream) {
         try {
-          stream = await navigator.mediaDevices.getDisplayMedia({ 
-            video: true, 
-            audio: true 
-          });
+          stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         } catch (e) {
           lastError = e;
         }
@@ -484,9 +550,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         return;
       }
       
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
+      stream.getVideoTracks()[0].onended = () => stopScreenShare();
       
       localScreenStreamRef.current = stream;
       setLocalScreenStream(stream);
@@ -579,13 +643,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       
       const source = audioContext.createMediaStreamSource(remoteStream);
       
-      // Creazione del GainNode per il controllo del volume (fino al 200%)
       const gainNode = audioContext.createGain();
       const initialVolume = (userVolumesRef.current[userId] ?? 100) / 100;
       gainNode.gain.value = isDeafenedRef.current ? 0 : initialVolume;
       gainNodesRef.current[userId] = gainNode;
       
-      // Colleghiamo la sorgente al GainNode e il GainNode agli altoparlanti
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
@@ -595,9 +657,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       audio.muted = true; 
       audio.setAttribute('data-user-id', userId);
       
-      // Applica il dispositivo di uscita selezionato se supportato
-      if (selectedAudioOutput && typeof (audio as any).setSinkId === 'function') {
-        (audio as any).setSinkId(selectedAudioOutput).catch(console.error);
+      if (selectedAudioOutputState && typeof (audio as any).setSinkId === 'function') {
+        (audio as any).setSinkId(selectedAudioOutputState).catch(console.error);
       }
       
       document.body.appendChild(audio);
@@ -639,7 +700,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     if (receivedSignal) peer.signal(receivedSignal);
 
     peersRef.current = [...peersRef.current.filter(p => p.userId !== userId), { peer, userId }];
-  }, [currentUser, selectedAudioOutput]);
+  }, [currentUser, selectedAudioOutputState]);
 
   const leaveVoiceChannel = useCallback(async () => {
     const channelToLeave = activeVoiceChannelIdRef.current;
@@ -865,6 +926,12 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     selectedAudioOutput,
     setSelectedAudioInput,
     setSelectedAudioOutput,
+    noiseSuppression,
+    setNoiseSuppression,
+    autoSensitivity,
+    setAutoSensitivity,
+    sensitivityThreshold,
+    setSensitivityThreshold,
   };
 
   return (
