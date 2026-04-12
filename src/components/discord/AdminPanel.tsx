@@ -52,7 +52,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     const { error } = await supabase.from('profiles').update({ digitalcardus: newDC }).eq('id', userId);
     
     if (error) {
-      showError("Errore durante l'aggiornamento dei DigitalCardus");
+      showError("Errore di permessi. Assicurati di aver eseguito il codice SQL per i permessi Admin.");
     } else {
       showSuccess(`DigitalCardus ${isAdding ? 'aggiunti' : 'rimossi'} con successo!`);
       setUsers(users.map(u => u.id === userId ? { ...u, digitalcardus: newDC } : u));
@@ -66,7 +66,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     const { error } = await supabase.from('profiles').update({ role: newRole } as any).eq('id', userId);
     
     if (error) {
-      showError("Errore. Assicurati di aver eseguito il codice SQL per aggiungere la colonna 'role'.");
+      showError("Errore di permessi. Assicurati di aver eseguito il codice SQL per i permessi Admin.");
     } else {
       showSuccess(`Ruolo aggiornato a ${newRole}!`);
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } as any : u));
@@ -154,64 +154,69 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                 return (
                   <div key={user.id} className="bg-[#2b2d31] p-3 rounded flex items-center justify-between">
                     <ProfilePopover user={userForCard} side="right" align="center">
-                      <div className="flex items-center gap-3 cursor-pointer hover:bg-[#35373c] p-1.5 rounded transition-colors">
+                      <div className="flex items-center gap-3 cursor-pointer hover:bg-[#35373c] p-1.5 rounded transition-colors flex-1 min-w-0">
                         <img 
                           src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} 
                           alt="avatar" 
-                          className="w-10 h-10 rounded-full bg-[#1e1f22] object-cover"
+                          className="w-10 h-10 rounded-full bg-[#1e1f22] object-cover flex-shrink-0"
                         />
-                        <div>
-                          <div className="text-white font-medium flex items-center gap-1.5">
-                            {(user as any).email || user.first_name || 'Utente Sconosciuto'}
-                            {isAdmin && <Shield size={14} className="text-red-500" title="Admin" />}
-                            {!isAdmin && isMod && <Shield size={14} className="text-blue-400" title="Moderatore Ufficiale" />}
+                        <div className="flex flex-col min-w-0">
+                          <div className="text-white font-medium flex items-center gap-1.5 truncate">
+                            <span className="truncate">{user.first_name || 'Utente Sconosciuto'}</span>
+                            {isAdmin && <Shield size={14} className="text-red-500 flex-shrink-0" title="Admin" />}
+                            {!isAdmin && isMod && <Shield size={14} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />}
                           </div>
-                          <div className="text-xs text-[#949ba4]">
+                          <div className="text-[11px] text-[#b5bac1] truncate">
+                            {(user as any).email || 'Email non disponibile'}
+                          </div>
+                          <div className="text-xs text-[#949ba4] mt-0.5">
                             {activeTab === 'dc' ? `${user.digitalcardus ?? 0} DC` : `Ruolo: ${isAdmin ? 'admin' : userRole}`}
                           </div>
                         </div>
                       </div>
                     </ProfilePopover>
 
-                    {activeTab === 'dc' ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          placeholder="Importo"
-                          value={amounts[user.id] || ''}
-                          onChange={(e) => setAmounts(prev => ({ ...prev, [user.id]: e.target.value }))}
-                          className="w-24 bg-[#1e1f22] text-white rounded p-1.5 text-sm focus:outline-none"
-                        />
+                    <div className="flex-shrink-0 ml-4">
+                      {activeTab === 'dc' ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            placeholder="Importo"
+                            value={amounts[user.id] || ''}
+                            onChange={(e) => setAmounts(prev => ({ ...prev, [user.id]: e.target.value }))}
+                            className="w-20 bg-[#1e1f22] text-white rounded p-1.5 text-sm focus:outline-none"
+                          />
+                          <button
+                            onClick={() => handleUpdateDC(user.id, user.digitalcardus ?? 0, true)}
+                            className="p-1.5 bg-[#23a559] text-white rounded hover:bg-[#1a7c43] transition-colors"
+                            title="Aggiungi"
+                          >
+                            <Plus size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleUpdateDC(user.id, user.digitalcardus ?? 0, false)}
+                            className="p-1.5 bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                            title="Rimuovi"
+                          >
+                            <Minus size={16} />
+                          </button>
+                        </div>
+                      ) : (
                         <button
-                          onClick={() => handleUpdateDC(user.id, user.digitalcardus ?? 0, true)}
-                          className="p-1.5 bg-[#23a559] text-white rounded hover:bg-[#1a7c43] transition-colors"
-                          title="Aggiungi"
+                          onClick={() => handleToggleMod(user.id, userRole)}
+                          disabled={isAdmin}
+                          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                            isAdmin 
+                              ? 'bg-[#1e1f22] text-[#949ba4] cursor-not-allowed'
+                              : userRole === 'moderator' 
+                                ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
+                                : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'
+                          }`}
                         >
-                          <Plus size={16} />
+                          {isAdmin ? 'Admin' : userRole === 'moderator' ? 'Rimuovi Mod' : 'Rendi Mod'}
                         </button>
-                        <button
-                          onClick={() => handleUpdateDC(user.id, user.digitalcardus ?? 0, false)}
-                          className="p-1.5 bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
-                          title="Rimuovi"
-                        >
-                          <Minus size={16} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleToggleMod(user.id, userRole)}
-                        disabled={isAdmin}
-                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                          isAdmin 
-                            ? 'bg-[#1e1f22] text-[#949ba4] cursor-not-allowed'
-                            : userRole === 'moderator' 
-                              ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
-                              : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'
-                        }`}
-                      >
-                        {isAdmin ? 'Admin' : userRole === 'moderator' ? 'Rimuovi Mod' : 'Rendi Mod'}
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })
