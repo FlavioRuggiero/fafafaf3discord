@@ -1100,9 +1100,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             if (j < parts.length - 1) {
               const isMe = member.id === currentUser?.id;
               result.push(
-                <span key={`${member.id}-${i}-${j}`} className={`font-medium px-1 rounded ${isMe ? 'bg-brand/30 text-brand' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
-                  {mentionStr}
-                </span>
+                <ProfilePopover key={`${member.id}-${i}-${j}`} user={member}>
+                  <span className={`font-medium px-1 rounded ${isMe ? 'bg-brand/30 text-brand' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
+                    {mentionStr}
+                  </span>
+                </ProfilePopover>
               );
             }
           });
