@@ -2,18 +2,24 @@
 
 import React from 'react';
 import { User } from '@/types/discord';
-import { Leaf, Sparkles, TreePine } from 'lucide-react';
+import { Leaf, Sparkles, TreePine, Menu } from 'lucide-react';
 
 interface ShopViewProps {
   currentUser: User;
+  onToggleSidebar?: () => void;
 }
 
-export const ShopView = ({ currentUser }: ShopViewProps) => {
+export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   return (
-    <div className="flex-1 flex flex-col bg-[#2b2d31] relative overflow-hidden h-full">
+    <div className="flex-1 flex flex-col bg-[#2b2d31] relative overflow-hidden h-full min-w-0">
       {/* Header */}
       <div className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm bg-[#2b2d31] z-10 flex-shrink-0">
         <div className="flex items-center text-white font-semibold">
+          {onToggleSidebar && (
+            <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
+              <Menu size={24} />
+            </button>
+          )}
           <Leaf className="mr-2 text-[#23a559]" size={20} />
           Cardi E-Shop
         </div>

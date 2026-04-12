@@ -5,6 +5,7 @@ import { ChatArea } from "@/components/discord/ChatArea";
 import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
+import { ShopView } from "@/components/discord/ShopView";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -854,47 +855,51 @@ const Index = () => {
             </div>
           </>
         ) : activeServerId === 'home' ? (
-          <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-            <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
-              <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
-                <Menu size={24} />
-              </button>
-              <Home size={20} className="text-[#80848e] mr-2" />
-              <h2 className="font-semibold text-white">Discord Canary 2</h2>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
-              <div className="max-w-xl w-full text-center">
-                <div className="w-20 h-20 bg-yellow-500 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
-                  <MessageSquare size={40} className="text-white" />
-                </div>
-                <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
-                <p className="text-[#b5bac1] mb-8 text-lg">
-                  Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
-                </p>
-                
-                <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
-                  <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                    <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Compass size={24} className="text-[#23a559]" />
-                    </div>
-                    <h3 className="font-bold text-white mb-1">Esplora Server</h3>
-                    <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
-                  </button>
+          activeChannel?.id === 'shop' ? (
+            <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : (
+            <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
+              <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
+                <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
+                  <Menu size={24} />
+                </button>
+                <Home size={20} className="text-[#80848e] mr-2" />
+                <h2 className="font-semibold text-white">Discord Canary 2</h2>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
+                <div className="max-w-xl w-full text-center">
+                  <div className="w-20 h-20 bg-yellow-500 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
+                    <MessageSquare size={40} className="text-white" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
+                  <p className="text-[#b5bac1] mb-8 text-lg">
+                    Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
+                  </p>
                   
-                  {canCreate && (
-                    <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                      <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Plus size={24} className="text-brand" />
+                  <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
+                    <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                      <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Compass size={24} className="text-[#23a559]" />
                       </div>
-                      <h3 className="font-bold text-white mb-1">Crea un Server</h3>
-                      <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
+                      <h3 className="font-bold text-white mb-1">Esplora Server</h3>
+                      <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
                     </button>
-                  )}
+                    
+                    {canCreate && (
+                      <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
+                        <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                          <Plus size={24} className="text-brand" />
+                        </div>
+                        <h3 className="font-bold text-white mb-1">Crea un Server</h3>
+                        <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )
         ) : (
           <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
         )}
