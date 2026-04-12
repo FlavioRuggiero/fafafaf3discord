@@ -12,6 +12,7 @@ import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { BombParty } from "./BombParty";
+import { CustomAudioPlayer } from "./CustomAudioPlayer";
 
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
@@ -191,9 +192,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [showScreenSelectModal, setShowScreenSelectModal] = useState(false);
   const [activeActivity, setActiveActivity] = useState<string | null>(null);
 
-  // Image Upload States
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // File Upload States
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [fileType, setFileType] = useState<'image' | 'audio' | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -341,8 +343,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     setRealMessages([]);
     setReplyingTo(null);
     setEditingMessageId(null);
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedFile(null);
+    setFilePreview(null);
+    setFileType(null);
 
     const fetchMessages = async () => {
       let { data, error } = await supabase
@@ -651,12 +654,41 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     chatInputRef.current?.focus();
   };
 
+  const validateAndSetFile = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      if (file.size > 2 * 1024 * 1024) {
+        showError("L'immagine non può superare i 2MB.");
+        return;
+      }
+      setSelectedFile(file);
+      setFileType('image');
+      setFilePreview(URL.createObjectURL(file));
+      setTimeout(() => chatInputRef.current?.focus(), 10);
+    } else if (file.type.startsWith('audio/')) {
+      const url = URL.createObjectURL(file);
+      const audio = new Audio(url);
+      audio.onloadedmetadata = () => {
+        if (audio.duration > 15) {
+          showError("L'audio non può superare i 15 secondi.");
+        } else {
+          setSelectedFile(file);
+          setFileType('audio');
+          setFilePreview(url);
+          setTimeout(() => chatInputRef.current?.focus(), 10);
+        }
+      };
+      audio.onerror = () => {
+        showError("File audio non valido.");
+      };
+    } else {
+      showError("Formato file non supportato. Carica un'immagine o un audio.");
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setTimeout(() => chatInputRef.current?.focus(), 10);
+    if (file) {
+      validateAndSetFile(file);
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -677,17 +709,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (channel?.type === 'voice') return;
     
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setTimeout(() => chatInputRef.current?.focus(), 10);
+    if (file) {
+      validateAndSetFile(file);
     }
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if ((!inputValue.trim() && !selectedImage) || isUploading) return;
+      if ((!inputValue.trim() && !selectedFile) || isUploading) return;
       
       const content = inputValue.trim();
       setInputValue("");
@@ -698,19 +728,19 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
       if (currentUser && channel && tableExists) {
         setIsUploading(true);
-        let imageUrl = "";
+        let fileUrl = "";
         
-        if (selectedImage) {
-          const fileExt = selectedImage.name.split('.').pop();
+        if (selectedFile) {
+          const fileExt = selectedFile.name.split('.').pop();
           const fileName = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const filePath = `chat_images/${fileName}`;
+          const filePath = `chat_attachments/${fileName}`;
           
-          const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, selectedImage);
+          const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, selectedFile);
           if (!uploadError) {
             const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-            imageUrl = data.publicUrl;
+            fileUrl = data.publicUrl;
           } else {
-            showError("Errore durante il caricamento dell'immagine.");
+            showError("Errore durante il caricamento del file.");
             setIsUploading(false);
             return;
           }
@@ -729,8 +759,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         const rawDate = new Date().toISOString();
         
         let finalContent = content;
-        if (imageUrl) {
-          finalContent = finalContent ? `${finalContent} <img:${imageUrl}>` : `<img:${imageUrl}>`;
+        if (fileUrl) {
+          const tag = fileType === 'image' ? `<img:${fileUrl}>` : `<audio:${fileUrl}>`;
+          finalContent = finalContent ? `${finalContent} ${tag}` : tag;
         }
         if (replyingTo) {
           finalContent = `<reply:${replyingTo.id}>${finalContent}`;
@@ -758,8 +789,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         setRealMessages(prev => [...prev, optimisticMsg]);
         setReplyingTo(null);
-        setSelectedImage(null);
-        setImagePreview(null);
+        setSelectedFile(null);
+        setFilePreview(null);
+        setFileType(null);
         setIsUploading(false);
 
         const { data, error } = await supabase.from('messages').insert({
@@ -803,7 +835,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
     let contentToEdit = replyMatch ? replyMatch[2] : msg.content;
     
-    contentToEdit = contentToEdit.replace(/<img:.*?>/g, '').trim();
+    contentToEdit = contentToEdit.replace(/<img:.*?>/g, '').replace(/<audio:.*?>/g, '').trim();
     
     if (contentToEdit.startsWith('**Risposta a')) {
       contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
@@ -831,9 +863,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
     
     const imgRegex = /<img:(.*?)>/g;
+    const audioRegex = /<audio:(.*?)>/g;
     let match;
     while (originalMsg && (match = imgRegex.exec(originalMsg.content)) !== null) {
       finalContent += ` <img:${match[1]}>`;
+    }
+    while (originalMsg && (match = audioRegex.exec(originalMsg.content)) !== null) {
+      finalContent += ` <audio:${match[1]}>`;
     }
 
     const now = new Date().toISOString();
@@ -1251,7 +1287,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   else if (typingNames.length === 2) typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
   else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
 
-  const hasTopAttachment = replyingTo || imagePreview;
+  const hasTopAttachment = replyingTo || filePreview;
 
   return (
     <div 
@@ -1264,8 +1300,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-lg border-2 border-dashed border-brand m-4">
           <div className="bg-[#2b2d31] p-6 rounded-xl flex flex-col items-center shadow-2xl pointer-events-none">
             <UploadCloud size={48} className="text-brand mb-4" />
-            <h3 className="text-xl font-bold text-white">Trascina l'immagine qui</h3>
-            <p className="text-[#b5bac1] mt-2">Rilascia per caricare nella chat</p>
+            <h3 className="text-xl font-bold text-white">Trascina il file qui</h3>
+            <p className="text-[#b5bac1] mt-2">Rilascia per caricare un'immagine (max 2MB) o un audio (max 15s)</p>
           </div>
         </div>
       )}
@@ -1307,12 +1343,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const displayContent = isReply ? replyMatch[2] : msg.content;
           
           const imgRegex = /<img:(.*?)>/g;
+          const audioRegex = /<audio:(.*?)>/g;
           const images: string[] = [];
+          const audios: string[] = [];
           let match;
           while ((match = imgRegex.exec(displayContent)) !== null) {
             images.push(match[1]);
           }
-          const textContent = displayContent.replace(imgRegex, '').trim();
+          while ((match = audioRegex.exec(displayContent)) !== null) {
+            audios.push(match[1]);
+          }
+          const textContent = displayContent.replace(imgRegex, '').replace(audioRegex, '').trim();
           
           let repliedMessage = null;
           let repliedMessageContent = "";
@@ -1323,7 +1364,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               repliedMessageContent = repliedMessage.content;
               const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
               if (nestedMatch) repliedMessageContent = nestedMatch[2];
-              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').trim();
+              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').trim();
             } else {
               repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
             }
@@ -1489,7 +1530,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                           ))}
                         </div>
                       )}
-                      {msg.updatedAt && !textContent && images.length > 0 && (
+                      {audios.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2 max-w-md">
+                          {audios.map((audioUrl, i) => (
+                            <CustomAudioPlayer key={i} src={audioUrl} />
+                          ))}
+                        </div>
+                      )}
+                      {msg.updatedAt && !textContent && (images.length > 0 || audios.length > 0) && (
                         <span 
                           className="text-[10px] text-[#949ba4] mt-1 block select-none hover:text-[#dbdee1] cursor-default transition-colors" 
                           title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
@@ -1550,12 +1598,18 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 </button>
               </div>
             )}
-            {imagePreview && (
+            {filePreview && (
               <div className="relative group inline-block self-start mt-1">
-                <img src={imagePreview} alt="Preview" className="max-h-48 rounded-md object-contain bg-[#1e1f22] border border-[#1e1f22]" />
+                {fileType === 'image' ? (
+                  <img src={filePreview} alt="Preview" className="max-h-48 rounded-md object-contain bg-[#1e1f22] border border-[#1e1f22]" />
+                ) : (
+                  <div className="w-64 bg-[#1e1f22] p-2 rounded-md border border-[#1e1f22]">
+                    <CustomAudioPlayer src={filePreview} />
+                  </div>
+                )}
                 <button 
-                  onClick={() => { setSelectedImage(null); setImagePreview(null); }}
-                  className="absolute -top-2 -right-2 bg-[#f23f43] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  onClick={() => { setSelectedFile(null); setFilePreview(null); setFileType(null); }}
+                  className="absolute -top-2 -right-2 bg-[#f23f43] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                 >
                   <X size={14} />
                 </button>
@@ -1577,7 +1631,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             type="file" 
             ref={fileInputRef} 
             className="hidden" 
-            accept="image/*" 
+            accept="image/*,audio/*" 
             onChange={handleFileSelect} 
           />
           
@@ -1588,7 +1642,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             disabled={isUploading}
-            placeholder={isUploading ? "Caricamento immagine in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
+            placeholder={isUploading ? "Caricamento file in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
             className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
           />
           <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
@@ -1635,7 +1689,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     <span className="text-xs text-[#949ba4]">{msgToDeleteData.timestamp}</span>
                   </div>
                   <div className="text-[#dbdee1] text-[15px] mt-1 line-clamp-3 overflow-hidden break-words">
-                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').trim()}
+                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').trim()}
                   </div>
                 </div>
               </div>
