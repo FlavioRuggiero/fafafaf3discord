@@ -15,6 +15,8 @@ import { BombParty } from "./BombParty";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "🎉"];
+
 type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
 const StreamPlayer = ({ stream, isLocal, className, volume = 1, isDeafened = false }: { stream: MediaStream; isLocal?: boolean; className?: string; volume?: number; isDeafened?: boolean }) => {
