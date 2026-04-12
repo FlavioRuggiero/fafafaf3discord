@@ -1806,7 +1806,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     </button>
                   </div>
                 )}
-                <div className="flex flex-col items-center text-center text-white bg-brand/10 px-6 py-3 rounded-lg border border-brand/30 shadow-sm max-w-3xl">
+                <div className="flex flex-col items-center text-center text-white bg-yellow-500/10 px-6 py-3 rounded-lg border border-yellow-600 shadow-sm max-w-3xl">
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-[11px] text-[#949ba4] uppercase tracking-wider">da {msg.user.name} • {msg.timestamp}</span>
                   </div>
