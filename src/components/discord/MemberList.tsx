@@ -5,6 +5,7 @@ import { User } from "@/types/discord";
 import { Crown, Shield } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
 import { useAuth } from "@/contexts/AuthContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MemberListProps {
   users: User[];
@@ -65,10 +66,24 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
                 {user.name}
               </span>
               {isAdmin && (
-                <Shield size={14} className="text-red-500 flex-shrink-0" title="admin di discord canary 2" />
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help flex items-center"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                    admin di discord canary 2
+                  </TooltipContent>
+                </Tooltip>
               )}
               {!isAdmin && isModerator && (
-                <Shield size={14} className="text-blue-400 flex-shrink-0" title="moderatore ufficiale" />
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help flex items-center"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                    moderatore ufficiale
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
             {user.customStatus && (

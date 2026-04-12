@@ -5,6 +5,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
 import { Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -62,10 +63,24 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
             <div className="flex items-center flex-wrap gap-2 mb-1">
               <h3 className="text-lg font-bold text-white leading-tight">{user.name}</h3>
               {isAdmin && (
-                <Shield size={16} className="text-red-500 flex-shrink-0" title="admin di discord canary 2" />
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help flex items-center"><Shield size={16} className="text-red-500 flex-shrink-0" /></div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                    admin di discord canary 2
+                  </TooltipContent>
+                </Tooltip>
               )}
               {!isAdmin && isModerator && (
-                <Shield size={16} className="text-blue-400 flex-shrink-0" title="moderatore ufficiale" />
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help flex items-center"><Shield size={16} className="text-blue-400 flex-shrink-0" /></div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                    moderatore ufficiale
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
 

@@ -8,6 +8,7 @@ import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -163,8 +164,26 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         <div className="flex flex-col min-w-0">
                           <div className="text-white font-medium flex items-center gap-1.5 truncate">
                             <span className="truncate">{user.first_name || 'Utente Sconosciuto'}</span>
-                            {isAdmin && <Shield size={14} className="text-red-500 flex-shrink-0" title="admin di discord canary 2" />}
-                            {!isAdmin && isMod && <Shield size={14} className="text-blue-400 flex-shrink-0" title="moderatore ufficiale" />}
+                            {isAdmin && (
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <div className="cursor-help flex items-center"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                  admin di discord canary 2
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {!isAdmin && isMod && (
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <div className="cursor-help flex items-center"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                  moderatore ufficiale
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </div>
                           <div className="text-[11px] text-[#b5bac1] truncate">
                             {(user as any).email || 'Email non disponibile'}

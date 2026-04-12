@@ -12,6 +12,7 @@ import { UserPanel } from "./UserPanel";
 import { playSound } from "@/utils/sounds";
 import { ProfilePopover } from "./ProfilePopover";
 import { AdminPanel } from "./AdminPanel";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -851,8 +852,26 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                       </div>
                                       <div className="ml-2 flex items-center gap-1 flex-1 min-w-0">
                                         <span className="text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>
-                                        {isAdmin && <Shield size={12} className="text-red-500 flex-shrink-0" title="Admin" />}
-                                        {!isAdmin && isMod && <Shield size={12} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />}
+                                        {isAdmin && (
+                                          <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                              <div className="cursor-help flex items-center"><Shield size={12} className="text-red-500 flex-shrink-0" /></div>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                              admin di discord canary 2
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {!isAdmin && isMod && (
+                                          <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                              <div className="cursor-help flex items-center"><Shield size={12} className="text-blue-400 flex-shrink-0" /></div>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                              moderatore ufficiale
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        )}
                                       </div>
                                       <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
                                         {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
