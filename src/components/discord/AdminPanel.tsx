@@ -6,12 +6,14 @@ import { X, Search, Shield, Coins, Plus, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminPanelProps {
   onClose: () => void;
 }
 
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
+  const { adminId } = useAuth();
   const [activeTab, setActiveTab] = useState<'dc' | 'mods'>('dc');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<Profile[]>([]);
@@ -131,6 +133,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             ) : (
               users.map(user => {
                 const userRole = (user as any).role || 'user';
+                const isAdmin = user.id === adminId;
+                const isMod = userRole === 'moderator';
                 
                 return (
                   <div key={user.id} className="bg-[#2b2d31] p-3 rounded flex items-center justify-between">
@@ -141,12 +145,13 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         className="w-10 h-10 rounded-full bg-[#1e1f22] object-cover"
                       />
                       <div>
-                        <div className="text-white font-medium flex items-center gap-2">
+                        <div className="text-white font-medium flex items-center gap-1.5">
                           {user.first_name || 'Utente Sconosciuto'}
-                          {userRole === 'moderator' && <Shield size={14} className="text-blue-400" />}
+                          {isAdmin && <Shield size={14} className="text-red-500" title="Admin" />}
+                          {!isAdmin && isMod && <Shield size={14} className="text-blue-400" title="Moderatore Ufficiale" />}
                         </div>
                         <div className="text-xs text-[#949ba4]">
-                          {activeTab === 'dc' ? `${user.digitalcardus ?? 0} DC` : `Ruolo: ${userRole}`}
+                          {activeTab === 'dc' ? `${user.digitalcardus ?? 0} DC` : `Ruolo: ${isAdmin ? 'admin' : userRole}`}
                         </div>
                       </div>
                     </div>
@@ -178,13 +183,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     ) : (
                       <button
                         onClick={() => handleToggleMod(user.id, userRole)}
+                        disabled={isAdmin}
                         className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                          userRole === 'moderator' 
-                            ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
-                            : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'
+                          isAdmin 
+                            ? 'bg-[#1e1f22] text-[#949ba4] cursor-not-allowed'
+                            : userRole === 'moderator' 
+                              ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
+                              : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'
                         }`}
                       >
-                        {userRole === 'moderator' ? 'Rimuovi Mod' : 'Rendi Mod'}
+                        {isAdmin ? 'Admin' : userRole === 'moderator' ? 'Rimuovi Mod' : 'Rendi Mod'}
                       </button>
                     )}
                   </div>

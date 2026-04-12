@@ -825,6 +825,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 const isSpeaking = speakingStates[member.user_id] ?? false;
                                 
                                 const userProfile = member.profiles;
+                                const isAdmin = member.user_id === adminId;
+                                const isMod = moderatorIds.includes(member.user_id);
+
                                 const userForCard: User | null = userProfile ? {
                                   id: userProfile.id,
                                   name: userProfile.first_name || 'Utente',
@@ -836,7 +839,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                   level: userProfile.level || 1,
                                   digitalcardus: userProfile.digitalcardus ?? 25,
                                   xp: userProfile.xp || 0,
-                                  global_role: (userProfile.id === adminId || moderatorIds.includes(userProfile.id)) ? (userProfile.id === adminId ? 'CREATOR' : 'MODERATOR') : 'USER',
+                                  global_role: isAdmin ? 'CREATOR' : isMod ? 'MODERATOR' : 'USER',
                                 } : null;
 
                                 return (
@@ -846,7 +849,11 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                         <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
                                         <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
                                       </div>
-                                      <span className="ml-2 text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate flex-1">{member.profiles?.first_name || 'Utente'}</span>
+                                      <div className="ml-2 flex items-center gap-1 flex-1 min-w-0">
+                                        <span className="text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>
+                                        {isAdmin && <Shield size={12} className="text-red-500 flex-shrink-0" title="Admin" />}
+                                        {!isAdmin && isMod && <Shield size={12} className="text-blue-400 flex-shrink-0" title="Moderatore Ufficiale" />}
+                                      </div>
                                       <div className="ml-auto flex items-center space-x-1 text-[#b5bac1]">
                                         {memberIsDeafened && <Headphones size={14} className="text-[#f23f43]"/>}
                                         {memberIsMuted && !memberIsDeafened && <MicOff size={14} className="text-[#f23f43]"/>}
