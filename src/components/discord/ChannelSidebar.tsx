@@ -60,7 +60,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
-  const prevMembersRef = useRef<ServerMemberWithProfile[]>([]);
   
   const [showShopAlert, setShowShopAlert] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -79,6 +78,94 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   const activeVoiceChannelIdRef = useRef(activeVoiceChannelId);
   useEffect(() => { activeVoiceChannelIdRef.current = activeVoiceChannelId; }, [activeVoiceChannelId]);
+
+  // --- GLOBAL VOICE CHANNEL STATE ---
+  const [activeVoiceChannelName, setActiveVoiceChannelName] = useState<string>("");
+  const [vcMembers, setVcMembers] = useState<string[]>([]);
+  const prevVcMembersRef = useRef<string[]>([]);
+  const isInitialVcLoad = useRef(true);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId) {
+      setActiveVoiceChannelName("");
+      setVcMembers([]);
+      prevVcMembersRef.current = [];
+      isInitialVcLoad.current = true;
+      return;
+    }
+
+    let isMounted = true;
+
+    // Fetch channel name
+    supabase.from('channels').select('name').eq('id', activeVoiceChannelId).single().then(({data}) => {
+      if (isMounted && data) setActiveVoiceChannelName(data.name);
+    });
+
+    // Fetch VC members for sounds
+    const fetchVcMembers = async () => {
+      const { data } = await supabase
+        .from('server_members')
+        .select('user_id')
+        .eq('voice_channel_id', activeVoiceChannelId);
+      
+      if (isMounted && data) {
+        setVcMembers(data.map(d => d.user_id));
+      }
+    };
+
+    fetchVcMembers();
+
+    const sub = supabase.channel(`vc_global_${activeVoiceChannelId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'server_members'
+      }, (payload) => {
+        if (!isMounted) return;
+        const oldVc = (payload.old as any)?.voice_channel_id;
+        const newVc = (payload.new as any)?.voice_channel_id;
+        
+        if (oldVc === activeVoiceChannelId || newVc === activeVoiceChannelId) {
+          fetchVcMembers();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(sub);
+    };
+  }, [activeVoiceChannelId]);
+
+  useEffect(() => {
+    if (!activeVoiceChannelId || !currentUser) return;
+
+    if (isInitialVcLoad.current) {
+      prevVcMembersRef.current = vcMembers;
+      if (vcMembers.length > 0) {
+        isInitialVcLoad.current = false;
+      }
+      return;
+    }
+
+    const currentIds = new Set(vcMembers);
+    const prevIds = new Set(prevVcMembersRef.current);
+
+    currentIds.forEach(id => {
+      if (!prevIds.has(id) && id !== currentUser.id) {
+        playSound('/enter.mp3');
+      }
+    });
+
+    prevIds.forEach(id => {
+      if (!currentIds.has(id) && id !== currentUser.id) {
+        playSound('/exit.mp3');
+      }
+    });
+
+    prevVcMembersRef.current = vcMembers;
+  }, [vcMembers, activeVoiceChannelId, currentUser]);
+  // ----------------------------------
 
   useEffect(() => {
     if (!activeServer?.id) return;
@@ -239,36 +326,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       supabase.removeChannel(memberSub);
     };
   }, [activeServer?.id]);
-
-  useEffect(() => {
-    if (!activeVoiceChannelId || !currentUser) return;
-
-    const currentVCUserIds = new Set(
-      members
-        .filter(m => m.voice_channel_id === activeVoiceChannelId)
-        .map(m => m.user_id)
-    );
-    
-    const prevVCUserIds = new Set(
-      prevMembersRef.current
-        .filter(m => m.voice_channel_id === activeVoiceChannelId)
-        .map(m => m.user_id)
-    );
-
-    currentVCUserIds.forEach(userId => {
-      if (!prevVCUserIds.has(userId) && userId !== currentUser.id) {
-        playSound('/enter.mp3');
-      }
-    });
-
-    prevVCUserIds.forEach(userId => {
-      if (!currentVCUserIds.has(userId) && userId !== currentUser.id) {
-        playSound('/exit.mp3');
-      }
-    });
-
-    prevMembersRef.current = members;
-  }, [members, activeVoiceChannelId, currentUser]);
 
   const displayChannels = useMemo(() => {
     return [...localChannels]
@@ -669,6 +726,30 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             </div>
           )}
         </div>
+        
+        {activeVoiceChannelId && (
+          <div className="px-2 py-2.5 bg-[#232428] border-t border-[#35363c] flex-shrink-0">
+            <div className="text-xs font-bold text-[#23a559] mb-2 flex items-center">
+              <Volume2 size={16} className="mr-1.5" />
+              Connesso
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-white truncate pr-2">
+                {activeVoiceChannelName}
+              </span>
+              <button 
+                onClick={() => {
+                  leaveVoiceChannel();
+                }}
+                className="p-1.5 text-[#dbdee1] hover:text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
+                title="Disconnetti"
+              >
+                <PhoneOff size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <UserPanel currentUser={currentUser} onOpenUserSettings={onOpenUserSettings} />
 
         {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
@@ -1017,7 +1098,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-white truncate pr-2">
-              {localChannels.find(c => c.id === activeVoiceChannelId)?.name}
+              {activeVoiceChannelName}
             </span>
             <button 
               onClick={() => {
