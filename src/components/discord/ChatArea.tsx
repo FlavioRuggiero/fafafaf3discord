@@ -278,6 +278,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (['ADMIN', 'CREATOR', 'MODERATOR'].includes(role) || isServerCreator) {
       cmds.push({ command: '/statusmessage', description: 'Invia un messaggio di stato ufficiale' });
     }
+    if (isServerCreator) {
+      cmds.push({ command: '/mentionseveryone', description: 'Menziona tutti gli utenti del server' });
+    }
     return cmds;
   }, [currentUser, currentUserProfile, isServerCreator]);
 
@@ -1027,6 +1030,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         finalContent = `<system:status>${statusText}`;
       }
 
+      if (finalContent.startsWith('/mentionseveryone ') && isServerCreator) {
+        const msgText = finalContent.replace('/mentionseveryone ', '').trim();
+        if (!msgText) return;
+        finalContent = `<@everyone> ${msgText}`;
+      }
+
       // Sostituisci le menzioni @nome con <@id>
       pendingMentions.forEach(m => {
         const escapedName = m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1143,6 +1152,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
     }
 
+    contentToEdit = contentToEdit.replace(/<@everyone>/g, '@tutti');
+
     // Converti <@id> in @nome per l'input
     const existingMentions: {name: string, id: string}[] = [];
     contentToEdit = contentToEdit.replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
@@ -1182,6 +1193,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       finalContent = finalContent.replace(regex, `<@${m.id}>`);
     });
     setPendingMentions([]);
+
+    if (isServerCreator) {
+      finalContent = finalContent.replace(/@tutti(?=[\s.,!?]|$)/gi, '<@everyone>');
+    }
     
     const replyMatch = originalMsg?.content.match(/^<reply:([a-zA-Z0-9-]+)>/);
     if (replyMatch) {
@@ -1293,10 +1308,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const renderContentWithMentions = (text: string) => {
     if (!text) return null;
-    const regex = /(<@[a-zA-Z0-9-]+>)/g;
+    const regex = /(<@[a-zA-Z0-9-]+>|<@everyone>)/g;
     const parts = text.split(regex);
     
     return parts.map((part, i) => {
+      if (part === '<@everyone>') {
+        return (
+          <span key={i} className="font-bold px-1.5 py-0.5 text-[14.5px] rounded bg-yellow-500/40 text-yellow-500 mx-0.5 shadow-sm">
+            @tutti
+          </span>
+        );
+      }
       const match = part.match(/^<@([a-zA-Z0-9-]+)>$/);
       if (match) {
         const userId = match[1];
@@ -1751,7 +1773,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               repliedMessageContent = repliedMessage.content;
               const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
               if (nestedMatch) repliedMessageContent = nestedMatch[2];
-              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (m, id) => {
+              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@everyone>/g, '@tutti').replace(/<@([a-zA-Z0-9-]+)>/g, (m, id) => {
                 const member = serverMembers?.find(sm => sm.id === id);
                 return member ? `@${member.name}` : '@Sconosciuto';
               }).trim();
@@ -1783,7 +1805,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             if (r.user_id === currentUser?.id) reactionCounts[r.emoji].hasReacted = true;
           });
 
-          const isMentioned = msg.content.includes(`<@${currentUser?.id}>`);
+          const isMentioned = msg.content.includes(`<@${currentUser?.id}>`) || msg.content.includes('<@everyone>');
 
           if (isSystemWelcome) {
             return (
@@ -2259,7 +2281,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                       ? '👋 Messaggio di benvenuto' 
                       : msgToDeleteData.content.startsWith('<system:status>')
                       ? `📢 ${msgToDeleteData.content.replace('<system:status>', '')}`
-                      : msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
+                      : msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@everyone>/g, '@tutti').replace(/<@([a-zA-Z0-9-]+)>/g, (match, id) => {
                       const member = serverMembers?.find(m => m.id === id);
                       return member ? `@${member.name}` : '@Sconosciuto';
                     }).trim()}

@@ -108,8 +108,8 @@ const Index = () => {
       const serverId = channel.server_id;
       const setting = notificationSettingsRef.current[serverId] || 'mentions'; // Default: solo menzioni
 
-      // Controllo menzione tramite ID univoco
-      const isMentioned = newMsg.content.includes(`<@${currentUser.id}>`);
+      // Controllo menzione tramite ID univoco o @everyone
+      const isMentioned = newMsg.content.includes(`<@${currentUser.id}>`) || newMsg.content.includes('<@everyone>');
 
       if (setting !== 'none') {
         // Se non stiamo guardando questo server, segnalo come non letto
