@@ -154,9 +154,10 @@ interface ChatAreaProps {
   onToggleSidebar: () => void;
   showMembers?: boolean;
   serverCreatorId?: string;
+  serverMembers?: User[];
 }
 
-export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId }: ChatAreaProps) => {
+export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId, serverMembers }: ChatAreaProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
   
   const adminIdRef = useRef(adminId);
@@ -209,6 +210,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Image Viewer State
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+
+  // Mentions State
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
 
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   
@@ -651,6 +656,18 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const value = e.target.value;
     setInputValue(value);
     
+    // Logica per le menzioni
+    const cursorPosition = e.target.selectionStart || 0;
+    const textBeforeCursor = value.slice(0, cursorPosition);
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
+
+    if (match) {
+      setMentionQuery(match[1].toLowerCase());
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+    
     if (value.length > 0) {
       setTypingStatus(true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -660,6 +677,32 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     } else {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setTypingStatus(false);
+    }
+  };
+
+  const filteredMembers = mentionQuery !== null && serverMembers
+    ? serverMembers.filter(m => m.name.toLowerCase().includes(mentionQuery))
+    : [];
+  const showMentions = mentionQuery !== null && filteredMembers.length > 0;
+
+  const insertMention = (name: string) => {
+    if (!chatInputRef.current) return;
+    const cursorPosition = chatInputRef.current.selectionStart || 0;
+    const textBeforeCursor = inputValue.slice(0, cursorPosition);
+    const textAfterCursor = inputValue.slice(cursorPosition);
+
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
+    if (match) {
+      const newTextBefore = textBeforeCursor.slice(0, match.index) + `@${name} `;
+      setInputValue(newTextBefore + textAfterCursor);
+      setMentionQuery(null);
+      setTimeout(() => {
+        if (chatInputRef.current) {
+          chatInputRef.current.selectionStart = newTextBefore.length;
+          chatInputRef.current.selectionEnd = newTextBefore.length;
+          chatInputRef.current.focus();
+        }
+      }, 0);
     }
   };
 
@@ -792,6 +835,28 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showMentions) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev + 1) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev - 1 + filteredMembers.length) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredMembers[mentionIndex].name);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if ((!inputValue.trim() && !selectedFile) || isUploading) return;
@@ -1015,6 +1080,39 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const msgTime = new Date(rawDate).getTime();
     const now = new Date().getTime();
     return (now - msgTime) <= 5 * 60 * 1000;
+  };
+
+  const renderContentWithMentions = (text: string) => {
+    if (!serverMembers || serverMembers.length === 0) return text;
+
+    const sortedMembers = [...serverMembers].sort((a, b) => b.name.length - a.name.length);
+    let elements: React.ReactNode[] = [text];
+
+    sortedMembers.forEach(member => {
+      const mentionStr = `@${member.name}`;
+      elements = elements.flatMap((el, i) => {
+        if (typeof el === 'string') {
+          const parts = el.split(mentionStr);
+          if (parts.length === 1) return [el];
+          const result: React.ReactNode[] = [];
+          parts.forEach((part, j) => {
+            result.push(part);
+            if (j < parts.length - 1) {
+              const isMe = member.id === currentUser?.id;
+              result.push(
+                <span key={`${member.id}-${i}-${j}`} className={`font-medium px-1 rounded ${isMe ? 'bg-brand/30 text-brand' : 'bg-[#404249] text-[#dbdee1] hover:bg-[#4e5058] cursor-pointer transition-colors'}`}>
+                  {mentionStr}
+                </span>
+              );
+            }
+          });
+          return result;
+        }
+        return [el];
+      });
+    });
+
+    return elements;
   };
 
   // VISTA CANALE VOCALE
@@ -1465,8 +1563,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             if (r.user_id === currentUser?.id) reactionCounts[r.emoji].hasReacted = true;
           });
 
+          const isMentioned = textContent.includes(`@${currentUser?.name}`);
+
           return (
-            <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col hover:bg-[#2e3035] -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'}`}>
+            <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-brand/10 border-l-2 border-brand hover:bg-brand/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
               
               {!isEditing && (
                 <div className={`absolute right-4 -top-3 ${isPopoverOpen ? 'flex' : 'hidden group-hover:flex'} items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all`}>
@@ -1589,7 +1689,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     </div>
                   ) : (
                     <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">
-                      {textContent}
+                      {renderContentWithMentions(textContent)}
                       {msg.updatedAt && textContent && (
                         <span 
                           className="text-[10px] text-[#949ba4] ml-1.5 select-none hover:text-[#dbdee1] cursor-default transition-colors" 
@@ -1661,6 +1761,26 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             </span>
           )}
         </div>
+
+        {showMentions && (
+          <div className="absolute bottom-full left-4 mb-2 w-64 bg-[#2b2d31] border border-[#1e1f22] rounded-lg shadow-xl overflow-hidden z-50">
+            <div className="px-3 py-2 bg-[#1e1f22] border-b border-[#1f2023] text-xs font-bold text-[#b5bac1] uppercase">
+              Membri
+            </div>
+            <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+              {filteredMembers.map((member, idx) => (
+                <div
+                  key={member.id}
+                  onClick={() => insertMention(member.name)}
+                  className={`flex items-center px-3 py-1.5 cursor-pointer ${idx === mentionIndex ? 'bg-[#35373c]' : 'hover:bg-[#35373c]'}`}
+                >
+                  <img src={member.avatar} className="w-6 h-6 rounded-full mr-2 object-cover" />
+                  <span className="text-[#dbdee1] text-sm font-medium">{member.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {hasTopAttachment && (
           <div className="bg-[#2b2d31] px-4 py-3 flex flex-col gap-2 text-sm rounded-t-lg -mb-2 z-10 relative border-x border-t border-[#1f2023]">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Compass, LogOut, Bell, BellOff } from "lucide-react";
+import { Plus, Compass, LogOut, Bell, BellOff, Check } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,14 +76,14 @@ interface ServerIconProps {
   onDrop?: (e: React.DragEvent) => void;
   isDragging?: boolean;
   isAnyDragging?: boolean;
-  isMuted?: boolean;
-  onToggleMute?: () => void;
+  notificationSetting?: 'all' | 'mentions' | 'none';
+  onSetNotificationSetting?: (setting: 'all' | 'mentions' | 'none') => void;
 }
 
 const ServerIcon = ({ 
   image, name, active, notify, onClick, serverId, audioUrl,
   draggable, onDragStart, onDragEnter, onDragOver, onDragEnd, onDrop, isDragging, isAnyDragging,
-  isMuted, onToggleMute
+  notificationSetting, onSetNotificationSetting
 }: ServerIconProps) => {
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -91,6 +91,7 @@ const ServerIcon = ({
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const isGif = image?.toLowerCase().includes('.gif');
+  const isMuted = notificationSetting === 'none';
 
   // Recupera il numero di membri per il server specificato
   useEffect(() => {
@@ -193,19 +194,37 @@ const ServerIcon = ({
   return (
     <HoverTooltip text={name} subtext={subtext} disabled={isAnyDragging}>
       <div className="relative mb-2 w-full flex justify-center">
-        {onToggleMute ? (
+        {onSetNotificationSetting ? (
           <ContextMenu.Root>
             <ContextMenu.Trigger asChild>
               {innerContent}
             </ContextMenu.Trigger>
             <ContextMenu.Portal>
-              <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-2 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">
+              <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-1.5 w-56 z-[99999] animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-2 py-1.5 text-xs font-bold text-[#b5bac1] uppercase mb-1">Impostazioni Notifiche</div>
+                
                 <ContextMenu.Item
-                  className="flex items-center px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none"
-                  onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                  className="flex items-center justify-between px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none mb-0.5"
+                  onClick={(e) => { e.stopPropagation(); onSetNotificationSetting('all'); }}
                 >
-                  {isMuted ? <Bell size={16} className="mr-2" /> : <BellOff size={16} className="mr-2" />}
-                  {isMuted ? "Riattiva Notifiche" : "Silenzia Server"}
+                  <span>Tutte le notifiche</span>
+                  {notificationSetting === 'all' && <Check size={16} />}
+                </ContextMenu.Item>
+                
+                <ContextMenu.Item
+                  className="flex items-center justify-between px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none mb-0.5"
+                  onClick={(e) => { e.stopPropagation(); onSetNotificationSetting('mentions'); }}
+                >
+                  <span>Solo @menzioni</span>
+                  {(!notificationSetting || notificationSetting === 'mentions') && <Check size={16} />}
+                </ContextMenu.Item>
+                
+                <ContextMenu.Item
+                  className="flex items-center justify-between px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none"
+                  onClick={(e) => { e.stopPropagation(); onSetNotificationSetting('none'); }}
+                >
+                  <span>Nessuna notifica</span>
+                  {notificationSetting === 'none' && <Check size={16} />}
                 </ContextMenu.Item>
               </ContextMenu.Content>
             </ContextMenu.Portal>
@@ -237,12 +256,12 @@ interface ServerSidebarProps {
   currentUser: User;
   onLogout: () => void;
   onReorderServers?: (servers: Server[]) => void;
-  mutedServers: string[];
-  onToggleMute: (serverId: string) => void;
+  notificationSettings: Record<string, 'all' | 'mentions' | 'none'>;
+  onSetNotificationSetting: (serverId: string, setting: 'all' | 'mentions' | 'none') => void;
   unreadServers: Set<string>;
 }
 
-export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers, mutedServers, onToggleMute, unreadServers }: ServerSidebarProps) => {
+export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers, notificationSettings, onSetNotificationSetting, unreadServers }: ServerSidebarProps) => {
   // Aggiunto MODERATOR ai permessi per creare server
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
 
@@ -348,8 +367,8 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
           onDrop={handleDrop}
           isDragging={draggedIndex === index}
           isAnyDragging={isAnyDragging}
-          isMuted={mutedServers.includes(server.id)}
-          onToggleMute={() => onToggleMute(server.id)}
+          notificationSetting={notificationSettings[server.id] || 'mentions'}
+          onSetNotificationSetting={(setting) => onSetNotificationSetting(server.id, setting)}
         />
       ))}
       

@@ -15,6 +15,8 @@ import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
 import { playSound } from "@/utils/sounds";
 
+type NotificationSetting = 'all' | 'mentions' | 'none';
+
 const Index = () => {
   const { user, adminId, moderatorIds } = useAuth();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -59,24 +61,24 @@ const Index = () => {
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
   // States per Notifiche
-  const [mutedServers, setMutedServers] = useState<string[]>([]);
+  const [notificationSettings, setNotificationSettings] = useState<Record<string, NotificationSetting>>({});
   const [unreadServers, setUnreadServers] = useState<Set<string>>(new Set());
 
-  // Carica server silenziati
+  // Carica impostazioni notifiche
   useEffect(() => {
     if (user) {
-      const saved = localStorage.getItem(`muted-servers-${user.id}`);
+      const saved = localStorage.getItem(`notification-settings-${user.id}`);
       if (saved) {
-        try { setMutedServers(JSON.parse(saved)); } catch(e) {}
+        try { setNotificationSettings(JSON.parse(saved)); } catch(e) {}
       }
     }
   }, [user]);
 
-  const handleToggleMute = (serverId: string) => {
-    setMutedServers(prev => {
-      const next = prev.includes(serverId) ? prev.filter(id => id !== serverId) : [...prev, serverId];
+  const handleSetNotificationSetting = (serverId: string, setting: NotificationSetting) => {
+    setNotificationSettings(prev => {
+      const next = { ...prev, [serverId]: setting };
       if (currentUser) {
-        localStorage.setItem(`muted-servers-${currentUser.id}`, JSON.stringify(next));
+        localStorage.setItem(`notification-settings-${currentUser.id}`, JSON.stringify(next));
       }
       return next;
     });
@@ -89,8 +91,8 @@ const Index = () => {
   const activeServerIdRef = useRef(activeServerId);
   useEffect(() => { activeServerIdRef.current = activeServerId; }, [activeServerId]);
 
-  const mutedServersRef = useRef(mutedServers);
-  useEffect(() => { mutedServersRef.current = mutedServers; }, [mutedServers]);
+  const notificationSettingsRef = useRef(notificationSettings);
+  useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
 
   // Listener globale per le notifiche
   useEffect(() => {
@@ -104,14 +106,22 @@ const Index = () => {
       if (!channel || !channel.server_id) return;
 
       const serverId = channel.server_id;
+      const setting = notificationSettingsRef.current[serverId] || 'mentions'; // Default: solo menzioni
 
-      // Se non stiamo guardando questo server, segnalo come non letto
-      if (activeServerIdRef.current !== serverId) {
-        setUnreadServers(prev => new Set(prev).add(serverId));
+      const isMentioned = newMsg.content.includes(`@${currentUser.name}`);
+
+      if (setting !== 'none') {
+        // Se non stiamo guardando questo server, segnalo come non letto
+        if (activeServerIdRef.current !== serverId) {
+          setUnreadServers(prev => new Set(prev).add(serverId));
+        }
       }
 
-      // Suona la notifica se il server non è silenziato
-      if (!mutedServersRef.current.includes(serverId)) {
+      let shouldNotify = false;
+      if (setting === 'all') shouldNotify = true;
+      if (setting === 'mentions' && isMentioned) shouldNotify = true;
+
+      if (shouldNotify) {
         playSound('/notifica.mp3');
       }
     };
@@ -761,8 +771,8 @@ const Index = () => {
             currentUser={currentUser}
             onLogout={handleLogout}
             onReorderServers={setServers}
-            mutedServers={mutedServers}
-            onToggleMute={handleToggleMute}
+            notificationSettings={notificationSettings}
+            onSetNotificationSetting={handleSetNotificationSetting}
             unreadServers={unreadServers}
           />
           
@@ -788,6 +798,7 @@ const Index = () => {
               onToggleSidebar={() => setShowSidebar(true)}
               showMembers={showMembers}
               serverCreatorId={activeServer?.created_by}
+              serverMembers={serverMembersList}
             />
             {showMembers && (
               <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
