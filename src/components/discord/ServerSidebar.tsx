@@ -211,7 +211,8 @@ interface ServerSidebarProps {
 }
 
 export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers }: ServerSidebarProps) => {
-  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR';
+  // Aggiunto MODERATOR ai permessi per creare server
+  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
 
   const [localServers, setLocalServers] = useState<Server[]>(servers);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);

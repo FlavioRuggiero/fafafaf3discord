@@ -364,7 +364,7 @@ const Index = () => {
     
     const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
     if (!canCreate) {
-      showError("Non hai i permessi per creare un server. Serve un account verificato.");
+      showError("Non hai i permessi per creare un server. Solo gli Admin e i Moderatori possono farlo.");
       return;
     }
 
