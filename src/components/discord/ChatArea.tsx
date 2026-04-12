@@ -728,6 +728,24 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (isUploading || channel?.type === 'voice') return;
+    
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          validateAndSetFile(file);
+          return;
+        }
+      }
+    }
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1712,6 +1730,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 disabled={isUploading}
                 placeholder={isUploading ? "Caricamento file in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
                 className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
