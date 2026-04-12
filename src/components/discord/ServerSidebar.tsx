@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Compass, LogOut } from "lucide-react";
+import { Plus, Compass, LogOut, Bell, BellOff } from "lucide-react";
+import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Server, User } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -75,11 +76,14 @@ interface ServerIconProps {
   onDrop?: (e: React.DragEvent) => void;
   isDragging?: boolean;
   isAnyDragging?: boolean;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
 const ServerIcon = ({ 
   image, name, active, notify, onClick, serverId, audioUrl,
-  draggable, onDragStart, onDragEnter, onDragOver, onDragEnd, onDrop, isDragging, isAnyDragging
+  draggable, onDragStart, onDragEnter, onDragOver, onDragEnd, onDrop, isDragging, isAnyDragging,
+  isMuted, onToggleMute
 }: ServerIconProps) => {
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -160,30 +164,55 @@ const ServerIcon = ({
 
   const displayImage = (isGif && !isHovered && staticImage) ? staticImage : image;
 
+  const innerContent = (
+    <div 
+      className={`relative group flex items-center justify-center cursor-pointer transition-transform duration-200 ${isDragging ? 'scale-105 z-50' : 'scale-100 z-10'}`} 
+      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onDrop={onDrop}
+    >
+      {audioUrl && <audio ref={audioRef} src={audioUrl} preload="none" className="hidden" />}
+      <div className={`absolute left-0 w-1 bg-white rounded-r-lg transition-all duration-300 ${active ? 'h-10' : 'h-0 group-hover:h-5'} ${notify && !active ? 'h-2' : ''}`} />
+      
+      <div className={`w-12 h-12 flex items-center justify-center overflow-hidden transition-all duration-300 ${active ? 'rounded-2xl bg-brand' : 'rounded-[24px] group-hover:rounded-2xl bg-[#313338] group-hover:bg-brand text-[#dbdee1] group-hover:text-white'} ${isMuted ? 'opacity-50' : ''}`}>
+        {image ? (
+          <img src={displayImage} alt={name || "Server"} className="w-full h-full object-cover pointer-events-none" draggable={false} />
+        ) : (
+          <span className="font-medium text-lg pointer-events-none select-none">{name?.substring(0, 2).toUpperCase()}</span>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <HoverTooltip text={name} subtext={subtext} disabled={isAnyDragging}>
-      <div 
-        className={`relative group flex items-center justify-center cursor-pointer mb-2 transition-transform duration-200 ${isDragging ? 'scale-105 z-50' : 'scale-100 z-10'}`} 
-        onClick={onClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        draggable={draggable}
-        onDragStart={onDragStart}
-        onDragEnter={onDragEnter}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
-        onDrop={onDrop}
-      >
-        {audioUrl && <audio ref={audioRef} src={audioUrl} preload="none" className="hidden" />}
-        <div className={`absolute left-0 w-1 bg-white rounded-r-lg transition-all duration-300 ${active ? 'h-10' : 'h-0 group-hover:h-5'} ${notify && !active ? 'h-2' : ''}`} />
-        
-        <div className={`w-12 h-12 flex items-center justify-center overflow-hidden transition-all duration-300 ${active ? 'rounded-2xl bg-brand' : 'rounded-[24px] group-hover:rounded-2xl bg-[#313338] group-hover:bg-brand text-[#dbdee1] group-hover:text-white'}`}>
-          {image ? (
-            <img src={displayImage} alt={name || "Server"} className="w-full h-full object-cover pointer-events-none" draggable={false} />
-          ) : (
-            <span className="font-medium text-lg pointer-events-none select-none">{name?.substring(0, 2).toUpperCase()}</span>
-          )}
-        </div>
+      <div className="relative mb-2 w-full flex justify-center">
+        {onToggleMute ? (
+          <ContextMenu.Root>
+            <ContextMenu.Trigger asChild>
+              {innerContent}
+            </ContextMenu.Trigger>
+            <ContextMenu.Portal>
+              <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-2 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">
+                <ContextMenu.Item
+                  className="flex items-center px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none"
+                  onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                >
+                  {isMuted ? <Bell size={16} className="mr-2" /> : <BellOff size={16} className="mr-2" />}
+                  {isMuted ? "Riattiva Notifiche" : "Silenzia Server"}
+                </ContextMenu.Item>
+              </ContextMenu.Content>
+            </ContextMenu.Portal>
+          </ContextMenu.Root>
+        ) : (
+          innerContent
+        )}
       </div>
     </HoverTooltip>
   );
@@ -208,9 +237,12 @@ interface ServerSidebarProps {
   currentUser: User;
   onLogout: () => void;
   onReorderServers?: (servers: Server[]) => void;
+  mutedServers: string[];
+  onToggleMute: (serverId: string) => void;
+  unreadServers: Set<string>;
 }
 
-export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers }: ServerSidebarProps) => {
+export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenCreate, onOpenDiscover, currentUser, onLogout, onReorderServers, mutedServers, onToggleMute, unreadServers }: ServerSidebarProps) => {
   // Aggiunto MODERATOR ai permessi per creare server
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
 
@@ -305,6 +337,7 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
           image={server.icon_url} 
           name={server.name} 
           active={activeServerId === server.id} 
+          notify={unreadServers.has(server.id)}
           onClick={() => onServerSelect(server.id)} 
           audioUrl={server.audio_url}
           draggable={true}
@@ -315,6 +348,8 @@ export const ServerSidebar = ({ servers, activeServerId, onServerSelect, onOpenC
           onDrop={handleDrop}
           isDragging={draggedIndex === index}
           isAnyDragging={isAnyDragging}
+          isMuted={mutedServers.includes(server.id)}
+          onToggleMute={() => onToggleMute(server.id)}
         />
       ))}
       

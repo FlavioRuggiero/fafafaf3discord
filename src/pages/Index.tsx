@@ -13,6 +13,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { Menu, Home, MessageSquare, Compass, Plus } from "lucide-react";
 import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
+import { playSound } from "@/utils/sounds";
 
 const Index = () => {
   const { user, adminId, moderatorIds } = useAuth();
@@ -56,6 +57,73 @@ const Index = () => {
   
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
+
+  // States per Notifiche
+  const [mutedServers, setMutedServers] = useState<string[]>([]);
+  const [unreadServers, setUnreadServers] = useState<Set<string>>(new Set());
+
+  // Carica server silenziati
+  useEffect(() => {
+    if (user) {
+      const saved = localStorage.getItem(`muted-servers-${user.id}`);
+      if (saved) {
+        try { setMutedServers(JSON.parse(saved)); } catch(e) {}
+      }
+    }
+  }, [user]);
+
+  const handleToggleMute = (serverId: string) => {
+    setMutedServers(prev => {
+      const next = prev.includes(serverId) ? prev.filter(id => id !== serverId) : [...prev, serverId];
+      if (currentUser) {
+        localStorage.setItem(`muted-servers-${currentUser.id}`, JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  // Refs per il listener globale
+  const allChannelsRef = useRef(allChannels);
+  useEffect(() => { allChannelsRef.current = allChannels; }, [allChannels]);
+
+  const activeServerIdRef = useRef(activeServerId);
+  useEffect(() => { activeServerIdRef.current = activeServerId; }, [activeServerId]);
+
+  const mutedServersRef = useRef(mutedServers);
+  useEffect(() => { mutedServersRef.current = mutedServers; }, [mutedServers]);
+
+  // Listener globale per le notifiche
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const handleNewMessage = (payload: any) => {
+      const newMsg = payload.new;
+      if (newMsg.user_id === currentUser.id) return; // Non notificare i propri messaggi
+
+      const channel = allChannelsRef.current.find(c => c.id === newMsg.channel_id);
+      if (!channel || !channel.server_id) return;
+
+      const serverId = channel.server_id;
+
+      // Se non stiamo guardando questo server, segnalo come non letto
+      if (activeServerIdRef.current !== serverId) {
+        setUnreadServers(prev => new Set(prev).add(serverId));
+      }
+
+      // Suona la notifica se il server non è silenziato
+      if (!mutedServersRef.current.includes(serverId)) {
+        playSound('/notifica.mp3');
+      }
+    };
+
+    const sub = supabase.channel('global_notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, handleNewMessage)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [currentUser]);
 
   // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
   const serverMembersList: User[] = serverProfiles.map(p => {
@@ -679,12 +747,23 @@ const Index = () => {
           <ServerSidebar 
             servers={servers}
             activeServerId={activeServerId}
-            onServerSelect={(id) => { setActiveServerId(id); setShowSidebar(false); }}
+            onServerSelect={(id) => { 
+              setActiveServerId(id); 
+              setShowSidebar(false); 
+              setUnreadServers(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              });
+            }}
             onOpenCreate={() => setShowCreateModal(true)}
             onOpenDiscover={handleOpenDiscover}
             currentUser={currentUser}
             onLogout={handleLogout}
             onReorderServers={setServers}
+            mutedServers={mutedServers}
+            onToggleMute={handleToggleMute}
+            unreadServers={unreadServers}
           />
           
           <ChannelSidebar 
