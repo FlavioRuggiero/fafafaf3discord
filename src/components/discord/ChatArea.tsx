@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command, Shield } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command, Shield, PhoneOff } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
@@ -233,7 +233,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     userVolumes,
     setUserVolume,
     isDeafened,
-    activeVoiceChannelId
+    activeVoiceChannelId,
+    kickFromVoiceChannel
   } = useVoiceChannel();
 
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
@@ -1356,6 +1357,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
 
     const focusedMember = focusedUserId ? displayVoiceMembers.find(m => m.user_id === focusedUserId) : null;
+    const isServerOwner = serverCreatorId === currentUser?.id;
 
     return (
       <div className="flex-1 flex flex-col min-w-0 bg-[#000000] relative">
@@ -1477,6 +1479,21 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                               onChange={(e) => setUserVolume(member.user_id, parseInt(e.target.value))}
                               className="w-full h-1.5 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
                             />
+                            {isServerOwner && !isLocal && (
+                              <>
+                                <div className="h-[1px] bg-[#1e1f22] my-2" />
+                                <ContextMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    kickFromVoiceChannel(member.user_id);
+                                  }}
+                                >
+                                  <PhoneOff size={14} className="mr-2" />
+                                  Disconnetti
+                                </ContextMenu.Item>
+                              </>
+                            )}
                           </ContextMenu.Content>
                         </ContextMenu.Portal>
                       </ContextMenu.Root>
@@ -1561,6 +1578,21 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                                 onChange={(e) => setUserVolume(member.user_id, parseInt(e.target.value))}
                                 className="w-full h-1.5 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
                               />
+                              {isServerOwner && !isLocal && (
+                                <>
+                                  <div className="h-[1px] bg-[#1e1f22] my-2" />
+                                  <ContextMenu.Item
+                                    className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      kickFromVoiceChannel(member.user_id);
+                                    }}
+                                  >
+                                    <PhoneOff size={14} className="mr-2" />
+                                    Disconnetti
+                                  </ContextMenu.Item>
+                                </>
+                              )}
                             </ContextMenu.Content>
                           </ContextMenu.Portal>
                         </ContextMenu.Root>
