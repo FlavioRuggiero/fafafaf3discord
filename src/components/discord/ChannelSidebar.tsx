@@ -56,9 +56,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [settingsIsLocked, setSettingsIsLocked] = useState(false);
   const [settingsIsWelcome, setSettingsIsWelcome] = useState(false);
 
-  const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel' | 'user', category?: string, sourceChannelId?: string } | null>(null);
+  const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel', category?: string } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
-  const [userDragOverId, setUserDragOverId] = useState<string | null>(null);
 
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
   const prevMembersRef = useRef<ServerMemberWithProfile[]>([]);
@@ -512,46 +511,26 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel' | 'user', category?: string, sourceChannelId?: string) => {
+  const handleDragStart = (e: React.DragEvent, id: string, type: 'category' | 'channel', category?: string) => {
     e.stopPropagation();
-    
-    if (type === 'user') {
-      if (!serverPermissions?.can_manage_users) {
-        e.preventDefault();
-        return;
-      }
-    } else {
-      if (!serverPermissions?.can_manage_channels) {
-        e.preventDefault();
-        return;
-      }
+    if (!serverPermissions?.can_manage_channels) {
+      e.preventDefault();
+      return;
     }
-
     const img = new Image();
     img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
     e.dataTransfer.setDragImage(img, 0, 0);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
-    setDragItem({ id, type, category, sourceChannelId });
+    setDragItem({ id, type, category });
   };
 
   const handleDragOver = (e: React.DragEvent, id: string, type: 'category' | 'channel') => {
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
-    
     if (!dragItem) return;
-    
-    if (dragItem.type === 'user') {
-      const targetChannel = localChannels.find(c => c.id === id);
-      if (targetChannel?.type === 'voice') {
-        setUserDragOverId(id);
-      }
-      return;
-    }
-
     if (dragItem.type === 'category' && type === 'channel') return;
-    
     const rect = e.currentTarget.getBoundingClientRect();
     const position = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
     if (dragOverInfo?.id !== id || dragOverInfo?.position !== position) {
@@ -564,33 +543,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     e.stopPropagation();
     const source = dragItem;
     const target = dragOverInfo;
-    
-    setUserDragOverId(null);
     setDragItem(null);
     setDragOverInfo(null);
-    
-    if (!source || !activeServer) return;
-
-    if (source.type === 'user') {
-      const targetChannel = localChannels.find(c => c.id === targetId);
-      if (targetChannel?.type === 'voice' && source.sourceChannelId !== targetId) {
-        const userId = source.id;
-        const originalMembers = [...members];
-        
-        setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, voice_channel_id: targetId } : m));
-        
-        const { error } = await supabase.from('server_members').update({ voice_channel_id: targetId }).eq('server_id', activeServer.id).eq('user_id', userId);
-        if (error) {
-          showError("Permesso negato: non puoi spostare gli utenti.");
-          setMembers(originalMembers);
-        } else {
-          showSuccess("Utente spostato!");
-        }
-      }
-      return;
-    }
-
-    if (!target) return;
+    if (!source || !target || !activeServer) return;
     if (source.id === target.id && source.type === target.type) return; 
     
     const originalChannels = [...localChannels];
@@ -669,7 +624,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   };
 
   const getDropIndicator = (id: string, type: 'category' | 'channel') => {
-    if (dragItem?.type === 'user') return '';
     if (dragOverInfo?.id === id && dragOverInfo?.type === type) {
       return dragOverInfo.position === 'top' 
         ? 'shadow-[0_-2px_0_#5865F2] z-20' 
@@ -822,8 +776,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 onDragStart={(e) => handleDragStart(e, category, 'category')}
                 onDragOver={(e) => handleDragOver(e, category, 'category')}
                 onDrop={(e) => handleDrop(e, category, 'category')}
-                onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); setUserDragOverId(null); }}
-                className={`relative ${getDropIndicator(category, 'category')} ${dragItem?.id === category && dragItem.type === 'category' ? 'opacity-40' : ''}`}
+                onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
+                className={`relative ${getDropIndicator(category, 'category')} ${dragItem?.id === category ? 'opacity-40' : ''}`}
               >
                 <div 
                   onClick={() => toggleCategory(category)}
@@ -871,10 +825,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                           draggable={canManageChannels}
                           onDragStart={(e) => handleDragStart(e, channel.id, 'channel', category)}
                           onDragOver={(e) => handleDragOver(e, channel.id, 'channel')}
-                          onDragLeave={() => { if (dragItem?.type === 'user') setUserDragOverId(null); }}
                           onDrop={(e) => handleDrop(e, channel.id, 'channel', category)}
-                          onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); setUserDragOverId(null); }}
-                          className={`relative ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id && dragItem.type === 'channel' ? 'opacity-40' : ''}`}
+                          onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setDragOverInfo(null); }}
+                          className={`relative ${getDropIndicator(channel.id, 'channel')} ${dragItem?.id === channel.id ? 'opacity-40' : ''}`}
                         >
                           <div
                             onClick={() => {
@@ -886,7 +839,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               }
                             }}
                             className={`relative flex items-center px-2 py-1.5 rounded cursor-pointer group ${
-                              isActive || userDragOverId === channel.id
+                              isActive 
                                 ? 'bg-[#404249] text-white' 
                                 : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
                             } ${channel.unread && !isActive && channel.type !== 'voice' ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
@@ -976,12 +929,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 } : null;
 
                                 const memberContent = (
-                                  <div 
-                                    className={`w-full ${dragItem?.id === member.user_id && dragItem.type === 'user' ? 'opacity-40' : ''}`}
-                                    draggable={serverPermissions?.can_manage_users && !isLocal}
-                                    onDragStart={(e) => handleDragStart(e, member.user_id, 'user', undefined, channel.id)}
-                                    onDragEnd={(e) => { e.stopPropagation(); setDragItem(null); setUserDragOverId(null); }}
-                                  >
+                                  <div className="w-full">
                                     <ProfilePopover user={userForCard} side="right" align="center">
                                       <div className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300 cursor-pointer">
                                         <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
@@ -1030,46 +978,19 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                       {memberContent}
                                     </ContextMenu.Trigger>
                                     <ContextMenu.Portal>
-                                      <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-2 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">
-                                        <div className="flex justify-between items-center mb-2 px-1">
+                                      <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-3 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">
+                                        <div className="flex justify-between items-center mb-2">
                                           <span className="text-xs font-bold text-[#b5bac1] uppercase">Volume Utente</span>
                                           <span className="text-xs font-medium text-brand">{userVolumes[member.user_id] ?? 100}%</span>
                                         </div>
-                                        <div className="px-1 mb-2">
-                                          <input 
-                                            type="range" 
-                                            min="0" 
-                                            max="200" 
-                                            value={userVolumes[member.user_id] ?? 100}
-                                            onChange={(e) => setUserVolume(member.user_id, parseInt(e.target.value))}
-                                            className="w-full h-1.5 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
-                                          />
-                                        </div>
-                                        
-                                        {serverPermissions?.can_manage_users && (
-                                          <>
-                                            <ContextMenu.Separator className="h-[1px] bg-[#1e1f22] my-1" />
-                                            <ContextMenu.Item 
-                                              className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none transition-colors"
-                                              onClick={async (e) => {
-                                                e.stopPropagation();
-                                                const originalMembers = [...members];
-                                                setMembers(prev => prev.map(m => m.user_id === member.user_id ? { ...m, voice_channel_id: null } : m));
-                                                
-                                                const { error } = await supabase.from('server_members').update({ voice_channel_id: null }).eq('server_id', activeServer.id).eq('user_id', member.user_id);
-                                                if (error) {
-                                                  showError("Permesso negato: non puoi disconnettere gli utenti.");
-                                                  setMembers(originalMembers);
-                                                } else {
-                                                  showSuccess("Utente disconnesso.");
-                                                }
-                                              }}
-                                            >
-                                              <PhoneOff size={14} className="mr-2" />
-                                              Disconnetti
-                                            </ContextMenu.Item>
-                                          </>
-                                        )}
+                                        <input 
+                                          type="range" 
+                                          min="0" 
+                                          max="200" 
+                                          value={userVolumes[member.user_id] ?? 100}
+                                          onChange={(e) => setUserVolume(member.user_id, parseInt(e.target.value))}
+                                          className="w-full h-1.5 bg-[#1e1f22] rounded-lg appearance-none cursor-pointer accent-[#5865F2]"
+                                        />
                                       </ContextMenu.Content>
                                     </ContextMenu.Portal>
                                   </ContextMenu.Root>

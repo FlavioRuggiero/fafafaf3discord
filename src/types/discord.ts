@@ -8,7 +8,6 @@ export type ServerRole = {
   can_use_commands?: boolean;
   can_manage_server?: boolean;
   can_manage_roles?: boolean;
-  can_manage_users?: boolean;
 };
 
 export type ServerPermissions = {
@@ -18,7 +17,6 @@ export type ServerPermissions = {
   can_use_commands: boolean;
   can_manage_server: boolean;
   can_manage_roles: boolean;
-  can_manage_users: boolean;
 };
 
 export type User = {
