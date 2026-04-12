@@ -188,6 +188,11 @@ const ServerIcon = ({
           <span className="font-medium text-lg pointer-events-none select-none">{name?.substring(0, 2).toUpperCase()}</span>
         )}
       </div>
+
+      {/* Pallino rosso per le notifiche */}
+      {notify && (
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#f23f43] rounded-full border-[3px] border-[#1e1f22] z-20 pointer-events-none" />
+      )}
     </div>
   );
 
