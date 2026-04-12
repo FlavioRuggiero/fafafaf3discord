@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home } from "lucide-react";
 import { Channel, Server, User, Profile, ServerMember } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -29,7 +29,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const { user: authUser, adminId, moderatorIds } = useAuth();
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [dmChannels, setDmChannels] = useState<Channel[]>([]);
   
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
@@ -80,64 +79,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       setCollapsedCategories(new Set());
     }
   }, [activeServer?.id]);
-
-  useEffect(() => {
-    if (activeServer) return;
-    
-    let isMounted = true;
-    
-    const fetchDMs = async () => {
-      const { data, error } = await supabase
-        .from('dm_channels')
-        .select('*')
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
-        
-      if (error || !data) return;
-
-      const otherUserIds = data.map(dm => dm.user1_id === currentUser.id ? dm.user2_id : dm.user1_id);
-      const { data: profiles } = await supabase.from('profiles').select('*').in('id', otherUserIds);
-      
-      const mappedDMs: Channel[] = data.map(dm => {
-        const otherId = dm.user1_id === currentUser.id ? dm.user2_id : dm.user1_id;
-        const profile = profiles?.find(p => p.id === otherId);
-        
-        return {
-          id: dm.id,
-          server_id: null,
-          name: profile?.first_name || 'Utente',
-          type: 'dm',
-          category: 'Messaggi Diretti',
-          recipient: profile ? {
-            id: profile.id,
-            name: profile.first_name || 'Utente',
-            avatar: profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
-            status: 'offline', 
-            bio: profile.bio || undefined,
-            banner_color: profile.banner_color || undefined,
-            banner_url: profile.banner_url || undefined,
-            level: profile.level || 1,
-            digitalcardus: profile.digitalcardus || 25,
-            xp: profile.xp || 0
-          } : undefined
-        };
-      });
-      
-      if (isMounted) setDmChannels(mappedDMs);
-    };
-
-    fetchDMs();
-
-    const dmSub = supabase.channel('dm_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_channels' }, () => {
-        fetchDMs();
-      })
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(dmSub);
-    };
-  }, [activeServer, currentUser.id]);
 
   useEffect(() => {
     if (!activeServer?.id) {
@@ -616,19 +557,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     return '';
   };
 
-  const handleDeleteDM = async (e: React.MouseEvent, dmId: string) => {
-    e.stopPropagation();
-    const { error } = await supabase.from('dm_channels').delete().eq('id', dmId);
-    if (!error) {
-      setDmChannels(prev => prev.filter(c => c.id !== dmId));
-      if (activeChannelId === dmId) {
-        onChannelSelect({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null });
-      }
-    } else {
-      showError("Impossibile rimuovere la chat.");
-    }
-  };
-
   if (!activeServer) {
     return (
       <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative h-full border-r border-[#1f2023]">
@@ -638,33 +566,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           </button>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-          <div className="flex justify-between items-center mt-2 mb-1 px-2 group">
-            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider hover:text-[#dbdee1] cursor-pointer">
-              Messaggi Diretti
-            </h3>
-            <Plus size={14} className="text-[#949ba4] opacity-0 group-hover:opacity-100 cursor-pointer hover:text-[#dbdee1]" title="Crea DM" onClick={() => onChannelSelect({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null })} />
-          </div>
-          
-          <div className="space-y-[2px]">
-            {dmChannels.map(dm => (
-              <button
-                key={dm.id}
-                onClick={() => onChannelSelect(dm)}
-                className={`w-full flex items-center px-2 py-1.5 rounded cursor-pointer group ${
-                  activeChannelId === dm.id 
-                    ? 'bg-[#404249] text-white' 
-                    : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
-                }`}
-              >
-                <div className="relative mr-3 flex-shrink-0">
-                  <img src={dm.recipient?.avatar} className="w-8 h-8 rounded-full object-cover bg-[#1e1f22]" />
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] ${dm.recipient?.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
-                </div>
-                <span className="truncate flex-1 text-left">{dm.name}</span>
-                <X size={14} className="opacity-0 group-hover:opacity-100 text-[#949ba4] hover:text-[#dbdee1]" onClick={(e) => handleDeleteDM(e, dm.id)} />
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => onChannelSelect({ id: 'home', name: 'Benvenuto', type: 'text', category: '', server_id: null })}
+            className="w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 bg-[#404249] text-white"
+          >
+            <Home size={20} className="mr-3" />
+            <span className="font-medium">Benvenuto</span>
+          </button>
         </div>
         <UserPanel currentUser={currentUser} onOpenUserSettings={onOpenUserSettings} />
       </div>
