@@ -15,16 +15,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:!bg-yellow-600 group-[.toaster]:!text-gray-900 group-[.toaster]:!border-yellow-700 group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:!text-gray-800",
+            "group toast group-[.toaster]:!bg-gray-900 group-[.toaster]:!text-yellow-500 group-[.toaster]:!border-gray-800 group-[.toaster]:shadow-lg",
+          description: "group-[.toast]:!text-yellow-600",
           actionButton:
-            "group-[.toast]:!bg-yellow-800 group-[.toast]:!text-gray-100",
+            "group-[.toast]:!bg-gray-800 group-[.toast]:!text-yellow-500",
           cancelButton:
-            "group-[.toast]:!bg-yellow-800 group-[.toast]:!text-gray-100",
-          success: "group-[.toaster]:!bg-yellow-600 group-[.toaster]:!text-gray-900 group-[.toaster]:!border-yellow-700",
-          error: "group-[.toaster]:!bg-yellow-600 group-[.toaster]:!text-gray-900 group-[.toaster]:!border-yellow-700",
-          warning: "group-[.toaster]:!bg-yellow-600 group-[.toaster]:!text-gray-900 group-[.toaster]:!border-yellow-700",
-          info: "group-[.toaster]:!bg-yellow-600 group-[.toaster]:!text-gray-900 group-[.toaster]:!border-yellow-700",
+            "group-[.toast]:!bg-gray-800 group-[.toast]:!text-yellow-500",
+          success: "group-[.toaster]:!bg-gray-900 group-[.toaster]:!text-yellow-500 group-[.toaster]:!border-gray-800",
+          error: "group-[.toaster]:!bg-gray-900 group-[.toaster]:!text-yellow-500 group-[.toaster]:!border-gray-800",
+          warning: "group-[.toaster]:!bg-gray-900 group-[.toaster]:!text-yellow-500 group-[.toaster]:!border-gray-800",
+          info: "group-[.toaster]:!bg-gray-900 group-[.toaster]:!text-yellow-500 group-[.toaster]:!border-gray-800",
         },
       }}
       {...props}
