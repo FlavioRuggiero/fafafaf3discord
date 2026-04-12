@@ -17,14 +17,16 @@ type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
 
 const EMOJIS = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "🚀", "🤔", "👎", "💯", "✨", "💀"];
 
-const StreamPlayer = ({ stream, isLocal, className }: { stream: MediaStream; isLocal?: boolean; className?: string }) => {
+const StreamPlayer = ({ stream, isLocal, className, volume = 1, isDeafened = false }: { stream: MediaStream; isLocal?: boolean; className?: string; volume?: number; isDeafened?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      videoRef.current.volume = Math.min(1, Math.max(0, volume));
+      videoRef.current.muted = isLocal || isDeafened;
     }
-  }, [stream]);
-  return <video ref={videoRef} autoPlay muted={isLocal} className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
+  }, [stream, volume, isDeafened, isLocal]);
+  return <video ref={videoRef} autoPlay playsInline muted={isLocal || isDeafened} className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
 };
 
 // Componente modale per l'interfaccia di selezione schermo
@@ -205,7 +207,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     startScreenShare,
     stopScreenShare,
     userVolumes,
-    setUserVolume
+    setUserVolume,
+    isDeafened
   } = useVoiceChannel();
 
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
@@ -882,7 +885,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[focusedMember.user_id];
                   
                   if (hasScreen && streamToPlay) {
-                    return <StreamPlayer stream={streamToPlay} isLocal={isLocal} className="w-full h-full object-contain rounded-lg shadow-2xl" />;
+                    return <StreamPlayer 
+                             stream={streamToPlay} 
+                             isLocal={isLocal} 
+                             volume={(userVolumes[focusedMember.user_id] ?? 100) / 100}
+                             isDeafened={isDeafened}
+                             className="w-full h-full object-contain rounded-lg shadow-2xl" 
+                           />;
                   } else {
                     return (
                       <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
@@ -912,26 +921,40 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
                     const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
 
+                    const memberContent = (
+                      <div onClick={() => setFocusedUserId(member.user_id)}
+                           className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${isSpeaking ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
+                        {hasScreen && streamToPlay ? (
+                          <div className="w-full h-full overflow-hidden rounded-lg pointer-events-none opacity-80">
+                             <StreamPlayer 
+                               stream={streamToPlay} 
+                               isLocal={isLocal} 
+                               volume={(userVolumes[member.user_id] ?? 100) / 100}
+                               isDeafened={isDeafened}
+                               className="w-full h-full object-cover" 
+                             />
+                          </div>
+                        ) : (
+                          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
+                            <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="absolute bottom-1.5 left-1.5 flex items-center bg-black/70 backdrop-blur-md rounded px-2 py-1">
+                          <span className="text-white text-[10px] sm:text-xs truncate max-w-[100px] font-medium">
+                            {member.profiles?.first_name || 'Utente'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+
+                    if (isLocal) {
+                      return <React.Fragment key={member.user_id}>{memberContent}</React.Fragment>;
+                    }
+
                     return (
                       <ContextMenu.Root key={member.user_id}>
                         <ContextMenu.Trigger asChild>
-                          <div onClick={() => setFocusedUserId(member.user_id)}
-                               className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${isSpeaking ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
-                            {hasScreen && streamToPlay ? (
-                              <div className="w-full h-full overflow-hidden rounded-lg pointer-events-none opacity-80">
-                                 <StreamPlayer stream={streamToPlay} isLocal={isLocal} className="w-full h-full object-cover" />
-                              </div>
-                            ) : (
-                              <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
-                                <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
-                              </div>
-                            )}
-                            <div className="absolute bottom-1.5 left-1.5 flex items-center bg-black/70 backdrop-blur-md rounded px-2 py-1">
-                              <span className="text-white text-[10px] sm:text-xs truncate max-w-[100px] font-medium">
-                                {member.profiles?.first_name || 'Utente'}
-                              </span>
-                            </div>
-                          </div>
+                          {memberContent}
                         </ContextMenu.Trigger>
                         <ContextMenu.Portal>
                           <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-3 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">
@@ -972,36 +995,50 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                       const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
                       const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
                       
+                      const memberContent = (
+                        <div className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
+                          
+                          {hasScreen && streamToPlay ? (
+                            <div className="w-full h-full bg-black relative">
+                              <StreamPlayer 
+                                stream={streamToPlay} 
+                                isLocal={isLocal} 
+                                volume={(userVolumes[member.user_id] ?? 100) / 100}
+                                isDeafened={isDeafened}
+                                className="w-full h-full object-cover" 
+                              />
+                              <div className="absolute top-3 left-3 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded shadow-md uppercase tracking-wider">In onda</div>
+                            </div>
+                          ) : (
+                            <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
+                              <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+
+                          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                             <button onClick={() => setFocusedUserId(member.user_id)} className="p-2 bg-black/70 hover:bg-black/90 rounded-lg text-white shadow-lg backdrop-blur-md transition-colors" title="Schermo intero">
+                               <Maximize size={18} />
+                             </button>
+                          </div>
+
+                          <div className="absolute bottom-3 left-3 flex items-center bg-black/70 backdrop-blur-md rounded-lg px-2.5 py-1.5 shadow-lg z-10">
+                            {member.is_deafened && <Headphones size={16} className="text-[#f23f43] mr-1.5" />}
+                            {member.is_muted && !member.is_deafened && <MicOff size={16} className="text-[#f23f43] mr-1.5" />}
+                            <span className="text-white text-sm font-medium truncate max-w-[120px]">
+                              {member.profiles?.first_name || 'Utente'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+
+                      if (isLocal) {
+                        return <React.Fragment key={member.user_id}>{memberContent}</React.Fragment>;
+                      }
+
                       return (
                         <ContextMenu.Root key={member.user_id}>
                           <ContextMenu.Trigger asChild>
-                            <div className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
-                              
-                              {hasScreen && streamToPlay ? (
-                                <div className="w-full h-full bg-black relative">
-                                  <StreamPlayer stream={streamToPlay} isLocal={isLocal} className="w-full h-full object-cover" />
-                                  <div className="absolute top-3 left-3 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded shadow-md uppercase tracking-wider">In onda</div>
-                                </div>
-                              ) : (
-                                <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
-                                  <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
-                                </div>
-                              )}
-
-                              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                 <button onClick={() => setFocusedUserId(member.user_id)} className="p-2 bg-black/70 hover:bg-black/90 rounded-lg text-white shadow-lg backdrop-blur-md transition-colors" title="Schermo intero">
-                                   <Maximize size={18} />
-                                 </button>
-                              </div>
-
-                              <div className="absolute bottom-3 left-3 flex items-center bg-black/70 backdrop-blur-md rounded-lg px-2.5 py-1.5 shadow-lg z-10">
-                                {member.is_deafened && <Headphones size={16} className="text-[#f23f43] mr-1.5" />}
-                                {member.is_muted && !member.is_deafened && <MicOff size={16} className="text-[#f23f43] mr-1.5" />}
-                                <span className="text-white text-sm font-medium truncate max-w-[120px]">
-                                  {member.profiles?.first_name || 'Utente'}
-                                </span>
-                              </div>
-                            </div>
+                            {memberContent}
                           </ContextMenu.Trigger>
                           <ContextMenu.Portal>
                             <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-3 w-48 z-[99999] animate-in fade-in zoom-in-95 duration-100">

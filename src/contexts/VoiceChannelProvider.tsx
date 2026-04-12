@@ -84,6 +84,14 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   useEffect(() => { isMutedRef.current = isMuted }, [isMuted]);
   useEffect(() => { isDeafenedRef.current = isDeafened }, [isDeafened]);
 
+  // Effetto per applicare il sordomutato a tutti i GainNode attivi
+  useEffect(() => {
+    Object.entries(gainNodesRef.current).forEach(([userId, gainNode]) => {
+      const baseVolume = (userVolumesRef.current[userId] ?? 100) / 100;
+      gainNode.gain.value = isDeafened ? 0 : baseVolume;
+    });
+  }, [isDeafened]);
+
   useEffect(() => {
     activeVoiceChannelIdRef.current = activeVoiceChannelId;
     activeServerIdRef.current = activeServerId;
@@ -386,7 +394,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const setUserVolume = useCallback((userId: string, volume: number) => {
     setUserVolumes(prev => ({ ...prev, [userId]: volume }));
     if (gainNodesRef.current[userId]) {
-      gainNodesRef.current[userId].gain.value = volume / 100;
+      gainNodesRef.current[userId].gain.value = isDeafenedRef.current ? 0 : volume / 100;
     }
   }, []);
 
@@ -450,24 +458,25 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       if (document.querySelector(`audio[data-user-id="${userId}"]`)) return;
       
-      // 1. Creiamo l'elemento audio HTML ma lo teniamo mutato. 
+      // Creiamo l'elemento audio HTML ma lo teniamo PERMANENTEMENTE mutato. 
       // Questo è un workaround necessario per Chrome per mantenere vivo il flusso WebRTC.
+      // L'audio vero uscirà dall'AudioContext.
       const audio = document.createElement('audio');
       audio.srcObject = remoteStream;
       audio.autoplay = true;
-      audio.muted = true; // Muto perché l'audio vero uscirà dall'AudioContext
+      audio.muted = true; 
       audio.setAttribute('data-user-id', userId);
       document.body.appendChild(audio);
 
-      // 2. Usiamo AudioContext per controllare il volume e analizzare la voce
       const audioContext = new AudioContext();
-      audioContext.resume(); // Assicuriamoci che sia in esecuzione
+      audioContext.resume(); 
       
       const source = audioContext.createMediaStreamSource(remoteStream);
       
       // Creazione del GainNode per il controllo del volume (fino al 200%)
       const gainNode = audioContext.createGain();
-      gainNode.gain.value = (userVolumesRef.current[userId] ?? 100) / 100;
+      const initialVolume = (userVolumesRef.current[userId] ?? 100) / 100;
+      gainNode.gain.value = isDeafenedRef.current ? 0 : initialVolume;
       gainNodesRef.current[userId] = gainNode;
       
       // Colleghiamo la sorgente al GainNode e il GainNode agli altoparlanti

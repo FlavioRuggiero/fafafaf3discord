@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Mic, MicOff, Headphones, Settings } from "lucide-react";
 import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
@@ -12,33 +12,6 @@ interface UserPanelProps {
 
 export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) => {
   const { isMuted, toggleMute, isDeafened, toggleDeafen } = useVoiceChannel();
-
-  // Effetto per silenziare l'audio degli altri utenti quando si è "sordomutati"
-  useEffect(() => {
-    const applyDeafenState = () => {
-      const mediaElements = document.querySelectorAll('audio, video') as NodeListOf<HTMLMediaElement>;
-      mediaElements.forEach(media => {
-        // Ignoriamo gli elementi con l'attributo 'muted' di default (es. il proprio stream locale per evitare l'eco)
-        if (!media.defaultMuted) {
-          media.muted = isDeafened;
-        }
-      });
-    };
-
-    applyDeafenState();
-
-    // Osservatore per applicare lo stato anche ai nuovi utenti che entrano nel canale
-    const observer = new MutationObserver((mutations) => {
-      const hasNewNodes = mutations.some(mutation => mutation.addedNodes.length > 0);
-      if (hasNewNodes) {
-        applyDeafenState();
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    return () => observer.disconnect();
-  }, [isDeafened]);
 
   const userLevel = (currentUser as any)?.level || 1;
   const userXp = (currentUser as any)?.xp || 0;
