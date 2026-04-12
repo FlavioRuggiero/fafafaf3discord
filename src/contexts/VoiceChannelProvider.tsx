@@ -69,6 +69,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   const activeServerIdRef = useRef(activeServerId);
   const wasMutedBeforeDeafen = useRef(false);
   const sessionTokenRef = useRef<string | null>(null);
+  const isJoiningRef = useRef(false);
 
   const isMutedRef = useRef(isMuted);
   const isDeafenedRef = useRef(isDeafened);
@@ -529,128 +530,133 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   }, [currentUser]);
 
   const joinVoiceChannel = useCallback(async (channelId: string, serverId: string) => {
-    if (!currentUser) return;
+    if (!currentUser || isJoiningRef.current) return;
     
-    if (activeVoiceChannelIdRef.current) {
-      await leaveVoiceChannel();
-    }
-    
-    let stream = localStreamRef.current;
-    if (!stream) {
-      stream = await requestMicrophone();
+    isJoiningRef.current = true;
+    try {
+      if (activeVoiceChannelIdRef.current) {
+        await leaveVoiceChannel();
+      }
+      
+      let stream = localStreamRef.current;
       if (!stream) {
-        showError("Impossibile entrare nel canale vocale senza accesso al microfono.");
-        return;
+        stream = await requestMicrophone();
+        if (!stream) {
+          showError("Impossibile entrare nel canale vocale senza accesso al microfono.");
+          return;
+        }
       }
-    }
-    
-    playSound('/enter.mp3');
+      
+      playSound('/enter.mp3');
 
-    setActiveVoiceChannelId(channelId);
-    setActiveServerId(serverId);
+      setActiveVoiceChannelId(channelId);
+      setActiveServerId(serverId);
 
-    await supabase
-      .from('server_members')
-      .update({ voice_channel_id: channelId })
-      .eq('server_id', serverId)
-      .eq('user_id', currentUser.id);
+      await supabase
+        .from('server_members')
+        .update({ voice_channel_id: channelId })
+        .eq('server_id', serverId)
+        .eq('user_id', currentUser.id);
 
-    const channel = supabase.channel(`voice-chat:${channelId}`, {
-      config: { presence: { key: currentUser.id } },
-    });
+      const channel = supabase.channel(`voice-chat:${channelId}`, {
+        config: { presence: { key: currentUser.id } },
+      });
 
-    channel.on('presence', { event: 'sync' }, () => {
-      const userIds = Object.keys(channel.presenceState());
-      userIds.forEach(userId => {
-        if (userId !== currentUser.id && !peersRef.current.some(p => p.userId === userId)) {
-          createPeer(userId, true, channel);
+      channel.on('presence', { event: 'sync' }, () => {
+        const userIds = Object.keys(channel.presenceState());
+        userIds.forEach(userId => {
+          if (userId !== currentUser.id && !peersRef.current.some(p => p.userId === userId)) {
+            createPeer(userId, true, channel);
+          }
+        });
+        peersRef.current.forEach(peerData => {
+          if (!userIds.includes(peerData.userId)) {
+            peerData.peer.destroy();
+            removePeer(peerData.userId);
+          }
+        });
+      });
+
+      channel.on('presence', { event: 'join' }, ({ key }) => {
+        if (key !== currentUser?.id) {
+          if (currentUser) {
+            channel.send({
+              type: 'broadcast',
+              event: 'state-update',
+              payload: {
+                userId: currentUser.id,
+                state: { isMuted: isMutedRef.current, isDeafened: isDeafenedRef.current },
+              },
+            });
+          }
         }
       });
-      peersRef.current.forEach(peerData => {
-        if (!userIds.includes(peerData.userId)) {
+      
+      channel.on('presence', { event: 'leave' }, ({ key }) => {
+        const peerData = peersRef.current.find(p => p.userId === key);
+        if (peerData) {
           peerData.peer.destroy();
-          removePeer(peerData.userId);
+          removePeer(key);
+        }
+        setMemberStates(prev => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        setRemoteScreenStreams(prev => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      });
+
+      channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
+        if (payload.to !== currentUser.id) return;
+        const peerData = peersRef.current.find(p => p.userId === payload.from);
+        if (peerData) {
+          if (!peerData.peer.destroyed) {
+            peerData.peer.signal(payload.signal);
+          }
+        } else {
+          createPeer(payload.from, false, channel, payload.signal);
         }
       });
-    });
 
-    channel.on('presence', { event: 'join' }, ({ key }) => {
-      if (key !== currentUser?.id) {
-        if (currentUser) {
-          channel.send({
-            type: 'broadcast',
-            event: 'state-update',
-            payload: {
-              userId: currentUser.id,
-              state: { isMuted: isMutedRef.current, isDeafened: isDeafenedRef.current },
-            },
-          });
-        }
-      }
-    });
-    
-    channel.on('presence', { event: 'leave' }, ({ key }) => {
-      const peerData = peersRef.current.find(p => p.userId === key);
-      if (peerData) {
-        peerData.peer.destroy();
-        removePeer(key);
-      }
-      setMemberStates(prev => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
+      channel.on('broadcast', { event: 'state-update' }, ({ payload }) => {
+        setMemberStates(prev => ({
+          ...prev,
+          [payload.userId]: { ...prev[payload.userId], ...payload.state },
+        }));
       });
-      setRemoteScreenStreams(prev => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
+
+      channel.on('broadcast', { event: 'screen-stop' }, ({ payload }) => {
+        setRemoteScreenStreams(prev => {
+          const next = { ...prev };
+          delete next[payload.userId];
+          return next;
+        });
       });
-    });
 
-    channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
-      if (payload.to !== currentUser.id) return;
-      const peerData = peersRef.current.find(p => p.userId === payload.from);
-      if (peerData) {
-        if (!peerData.peer.destroyed) {
-          peerData.peer.signal(payload.signal);
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({});
+          if (currentUser) {
+            channel.send({
+              type: 'broadcast',
+              event: 'state-update',
+              payload: {
+                userId: currentUser.id,
+                state: { isMuted, isDeafened },
+              },
+            });
+          }
         }
-      } else {
-        createPeer(payload.from, false, channel, payload.signal);
-      }
-    });
-
-    channel.on('broadcast', { event: 'state-update' }, ({ payload }) => {
-      setMemberStates(prev => ({
-        ...prev,
-        [payload.userId]: { ...prev[payload.userId], ...payload.state },
-      }));
-    });
-
-    channel.on('broadcast', { event: 'screen-stop' }, ({ payload }) => {
-      setRemoteScreenStreams(prev => {
-        const next = { ...prev };
-        delete next[payload.userId];
-        return next;
       });
-    });
 
-    channel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await channel.track({});
-        if (currentUser) {
-          channel.send({
-            type: 'broadcast',
-            event: 'state-update',
-            payload: {
-              userId: currentUser.id,
-              state: { isMuted, isDeafened },
-            },
-          });
-        }
-      }
-    });
-
-    signalingChannelRef.current = channel;
+      signalingChannelRef.current = channel;
+    } finally {
+      isJoiningRef.current = false;
+    }
   }, [currentUser, createPeer, leaveVoiceChannel, requestMicrophone, isMuted, isDeafened]);
 
   useEffect(() => {

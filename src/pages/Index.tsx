@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ServerSidebar } from "@/components/discord/ServerSidebar";
 import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
 import { ChatArea } from "@/components/discord/ChatArea";
@@ -164,23 +164,30 @@ const Index = () => {
   }, [adminId, moderatorIds, user?.id]);
 
   // Caricamento dati iniziali e premi giornalieri
+  const hasInitializedRef = useRef(false);
+
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
-      // 1. Aggiorna data ultimo accesso
-      await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
-      
-      // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
-      await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
-      
-      // Controllo del premio giornaliero
-      const { data: rewardData } = await supabase.rpc('claim_daily_reward', { user_id_param: user.id });
-      
-      if (rewardData && rewardData.rewarded) {
-        showSuccess('Accesso giornaliero: +5 XP, +3 Digitalcardus!');
-        if (rewardData.leveled_up) {
-          setTimeout(() => showSuccess(`🎉 Sei salito al livello ${rewardData.new_level}!`), 1500);
+      // Eseguiamo la pulizia e i premi solo una volta per sessione
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        
+        // 1. Aggiorna data ultimo accesso
+        await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
+        
+        // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
+        await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
+        
+        // Controllo del premio giornaliero
+        const { data: rewardData } = await supabase.rpc('claim_daily_reward', { user_id_param: user.id });
+        
+        if (rewardData && rewardData.rewarded) {
+          showSuccess('Accesso giornaliero: +5 XP, +3 Digitalcardus!');
+          if (rewardData.leveled_up) {
+            setTimeout(() => showSuccess(`🎉 Sei salito al livello ${rewardData.new_level}!`), 1500);
+          }
         }
       }
       
