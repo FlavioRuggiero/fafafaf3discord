@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
@@ -29,7 +29,6 @@ const StreamPlayer = ({ stream, isLocal, className, volume = 1, isDeafened = fal
   return <video ref={videoRef} autoPlay playsInline muted={isLocal || isDeafened} className={`bg-black ${className || 'w-full h-full object-contain'}`} />;
 };
 
-// Componente modale per l'interfaccia di selezione schermo
 const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onClose: () => void, onSelect: (id?: string) => void }) => {
   const [activeTab, setActiveTab] = useState<'screens' | 'apps'>('screens');
   const [sources, setSources] = useState<any[]>([]);
@@ -40,7 +39,6 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
     setIsLoading(true);
 
     const loadSources = async () => {
-      // 1. App Desktop (Electron/WebView) con API custom definita dallo sviluppatore
       if ((window as any).electronAPI?.getDesktopSources) {
         try {
           const res = await (window as any).electronAPI.getDesktopSources();
@@ -54,7 +52,6 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
           console.error(err);
         }
       } 
-      // 2. App Desktop ma senza l'API esplicita (ci affidiamo agli ID chromium predefiniti per gli schermi)
       else if (navigator.userAgent.toLowerCase().includes('electron') || (window as any).process) {
         setSources([
           { id: 'screen:0:0', name: 'Schermo Principale', type: 'screen' },
@@ -63,7 +60,6 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
           { id: 'window:0', name: 'Finestra generica', type: 'window' }
         ]);
       } 
-      // 3. Fallback per la visualizzazione Web pura (affida al browser nativo la selezione)
       else {
         setSources([
           { id: 'native-browser', name: 'Usa il selettore del browser', type: 'screen' }
@@ -162,7 +158,6 @@ interface ChatAreaProps {
 export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId }: ChatAreaProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
   
-  // Refs per evitare stale closures negli eventi realtime
   const adminIdRef = useRef(adminId);
   const moderatorIdsRef = useRef(moderatorIds);
 
@@ -196,10 +191,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [showScreenSelectModal, setShowScreenSelectModal] = useState(false);
   const [activeActivity, setActiveActivity] = useState<string | null>(null);
 
-  // Stato per gli utenti connessi al canale vocale
+  // Image Upload States
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [voiceMembers, setVoiceMembers] = useState<any[]>([]);
   
-  // Utilizziamo i metodi e lo state dal VoiceChannelProvider
   const { 
     speakingStates, 
     localScreenStream, 
@@ -270,7 +270,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     fetchUser();
   }, []);
 
-  // Fetch e Sottoscrizione Membri del Canale Vocale
   useEffect(() => {
     if (channel?.type !== 'voice') {
       setVoiceMembers([]);
@@ -332,7 +331,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, channel?.type, channel?.server_id]);
 
-  // Gestione Messaggi Testuali
   useEffect(() => {
     if (!channel?.id || channel?.type === 'voice') {
       setIsLoading(false);
@@ -343,6 +341,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     setRealMessages([]);
     setReplyingTo(null);
     setEditingMessageId(null);
+    setSelectedImage(null);
+    setImagePreview(null);
 
     const fetchMessages = async () => {
       let { data, error } = await supabase
@@ -651,8 +651,44 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     chatInputRef.current?.focus();
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setTimeout(() => chatInputRef.current?.focus(), 10);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (channel?.type !== 'voice') setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    if (channel?.type === 'voice') return;
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setTimeout(() => chatInputRef.current?.focus(), 10);
+    }
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && inputValue.trim()) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if ((!inputValue.trim() && !selectedImage) || isUploading) return;
+      
       const content = inputValue.trim();
       setInputValue("");
       setShowChatEmojiPicker(false);
@@ -661,6 +697,25 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       setTypingStatus(false); 
 
       if (currentUser && channel && tableExists) {
+        setIsUploading(true);
+        let imageUrl = "";
+        
+        if (selectedImage) {
+          const fileExt = selectedImage.name.split('.').pop();
+          const fileName = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `chat_images/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, selectedImage);
+          if (!uploadError) {
+            const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+            imageUrl = data.publicUrl;
+          } else {
+            showError("Errore durante il caricamento dell'immagine.");
+            setIsUploading(false);
+            return;
+          }
+        }
+
         const tempId = `temp-${Date.now()}`;
         const userName = currentUserProfile ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Utente' : 'Utente';
         
@@ -674,8 +729,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         const rawDate = new Date().toISOString();
         
         let finalContent = content;
+        if (imageUrl) {
+          finalContent = finalContent ? `${finalContent} <img:${imageUrl}>` : `<img:${imageUrl}>`;
+        }
         if (replyingTo) {
-          finalContent = `<reply:${replyingTo.id}>${content}`;
+          finalContent = `<reply:${replyingTo.id}>${finalContent}`;
         }
         
         const optimisticMsg: LocalMessage = {
@@ -700,6 +758,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         
         setRealMessages(prev => [...prev, optimisticMsg]);
         setReplyingTo(null);
+        setSelectedImage(null);
+        setImagePreview(null);
+        setIsUploading(false);
 
         const { data, error } = await supabase.from('messages').insert({
           channel_id: channel.id,
@@ -742,6 +803,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
     let contentToEdit = replyMatch ? replyMatch[2] : msg.content;
     
+    contentToEdit = contentToEdit.replace(/<img:.*?>/g, '').trim();
+    
     if (contentToEdit.startsWith('**Risposta a')) {
       contentToEdit = contentToEdit.split('\n').slice(1).join('\n');
     }
@@ -765,6 +828,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const replyMatch = originalMsg?.content.match(/^<reply:([a-zA-Z0-9-]+)>/);
     if (replyMatch) {
       finalContent = `${replyMatch[0]}${finalContent}`;
+    }
+    
+    const imgRegex = /<img:(.*?)>/g;
+    let match;
+    while (originalMsg && (match = imgRegex.exec(originalMsg.content)) !== null) {
+      finalContent += ` <img:${match[1]}>`;
     }
 
     const now = new Date().toISOString();
@@ -1182,8 +1251,25 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   else if (typingNames.length === 2) typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
   else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
 
+  const hasTopAttachment = replyingTo || imagePreview;
+
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
+    <div 
+      className="flex-1 flex flex-col min-w-0 bg-[#313338] relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingFile && (
+        <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-lg border-2 border-dashed border-brand m-4">
+          <div className="bg-[#2b2d31] p-6 rounded-xl flex flex-col items-center shadow-2xl pointer-events-none">
+            <UploadCloud size={48} className="text-brand mb-4" />
+            <h3 className="text-xl font-bold text-white">Trascina l'immagine qui</h3>
+            <p className="text-[#b5bac1] mt-2">Rilascia per caricare nella chat</p>
+          </div>
+        </div>
+      )}
+
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0">
         <div className="flex items-center min-w-0 flex-1">
           <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
@@ -1220,6 +1306,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           const replyToId = isReply ? replyMatch[1] : null;
           const displayContent = isReply ? replyMatch[2] : msg.content;
           
+          const imgRegex = /<img:(.*?)>/g;
+          const images: string[] = [];
+          let match;
+          while ((match = imgRegex.exec(displayContent)) !== null) {
+            images.push(match[1]);
+          }
+          const textContent = displayContent.replace(imgRegex, '').trim();
+          
           let repliedMessage = null;
           let repliedMessageContent = "";
           
@@ -1229,6 +1323,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               repliedMessageContent = repliedMessage.content;
               const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
               if (nestedMatch) repliedMessageContent = nestedMatch[2];
+              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').trim();
             } else {
               repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
             }
@@ -1376,10 +1471,27 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     </div>
                   ) : (
                     <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">
-                      {displayContent}
-                      {msg.updatedAt && (
+                      {textContent}
+                      {msg.updatedAt && textContent && (
                         <span 
                           className="text-[10px] text-[#949ba4] ml-1.5 select-none hover:text-[#dbdee1] cursor-default transition-colors" 
+                          title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
+                        >
+                          (modificato)
+                        </span>
+                      )}
+                      {images.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2">
+                          {images.map((imgUrl, i) => (
+                            <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer" className="inline-block max-w-sm">
+                              <img src={imgUrl} alt="Attachment" className="max-h-80 rounded-lg object-contain bg-[#2b2d31] border border-[#1e1f22]" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {msg.updatedAt && !textContent && images.length > 0 && (
+                        <span 
+                          className="text-[10px] text-[#949ba4] mt-1 block select-none hover:text-[#dbdee1] cursor-default transition-colors" 
                           title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
                         >
                           (modificato)
@@ -1425,31 +1537,63 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           )}
         </div>
 
-        {replyingTo && (
-          <div className="bg-[#2b2d31] text-[#b5bac1] px-4 py-2 flex items-center justify-between text-sm rounded-t-lg -mb-2 z-10 relative border-x border-t border-[#1f2023]">
-            <div className="flex items-center truncate">
-              <ReplyIcon size={16} className="mr-2 flex-shrink-0" />
-              Stai rispondendo a <span className="font-semibold text-[#dbdee1] ml-1 truncate">@{replyingTo.user.name}</span>
-            </div>
-            <button onClick={() => setReplyingTo(null)} className="hover:text-[#dbdee1] ml-2 flex-shrink-0">
-              <X size={16} />
-            </button>
+        {hasTopAttachment && (
+          <div className="bg-[#2b2d31] px-4 py-3 flex flex-col gap-2 text-sm rounded-t-lg -mb-2 z-10 relative border-x border-t border-[#1f2023]">
+            {replyingTo && (
+              <div className="flex items-center justify-between text-[#b5bac1]">
+                <div className="flex items-center truncate">
+                  <ReplyIcon size={16} className="mr-2 flex-shrink-0" />
+                  Stai rispondendo a <span className="font-semibold text-[#dbdee1] ml-1 truncate">@{replyingTo.user.name}</span>
+                </div>
+                <button onClick={() => setReplyingTo(null)} className="hover:text-[#dbdee1] ml-2 flex-shrink-0">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+            {imagePreview && (
+              <div className="relative group inline-block self-start mt-1">
+                <img src={imagePreview} alt="Preview" className="max-h-48 rounded-md object-contain bg-[#1e1f22] border border-[#1e1f22]" />
+                <button 
+                  onClick={() => { setSelectedImage(null); setImagePreview(null); }}
+                  className="absolute -top-2 -right-2 bg-[#f23f43] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        <div className={`bg-[#383a40] flex items-center px-4 py-2.5 min-w-0 z-20 relative ${replyingTo ? 'rounded-b-lg rounded-t-none border-x border-b border-[#1f2023]' : 'rounded-lg'}`}>
+        <div className={`bg-[#383a40] flex items-center px-4 py-2.5 min-w-0 z-20 relative ${hasTopAttachment ? 'rounded-b-lg rounded-t-none border-x border-b border-[#1f2023]' : 'rounded-lg'}`}>
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors mr-2 flex-shrink-0 focus:outline-none disabled:opacity-50" 
+            title="Carica un file"
+          >
+            <PlusCircle size={24} />
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleFileSelect} 
+          />
+          
           <input
             ref={chatInputRef}
             type="text"
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
-            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e]"
+            disabled={isUploading}
+            placeholder={isUploading ? "Caricamento immagine in corso..." : replyingTo ? `Rispondi a @${replyingTo.user.name}` : `Invia un messaggio in #${channel.name}`}
+            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50"
           />
           <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
             <Popover.Trigger asChild>
-              <button className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none" title="Scegli Emoji">
+              <button disabled={isUploading} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50" title="Scegli Emoji">
                 <SmilePlus size={24} />
               </button>
             </Popover.Trigger>
@@ -1491,7 +1635,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     <span className="text-xs text-[#949ba4]">{msgToDeleteData.timestamp}</span>
                   </div>
                   <div className="text-[#dbdee1] text-[15px] mt-1 line-clamp-3 overflow-hidden break-words">
-                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '')}
+                    {msgToDeleteData.content.replace(/^<reply:([a-zA-Z0-9-]+)>/, '').replace(/<img:.*?>/g, '[Immagine]').trim()}
                   </div>
                 </div>
               </div>
