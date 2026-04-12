@@ -306,7 +306,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       return;
     }
 
-    const myLastMsg = [...realMessages].reverse().find(m => m.user.id === currentUser.id);
+    // Ignora i messaggi di sistema per il calcolo del cooldown
+    const myLastMsg = [...realMessages].reverse().find(m => m.user.id === currentUser.id && m.content !== '<system:welcome>');
     if (!myLastMsg) {
       setCooldownRemaining(0);
       return;
