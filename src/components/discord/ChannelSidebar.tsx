@@ -309,6 +309,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       return;
     }
 
+    const originalChannels = [...localChannels];
     setLocalChannels(prev => prev.map(c => c.category === categoryToRename ? { ...c, category: newName } : c));
     
     if (collapsedCategories.has(categoryToRename)) {
@@ -331,7 +332,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         .eq('category', oldName);
       
       if (error) {
-        showError("Errore durante la rinomina della categoria.");
+        showError("Permesso negato: non puoi gestire i canali.");
+        setLocalChannels(originalChannels);
       }
     } catch (e) {
       console.error(e);
@@ -380,7 +382,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       }).select().single();
 
       if (error) {
-        showError("Errore durante la creazione del canale. Hai eseguito il file SQL?");
+        showError("Permesso negato: non puoi gestire i canali.");
         setLocalChannels(prev => prev.filter(c => c.id !== tempId));
         return;
       }
@@ -416,7 +418,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     try {
       const { error } = await supabase.from('channels').delete().eq('id', id);
       if (error) {
-        showError("Impossibile eliminare.");
+        showError("Permesso negato: non puoi gestire i canali.");
         setLocalChannels(prev => [...prev, originalChannel]);
       }
     } catch (error) {
@@ -436,13 +438,17 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       return;
     }
 
+    const originalChannels = [...localChannels];
     setLocalChannels(prev => prev.map(c => c.id === channelToEdit.id ? { ...c, name: newName } : c));
     const channelId = channelToEdit.id;
     setChannelToEdit(null);
 
     try {
       const { error } = await supabase.from('channels').update({ name: newName }).eq('id', channelId);
-      if (error) showError("Errore durante la modifica del nome.");
+      if (error) {
+        showError("Permesso negato: non puoi gestire i canali.");
+        setLocalChannels(originalChannels);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -453,6 +459,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     if (!channelToSettings || !activeServer) return;
 
     const channelId = channelToSettings.id;
+    const originalChannels = [...localChannels];
     
     // Aggiornamento ottimistico
     setLocalChannels(prev => prev.map(c => {
@@ -479,7 +486,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       }).eq('id', channelId);
 
       if (error) {
-        showError("Errore durante il salvataggio delle impostazioni. Hai eseguito lo script SQL?");
+        showError("Permesso negato: non puoi gestire i canali.");
+        setLocalChannels(originalChannels);
       } else {
         showSuccess("Impostazioni canale salvate!");
       }
@@ -539,7 +547,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setDragOverInfo(null);
     if (!source || !target || !activeServer) return;
     if (source.id === target.id && source.type === target.type) return; 
+    
+    const originalChannels = [...localChannels];
     const channelsCopy = localChannels.map(c => ({...c}));
+    
     if (source.type === 'category' && target.type === 'category') {
       const cats = Array.from(new Set(displayChannels.map(c => c.category)));
       const sIdx = cats.indexOf(source.id);
@@ -559,9 +570,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       });
       setLocalChannels(channelsCopy);
       try {
-        await Promise.all(updates.map(u => supabase.from('channels').update({ category_position: u.category_position }).eq('id', u.id)));
+        const results = await Promise.all(updates.map(u => supabase.from('channels').update({ category_position: u.category_position }).eq('id', u.id)));
+        if (results.some(r => r.error)) {
+          showError("Permesso negato: non puoi gestire i canali.");
+          setLocalChannels(originalChannels);
+        }
       } catch(err) {
         showError("Errore durante il salvataggio della posizione.");
+        setLocalChannels(originalChannels);
       }
     } 
     else if (source.type === 'channel') {
@@ -589,15 +605,20 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       });
       setLocalChannels(channelsCopy);
       try {
-        await Promise.all(updates.map(u => 
+        const results = await Promise.all(updates.map(u => 
           supabase.from('channels').update({ 
             position: u.position, 
             category: u.category, 
             category_position: u.category_position 
           }).eq('id', u.id)
         ));
+        if (results.some(r => r.error)) {
+          showError("Permesso negato: non puoi gestire i canali.");
+          setLocalChannels(originalChannels);
+        }
       } catch(err) {
         showError("Errore durante il salvataggio della posizione.");
+        setLocalChannels(originalChannels);
       }
     }
   };

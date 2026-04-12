@@ -508,7 +508,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       });
       setActiveRoleTab('members');
     } else {
-      showError("Errore creazione ruolo. Hai eseguito lo script SQL?");
+      showError("Permesso negato: non puoi gestire i ruoli.");
     }
   };
 
@@ -524,7 +524,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       setRoles(roles.map(r => r.id === selectedRoleId ? { ...r, name: editRoleName, color: editRoleColor, ...editRolePermissions } : r));
       showSuccess("Ruolo aggiornato!");
     } else {
-      showError("Errore durante l'aggiornamento del ruolo.");
+      showError("Permesso negato: non puoi gestire i ruoli.");
     }
   };
 
@@ -535,6 +535,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       setRoles(roles.filter(r => r.id !== selectedRoleId));
       setSelectedRoleId(null);
       showSuccess("Ruolo eliminato!");
+    } else {
+      showError("Permesso negato: non puoi gestire i ruoli.");
     }
   };
 
@@ -542,10 +544,18 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     if (!selectedRoleId || !server) return;
     
     if (hasRole) {
-      await supabase.from('server_member_roles').delete().eq('server_id', server.id).eq('user_id', userId).eq('role_id', selectedRoleId);
+      const { error } = await supabase.from('server_member_roles').delete().eq('server_id', server.id).eq('user_id', userId).eq('role_id', selectedRoleId);
+      if (error) {
+        showError("Permesso negato: non puoi gestire i ruoli.");
+        return;
+      }
       setMemberRoles(memberRoles.filter(mr => !(mr.user_id === userId && mr.role_id === selectedRoleId)));
     } else {
-      await supabase.from('server_member_roles').insert({ server_id: server.id, user_id: userId, role_id: selectedRoleId });
+      const { error } = await supabase.from('server_member_roles').insert({ server_id: server.id, user_id: userId, role_id: selectedRoleId });
+      if (error) {
+        showError("Permesso negato: non puoi gestire i ruoli.");
+        return;
+      }
       setMemberRoles([...memberRoles, { server_id: server.id, user_id: userId, role_id: selectedRoleId }]);
     }
   };
