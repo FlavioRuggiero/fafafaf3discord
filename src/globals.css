@@ -118,9 +118,9 @@ body {
   z-index: 20;
   pointer-events: none;
 }
-.dc-particle.p1 { top: -5px; left: 10%; animation: float-up-fade 1.5s infinite 0s; }
-.dc-particle.p2 { top: 10%; right: -5px; animation: float-up-fade 1.5s infinite 0.5s; }
-.dc-particle.p3 { bottom: -5px; left: 50%; animation: float-up-fade 1.5s infinite 1s; }
+.dc-particle.p1 { top: 0; left: 10%; animation: float-up-fade 1.5s infinite 0s; }
+.dc-particle.p2 { top: 10%; right: 0; animation: float-up-fade 1.5s infinite 0.5s; }
+.dc-particle.p3 { bottom: 0; left: 50%; animation: float-up-fade 1.5s infinite 1s; }
 
 /* Matrix Hacker */
 @keyframes matrix-glow {
@@ -148,10 +148,10 @@ body {
   z-index: 20;
   text-shadow: 0 0 3px #0f0;
 }
-.matrix-char.m1 { top: -5px; left: 15%; animation: matrix-fall 1s infinite linear; }
-.matrix-char.m2 { top: 15%; right: -5px; animation: matrix-fall 1.2s infinite linear 0.3s; }
-.matrix-char.m3 { bottom: 15%; left: -5px; animation: matrix-fall 0.8s infinite linear 0.7s; }
-.matrix-char.m4 { bottom: -5px; right: 15%; animation: matrix-fall 1.5s infinite linear 0.5s; }
+.matrix-char.m1 { top: 0; left: 15%; animation: matrix-fall 1s infinite linear; }
+.matrix-char.m2 { top: 15%; right: 0; animation: matrix-fall 1.2s infinite linear 0.3s; }
+.matrix-char.m3 { bottom: 15%; left: 0; animation: matrix-fall 0.8s infinite linear 0.7s; }
+.matrix-char.m4 { bottom: 0; right: 15%; animation: matrix-fall 1.5s infinite linear 0.5s; }
 
 /* Explosive Chaotic */
 .dec-explosive {

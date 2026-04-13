@@ -27,42 +27,35 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: Ava
     <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${activeDecoration} ${speakingClass} ${className}`}>
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
-      {/* 
-        Questo contenitore invisibile è il trucco per evitare che le animazioni 
-        delle particelle allarghino l'area di scorrimento (scroll) della pagina.
-        Diamo spazio sufficiente (-60px) per farle uscire, ma nascondiamo l'overflow
-        in modo che non interagiscano MAI con il layout dell'interfaccia.
-      */}
-      <div className="absolute pointer-events-none z-20 overflow-hidden" style={{ top: '-60px', left: '-60px', right: '-60px', bottom: '-60px' }}>
-        <div className="absolute" style={{ top: '60px', left: '60px', right: '60px', bottom: '60px' }}>
-          {activeDecoration === 'dc-emit' && (
-            <>
-              <div className="dc-particle p1"></div>
-              <div className="dc-particle p2"></div>
-              <div className="dc-particle p3"></div>
-            </>
-          )}
-          
-          {activeDecoration === 'matrix' && (
-            <>
-              <div className="matrix-char m1">1</div>
-              <div className="matrix-char m2">0</div>
-              <div className="matrix-char m3">1</div>
-              <div className="matrix-char m4">0</div>
-            </>
-          )}
-          
-          {activeDecoration === 'explosive' && (
-            <>
-              <div className="explode-emoji e1">💥</div>
-              <div className="explode-emoji e2">🔥</div>
-              <div className="explode-emoji e3">💥</div>
-              <div className="explode-emoji e4">🧨</div>
-              <div className="explode-emoji e5">💥</div>
-              <div className="explode-emoji e6">🔥</div>
-            </>
-          )}
-        </div>
+      {/* Le particelle ora sono contenute esattamente nell'avatar e usano solo transform per uscire, senza alterare lo scroll */}
+      <div className="absolute inset-0 pointer-events-none z-20">
+        {activeDecoration === 'dc-emit' && (
+          <>
+            <div className="dc-particle p1"></div>
+            <div className="dc-particle p2"></div>
+            <div className="dc-particle p3"></div>
+          </>
+        )}
+        
+        {activeDecoration === 'matrix' && (
+          <>
+            <div className="matrix-char m1">1</div>
+            <div className="matrix-char m2">0</div>
+            <div className="matrix-char m3">1</div>
+            <div className="matrix-char m4">0</div>
+          </>
+        )}
+        
+        {activeDecoration === 'explosive' && (
+          <>
+            <div className="explode-emoji e1">💥</div>
+            <div className="explode-emoji e2">🔥</div>
+            <div className="explode-emoji e3">💥</div>
+            <div className="explode-emoji e4">🧨</div>
+            <div className="explode-emoji e5">💥</div>
+            <div className="explode-emoji e6">🔥</div>
+          </>
+        )}
       </div>
     </div>
   );
