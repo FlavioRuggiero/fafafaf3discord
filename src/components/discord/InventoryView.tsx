@@ -130,10 +130,10 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           </div>
                         )}
 
-                        {/* Pulsante Vendi (nell'angolino in alto a destra, z-index basso per non coprire la preview) */}
+                        {/* Pulsante Vendi (tastino angolare in alto a destra) */}
                         <button 
                           onClick={() => setItemToSell(item)}
-                          className="absolute top-2 right-2 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2 py-1 rounded-md border border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-30"
+                          className="absolute top-0 right-0 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2.5 py-1.5 rounded-tr-xl rounded-bl-xl border-b border-l border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-30"
                           title="Vendi oggetto"
                         >
                           <DollarSign size={14} />
