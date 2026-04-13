@@ -1,23 +1,54 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Mic, MicOff, Headphones, Settings } from "lucide-react";
 import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { Avatar } from "./Avatar";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UserPanelProps {
   currentUser: User;
   onOpenUserSettings?: () => void;
 }
 
-export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) => {
+export const UserPanel = ({ currentUser: initialUser, onOpenUserSettings }: UserPanelProps) => {
   const { isMuted, toggleMute, isDeafened, toggleDeafen } = useVoiceChannel();
+  const [liveUser, setLiveUser] = useState(initialUser);
 
-  const userLevel = (currentUser as any)?.level || 1;
-  const userXp = (currentUser as any)?.xp || 0;
+  // Sincronizza con le props iniziali
+  useEffect(() => {
+    setLiveUser(initialUser);
+  }, [initialUser]);
+
+  // Listener in tempo reale per aggiornare istantaneamente il contorno nel pannello
+  useEffect(() => {
+    if (!initialUser?.id) return;
+    
+    const sub = supabase.channel(`userpanel_${initialUser.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${initialUser.id}`
+      }, (payload) => {
+        setLiveUser(prev => ({ 
+          ...prev, 
+          ...payload.new,
+          avatar_decoration: payload.new.avatar_decoration
+        }));
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [initialUser?.id]);
+
+  const userLevel = (liveUser as any)?.level || 1;
+  const userXp = (liveUser as any)?.xp || 0;
   const userXpNeeded = userLevel * 5;
-  const userDigitalcardus = (currentUser as any)?.digitalcardus ?? 25;
+  const userDigitalcardus = (liveUser as any)?.digitalcardus ?? 25;
   const xpPercentage = Math.min(100, (userXp / userXpNeeded) * 100);
 
   return (
@@ -45,11 +76,17 @@ export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) =
         </div>
 
         <div className="relative">
-          <Avatar src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} decoration={currentUser?.avatar_decoration} className="w-8 h-8" />
+          {/* clipEffects={true} impedisce alle emoji di uscire dal pannello e sballare il layout */}
+          <Avatar 
+            src={liveUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${liveUser?.id}`} 
+            decoration={liveUser?.avatar_decoration} 
+            className="w-8 h-8" 
+            clipEffects={true} 
+          />
           <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559] z-30" />
         </div>
         <div className="ml-2 flex flex-col min-w-0">
-          <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser?.name}</span>
+          <span className="text-sm font-semibold text-white truncate leading-tight">{liveUser?.name}</span>
           <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
         </div>
       </div>

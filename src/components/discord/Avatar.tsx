@@ -6,14 +6,19 @@ interface AvatarProps {
   className?: string;
   decoration?: string | null;
   isSpeaking?: boolean;
+  clipEffects?: boolean;
 }
 
-export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: AvatarProps) => {
+export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipEffects }: AvatarProps) => {
   // Se isSpeaking è un booleano, significa che siamo in un contesto vocale.
-  // Mostriamo la decorazione SOLO se non siamo in vocale, OPPURE se siamo in vocale e stiamo parlando.
   const isVoiceContext = typeof isSpeaking === 'boolean';
-  const shouldShowDecoration = decoration && (!isVoiceContext || isSpeaking);
-  const activeDecoration = shouldShowDecoration ? decoration : null;
+  
+  // Fix: a volte il database o lo state passano la stringa "null" invece del valore null
+  const actualDecoration = decoration === "null" ? null : decoration;
+  
+  // Mostriamo la decorazione SOLO se non siamo in vocale, OPPURE se siamo in vocale e stiamo parlando.
+  const shouldShowDecoration = actualDecoration && (!isVoiceContext || isSpeaking);
+  const activeDecoration = shouldShowDecoration ? actualDecoration : null;
 
   // Il cerchio giallo si mostra se stiamo parlando E NON abbiamo una decorazione attiva
   const showYellowRing = isSpeaking && !activeDecoration;
@@ -27,7 +32,8 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: Ava
     <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${activeDecoration} ${speakingClass} ${className}`}>
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
-      <div className="absolute inset-0 pointer-events-none z-20">
+      {/* Se clipEffects è true (es. nel UserPanel in basso), intrappoliamo le particelle nel cerchio per non sballare il layout */}
+      <div className={`absolute inset-0 pointer-events-none z-20 ${clipEffects ? 'overflow-hidden rounded-full' : ''}`}>
         {activeDecoration === 'dc-emit' && (
           <>
             <div className="dc-particle p1"></div>
