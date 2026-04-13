@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu, Gift } from 'lucide-react';
+import { ShoppingCart, Menu, Gift, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -26,9 +26,57 @@ const getThemeTextClass = (id: string) => {
 export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  
+  // Stati per la rotazione dello shop
+  const [activeItems, setActiveItems] = useState<typeof SHOP_ITEMS>([]);
+  const [countdown, setCountdown] = useState<string>("");
 
   const today = new Date().toISOString().split('T')[0];
   const canClaimReward = currentUser?.last_reward_date !== today;
+
+  // Logica deterministica per la rotazione oraria sincronizzata
+  useEffect(() => {
+    let currentHourSeed = 0;
+
+    const updateShop = () => {
+      const now = Date.now();
+      const msPerHour = 1000 * 60 * 60;
+      const hourSeed = Math.floor(now / msPerHour);
+      
+      // Se l'ora è cambiata (o è il primo caricamento), ricalcoliamo gli oggetti
+      if (hourSeed !== currentHourSeed) {
+        currentHourSeed = hourSeed;
+        
+        // Generatore di numeri pseudo-casuali basato sul seed dell'ora
+        let seed = hourSeed;
+        const random = () => {
+          const x = Math.sin(seed++) * 10000;
+          return x - Math.floor(x);
+        };
+
+        // Fisher-Yates shuffle deterministico
+        const items = [...SHOP_ITEMS];
+        for (let i = items.length - 1; i > 0; i--) {
+          const j = Math.floor(random() * (i + 1));
+          [items[i], items[j]] = [items[j], items[i]];
+        }
+        
+        // Prendiamo i primi 4
+        setActiveItems(items.slice(0, 4));
+      }
+
+      // Calcolo del countdown
+      const nextHourTimestamp = (hourSeed + 1) * msPerHour;
+      const diff = nextHourTimestamp - now;
+      const minutes = Math.floor(diff / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setCountdown(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    updateShop();
+    const interval = setInterval(updateShop, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleClaimReward = async () => {
     if (!canClaimReward) return;
@@ -52,7 +100,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     }
   };
 
-  const handlePurchase = async (item: any) => {
+  const handlePurchase = async (item: typeof SHOP_ITEMS[0]) => {
     if (currentUser.digitalcardus < item.price) {
       showError("Non hai abbastanza digitalcardus!");
       return;
@@ -81,8 +129,6 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       setIsPurchasing(false);
     }
   };
-
-  const categories = Array.from(new Set(SHOP_ITEMS.map(item => item.category)));
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] relative overflow-hidden h-full min-w-0">
@@ -149,46 +195,56 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
             </button>
           </div>
 
-          {categories.map(category => (
-            <div key={category} className="mb-10">
-              <h2 className="text-xl font-bold text-white mb-4 border-b border-[#3f4147]/50 pb-2">{category}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {SHOP_ITEMS.filter(item => item.category === category).map(item => {
-                  const isOwned = currentUser.purchased_decorations?.includes(item.id);
-
-                  return (
-                    <div key={item.id} className="bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147]">
-                      <div className="mb-6 mt-2 h-24 flex items-center justify-center">
-                        <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
-                      </div>
-                      <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
-
-                      <div className="mt-auto w-full">
-                        {isOwned ? (
-                          <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
-                            Posseduto
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => handlePurchase(item)} 
-                            disabled={isPurchasing || currentUser.digitalcardus < item.price}
-                            className={`w-full py-2 rounded font-medium transition-colors text-sm flex items-center justify-center ${
-                              currentUser.digitalcardus < item.price 
-                                ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
-                                : 'bg-[#23a559] text-white hover:bg-[#1a7c43]'
-                            }`}
-                          >
-                            Acquista - {item.price}
-                            <img src="/digitalcardus.png" alt="Digitalcardus" className="w-3.5 h-3.5 ml-1.5 object-contain" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Shop Items Rotation */}
+          <div className="mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b border-[#3f4147]/50 pb-3 gap-3">
+              <h2 className="text-xl font-bold text-white">In Vetrina Ora</h2>
+              <div className="flex items-center bg-[#1e1f22]/80 backdrop-blur-sm border border-[#3f4147] px-3 py-1.5 rounded-lg shadow-inner">
+                <Clock size={16} className="text-brand mr-2" />
+                <span className="text-[#dbdee1] font-mono font-medium text-sm">
+                  Aggiornamento tra: <span className="text-white font-bold ml-1">{countdown}</span>
+                </span>
               </div>
             </div>
-          ))}
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {activeItems.map(item => {
+                const isOwned = currentUser.purchased_decorations?.includes(item.id);
+
+                return (
+                  <div key={item.id} className="bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147]">
+                    <div className="mb-6 mt-2 h-24 flex items-center justify-center">
+                      <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
+                    </div>
+                    <h3 className={`font-bold mb-1 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
+                    <p className="text-[11px] text-[#949ba4] uppercase font-bold tracking-wider mb-4">{item.category}</p>
+
+                    <div className="mt-auto w-full">
+                      {isOwned ? (
+                        <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
+                          Posseduto
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handlePurchase(item)} 
+                          disabled={isPurchasing || currentUser.digitalcardus < item.price}
+                          className={`w-full py-2 rounded font-medium transition-colors text-sm flex items-center justify-center ${
+                            currentUser.digitalcardus < item.price 
+                              ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
+                              : 'bg-[#23a559] text-white hover:bg-[#1a7c43]'
+                          }`}
+                        >
+                          Acquista - {item.price}
+                          <img src="/digitalcardus.png" alt="Digitalcardus" className="w-3.5 h-3.5 ml-1.5 object-contain" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
         </div>
       </div>
     </div>
