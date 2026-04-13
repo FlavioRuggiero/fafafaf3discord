@@ -184,6 +184,17 @@ const Index = () => {
     fetchActiveTrade();
 
     const tradeSub = supabase.channel(`active_trades_global_${userId}`)
+      .on('broadcast', { event: 'trade_request' }, () => {
+        fetchNotificationCount();
+        playSound('/notifica.mp3');
+        showSuccess("Hai ricevuto una nuova richiesta di scambio!");
+      })
+      .on('broadcast', { event: 'trade_accepted' }, (payload) => {
+        fetchNotificationCount();
+        if (payload.payload?.trade_id) {
+          setActiveTradeId(payload.payload.trade_id);
+        }
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
         fetchNotificationCount();
         const { data } = await supabase.from('trades').select('status, sender_id, receiver_id').eq('id', payload.new.id).single();
@@ -193,10 +204,6 @@ const Index = () => {
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, (payload) => {
         fetchNotificationCount();
-        if (payload.new.receiver_id === userId) {
-          playSound('/notifica.mp3');
-          showSuccess("Hai ricevuto una nuova richiesta di scambio!");
-        }
       })
       .subscribe();
 

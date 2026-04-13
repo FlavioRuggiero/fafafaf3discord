@@ -138,15 +138,28 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
     const updateField = isSender ? { sender_accepted: newAccepted } : { receiver_accepted: newAccepted };
     await supabase.from('trades').update(updateField).eq('id', tradeId);
 
-    if (newAccepted && theirAccepted) {
+    // Fetch dello stato più recente per evitare race conditions se entrambi cliccano insieme
+    const { data: latestTrade } = await supabase.from('trades').select('sender_accepted, receiver_accepted').eq('id', tradeId).single();
+
+    if (latestTrade && latestTrade.sender_accepted && latestTrade.receiver_accepted) {
+      // Workaround: L'RPC richiede che lo status sia 'pending'. Lo rimettiamo temporaneamente a pending.
+      await supabase.from('trades').update({ status: 'pending' }).eq('id', tradeId);
+
       const itemPrices = SHOP_ITEMS.reduce((acc, item) => ({ ...acc, [item.id]: item.price }), {});
-      const { error } = await supabase.rpc('execute_trade', { 
+      const { data, error } = await supabase.rpc('execute_trade', { 
         p_trade_id: tradeId, 
         p_item_prices: itemPrices 
       });
       
       if (error) {
-        showError("Errore durante l'esecuzione dello scambio.");
+        showError("Errore di connessione durante lo scambio.");
+        await supabase.from('trades').update({ status: 'active', sender_accepted: false, receiver_accepted: false }).eq('id', tradeId);
+      } else if (data && data.success === false) {
+        // Se l'errore è che non è più in corso, significa che l'altro utente ha già completato la transazione con successo
+        if (data.error !== 'Lo scambio non è più in corso.') {
+          showError(data.error);
+          await supabase.from('trades').update({ status: 'active', sender_accepted: false, receiver_accepted: false }).eq('id', tradeId);
+        }
       }
     }
     

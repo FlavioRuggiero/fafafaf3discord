@@ -716,7 +716,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           >
             <Bell size={20} className="mr-3" />
             <span className="font-medium flex-1 text-left">Notifiche</span>
-            {notificationCount > 0 && (
+            {notificationCount > 0 && activeChannelId !== 'notifications' && (
               <span className="bg-[#f23f43] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {notificationCount}
               </span>
