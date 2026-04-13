@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SHOP_ITEMS } from "@/data/shopItems";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -16,11 +17,12 @@ interface AdminPanelProps {
 
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const { adminId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dc' | 'mods'>('dc');
+  const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics'>('dc');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [selectedCosmeticId, setSelectedCosmeticId] = useState<string>(SHOP_ITEMS[0]?.id || '');
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -74,9 +76,37 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  const handleToggleCosmetic = async (user: Profile, cosmeticId: string, hasIt: boolean) => {
+    const currentPurchased = user.purchased_decorations || [];
+    let newPurchased;
+    let newEquipped = user.avatar_decoration;
+
+    if (hasIt) {
+      newPurchased = currentPurchased.filter(id => id !== cosmeticId);
+      // Se lo stiamo rimuovendo ed è attualmente equipaggiato, lo togliamo anche dall'equipaggiamento
+      if (newEquipped === cosmeticId) {
+        newEquipped = null;
+      }
+    } else {
+      newPurchased = [...currentPurchased, cosmeticId];
+    }
+
+    const { error } = await supabase.from('profiles').update({ 
+      purchased_decorations: newPurchased,
+      avatar_decoration: newEquipped
+    }).eq('id', user.id);
+
+    if (error) {
+      showError("Errore di permessi. Assicurati di aver eseguito il codice SQL per i permessi Admin.");
+    } else {
+      showSuccess(`Cosmetico ${hasIt ? 'rimosso' : 'assegnato'} con successo!`);
+      setUsers(users.map(u => u.id === user.id ? { ...u, purchased_decorations: newPurchased, avatar_decoration: newEquipped } : u));
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="bg-[#313338] rounded-lg w-[600px] max-h-[80vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#313338] rounded-lg w-[650px] max-h-[85vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-[#1e1f22] flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -89,10 +119,10 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex px-4 pt-4 gap-4 border-b border-[#1e1f22]">
+        <div className="flex px-4 pt-4 gap-4 border-b border-[#1e1f22] overflow-x-auto custom-scrollbar">
           <button
             onClick={() => setActiveTab('dc')}
-            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors ${activeTab === 'dc' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
+            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'dc' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
           >
             <div className="flex items-center gap-2">
               <Coins size={16} />
@@ -101,17 +131,45 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           </button>
           <button
             onClick={() => setActiveTab('mods')}
-            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors ${activeTab === 'mods' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
+            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'mods' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
           >
             <div className="flex items-center gap-2">
               <Shield size={16} />
               Gestione Moderatori
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('cosmetics')}
+            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'cosmetics' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
+          >
+            <div className="flex items-center gap-2">
+              <Palette size={16} />
+              Gestione Cosmetici
+            </div>
+          </button>
         </div>
 
         {/* Content */}
         <div className="p-4 flex-1 overflow-hidden flex flex-col">
+          
+          {/* Selettore Cosmetico (solo nel tab cosmetici) */}
+          {activeTab === 'cosmetics' && (
+            <div className="mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#1e1f22]">
+              <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona Cosmetico da gestire</label>
+              <select
+                value={selectedCosmeticId}
+                onChange={(e) => setSelectedCosmeticId(e.target.value)}
+                className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+              >
+                {SHOP_ITEMS.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} ({item.category}) - {item.price} DC
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative mb-4">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -137,6 +195,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                 const userRole = (user as any).role || 'user';
                 const isAdmin = user.id === adminId;
                 const isMod = userRole === 'moderator';
+                const hasCosmetic = user.purchased_decorations?.includes(selectedCosmeticId) || false;
                 
                 const userForCard: User = {
                   id: user.id,
@@ -150,10 +209,12 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   digitalcardus: user.digitalcardus ?? 25,
                   xp: user.xp || 0,
                   global_role: isAdmin ? 'CREATOR' : isMod ? 'MODERATOR' : 'USER',
+                  avatar_decoration: user.avatar_decoration || null,
+                  purchased_decorations: user.purchased_decorations || []
                 };
                 
                 return (
-                  <div key={user.id} className="bg-[#2b2d31] p-3 rounded flex items-center justify-between">
+                  <div key={user.id} className="bg-[#2b2d31] p-3 rounded flex items-center justify-between border border-transparent hover:border-[#3f4147] transition-colors">
                     <ProfilePopover user={userForCard} side="right" align="center">
                       <div className="flex items-center gap-3 cursor-pointer hover:bg-[#35373c] p-1.5 rounded transition-colors flex-1 min-w-0">
                         <img 
@@ -189,14 +250,20 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             {(user as any).email || 'Email non disponibile'}
                           </div>
                           <div className="text-xs text-[#949ba4] mt-0.5">
-                            {activeTab === 'dc' ? `${user.digitalcardus ?? 0} DC` : `Ruolo: ${isAdmin ? 'admin' : userRole}`}
+                            {activeTab === 'dc' && `${user.digitalcardus ?? 0} DC`}
+                            {activeTab === 'mods' && `Ruolo: ${isAdmin ? 'admin' : userRole}`}
+                            {activeTab === 'cosmetics' && (
+                              <span className={hasCosmetic ? "text-[#23a559]" : "text-[#949ba4]"}>
+                                {hasCosmetic ? "Possiede l'oggetto" : "Non possiede l'oggetto"}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                     </ProfilePopover>
 
                     <div className="flex-shrink-0 ml-4">
-                      {activeTab === 'dc' ? (
+                      {activeTab === 'dc' && (
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -220,7 +287,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             <Minus size={16} />
                           </button>
                         </div>
-                      ) : (
+                      )}
+                      
+                      {activeTab === 'mods' && (
                         <button
                           onClick={() => handleToggleMod(user.id, userRole)}
                           disabled={isAdmin}
@@ -233,6 +302,19 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           }`}
                         >
                           {isAdmin ? 'Admin' : userRole === 'moderator' ? 'Rimuovi Mod' : 'Rendi Mod'}
+                        </button>
+                      )}
+
+                      {activeTab === 'cosmetics' && (
+                        <button
+                          onClick={() => handleToggleCosmetic(user, selectedCosmeticId, hasCosmetic)}
+                          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors w-24 ${
+                            hasCosmetic 
+                              ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
+                              : 'bg-[#23a559] text-white hover:bg-[#1a7c43]'
+                          }`}
+                        >
+                          {hasCosmetic ? 'Rimuovi' : 'Assegna'}
                         </button>
                       )}
                     </div>
