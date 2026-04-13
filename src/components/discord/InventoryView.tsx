@@ -45,8 +45,8 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
   const handleSell = async () => {
     if (!itemToSell) return;
 
-    // Rimborso di 1/3 del valore dell'oggetto (arrotondato per eccesso)
-    const refundAmount = Math.ceil(itemToSell.price / 3);
+    // Rimborso della metà del valore dell'oggetto (arrotondato per difetto)
+    const refundAmount = Math.floor(itemToSell.price / 2);
     const newDecorations = (currentUser.purchased_decorations || []).filter(id => id !== itemToSell.id);
     
     const updates: any = {
@@ -206,7 +206,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
             <p className="text-[#dbdee1] mb-6 leading-relaxed">
               Sei sicuro di voler vendere <strong className={getThemeTextClass(itemToSell.id)}>{itemToSell.name}</strong>? 
               <br className="mb-2" />
-              Riceverai indietro <strong className="text-white">{Math.ceil(itemToSell.price / 3)}</strong> <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 inline-block align-text-bottom" />.
+              Riceverai indietro <strong className="text-white">{Math.floor(itemToSell.price / 2)}</strong> <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 inline-block align-text-bottom" />.
             </p>
             
             <div className="flex justify-end gap-3">
