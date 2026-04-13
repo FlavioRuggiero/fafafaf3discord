@@ -294,15 +294,14 @@ body {
 }
 .esquelito-wrapper {
   position: absolute;
-  top: 50%; left: 50%;
-  width: 0; height: 0;
+  inset: 0;
   z-index: 25;
   pointer-events: none;
   animation: spin-linear 5s linear infinite;
 }
 .esquelito-arm {
   position: absolute;
-  top: 0; left: 0;
+  inset: 0;
   transform: rotate(var(--arm-rot));
 }
 .esquelito-arm.a1 { --arm-rot: 0deg; }
@@ -311,7 +310,7 @@ body {
 
 .esquelito-pulser {
   position: absolute;
-  top: 0; left: 0;
+  top: 0; left: 50%;
   animation: pulse-bounce 1.2s infinite ease-in-out alternate;
 }
 .esquelito-pulser.p1 { animation-delay: 0s; }
@@ -320,11 +319,13 @@ body {
 
 .esquelito-skull {
   position: absolute;
-  width: 26px; height: 26px;
-  margin: -13px 0 0 -13px;
+  width: 32px; height: 32px;
+  margin: -16px 0 0 -16px; /* Centra l'immagine sul punto del pulser */
   animation: counter-spin 5s linear infinite;
   filter: drop-shadow(0 0 6px #ff4500) drop-shadow(0 0 2px #fff);
   object-fit: contain;
+  background-color: rgba(255, 69, 0, 0.1); /* Fallback visivo se l'immagine non carica */
+  border-radius: 50%;
 }
 
 @keyframes spin-linear {
@@ -336,6 +337,6 @@ body {
   to { transform: rotate(calc(-360deg - var(--arm-rot))); }
 }
 @keyframes pulse-bounce {
-  0% { transform: translateY(-22px) scale(0.8); }
-  100% { transform: translateY(-38px) scale(1.4); }
+  0% { transform: translateY(5px) scale(0.8); }
+  100% { transform: translateY(-25px) scale(1.3); }
 }
