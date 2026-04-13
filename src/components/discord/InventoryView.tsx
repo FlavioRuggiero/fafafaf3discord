@@ -125,15 +125,15 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                         
                         {/* Spunta equipaggiato (spostata a sinistra) */}
                         {isEquipped && (
-                          <div className="absolute top-2 left-2 bg-brand text-white p-1 rounded-full shadow-md z-10">
+                          <div className="absolute top-2 left-2 bg-brand text-white p-1 rounded-full shadow-md z-20">
                             <Check size={14} />
                           </div>
                         )}
 
-                        {/* Pulsante Vendi (tastino angolare in alto a destra) */}
+                        {/* Pulsante Vendi (tastino angolare in alto a destra, z-index 10 per stare dietro ai contorni) */}
                         <button 
                           onClick={() => setItemToSell(item)}
-                          className="absolute top-0 right-0 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2.5 py-1.5 rounded-tr-xl rounded-bl-xl border-b border-l border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-30"
+                          className="absolute top-0 right-0 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2.5 py-1.5 rounded-tr-xl rounded-bl-xl border-b border-l border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-10 pointer-events-auto"
                           title="Vendi oggetto"
                         >
                           <DollarSign size={14} />
@@ -159,14 +159,14 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                             </div>
                           </div>
                         ) : (
-                          <div className="mb-6 mt-2 h-24 flex items-center justify-center">
+                          <div className="mb-6 mt-2 h-24 flex items-center justify-center relative z-20 pointer-events-none">
                             <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
                           </div>
                         )}
                         
-                        <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
+                        <h3 className={`font-bold mb-4 text-sm relative z-20 ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
-                        <div className="mt-auto w-full">
+                        <div className="mt-auto w-full relative z-30">
                           {item.type === 'emoji_pack' ? (
                             <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
                               In Chat
