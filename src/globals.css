@@ -121,3 +121,61 @@ body {
 .dc-particle.p1 { top: -5px; left: 10%; animation: float-up-fade 1.5s infinite 0s; }
 .dc-particle.p2 { top: 10%; right: -5px; animation: float-up-fade 1.5s infinite 0.5s; }
 .dc-particle.p3 { bottom: -5px; left: 50%; animation: float-up-fade 1.5s infinite 1s; }
+
+/* Matrix Hacker */
+@keyframes matrix-glow {
+  0%, 100% { box-shadow: 0 0 5px #0f0, inset 0 0 5px #0f0; border-color: #0f0; }
+  50% { box-shadow: 0 0 15px #0f0, inset 0 0 10px #0f0; border-color: #5f5; }
+}
+.dec-matrix {
+  border: 2px solid #0f0;
+  animation: matrix-glow 1.5s infinite alternate;
+  position: relative;
+}
+@keyframes matrix-fall {
+  0% { transform: translateY(-10px); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(20px); opacity: 0; }
+}
+.matrix-char {
+  position: absolute;
+  color: #0f0;
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 20;
+  text-shadow: 0 0 3px #0f0;
+}
+.matrix-char.m1 { top: -5px; left: 15%; animation: matrix-fall 1s infinite linear; }
+.matrix-char.m2 { top: 15%; right: -5px; animation: matrix-fall 1.2s infinite linear 0.3s; }
+.matrix-char.m3 { bottom: 15%; left: -5px; animation: matrix-fall 0.8s infinite linear 0.7s; }
+.matrix-char.m4 { bottom: -5px; right: 15%; animation: matrix-fall 1.5s infinite linear 0.5s; }
+
+/* Explosive Chaotic */
+.dec-explosive {
+  border: 2px dashed #ff4500;
+  position: relative;
+}
+@keyframes explode-pop {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 1; }
+  50% { opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(1.5); opacity: 0; }
+}
+.explode-emoji {
+  position: absolute;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 20;
+  top: 50%;
+  left: 50%;
+  margin-top: -8px;
+  margin-left: -8px;
+}
+.explode-emoji.e1 { --tx: -30px; --ty: -30px; animation: explode-pop 0.6s infinite ease-out 0s; }
+.explode-emoji.e2 { --tx: 30px; --ty: -20px; animation: explode-pop 0.5s infinite ease-out 0.2s; }
+.explode-emoji.e3 { --tx: -20px; --ty: 30px; animation: explode-pop 0.7s infinite ease-out 0.4s; }
+.explode-emoji.e4 { --tx: 30px; --ty: 30px; animation: explode-pop 0.6s infinite ease-out 0.1s; }
+.explode-emoji.e5 { --tx: 0px; --ty: -35px; animation: explode-pop 0.5s infinite ease-out 0.5s; }
+.explode-emoji.e6 { --tx: 0px; --ty: 35px; animation: explode-pop 0.6s infinite ease-out 0.3s; }
