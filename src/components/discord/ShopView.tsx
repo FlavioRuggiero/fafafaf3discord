@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu, Coins } from 'lucide-react';
+import { ShoppingCart, Menu } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -72,7 +72,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           Cardi E-Shop
         </div>
         <div className="flex items-center bg-[#2b2d31] px-3 py-1 rounded-full">
-          <Coins size={16} className="text-yellow-500 mr-2" />
+          <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 mr-2 object-contain" />
           <span className="text-white font-bold">{currentUser.digitalcardus}</span>
         </div>
       </div>
@@ -99,7 +99,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                       </div>
                       <h3 className={`font-bold mb-2 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
                       <div className="flex items-center justify-center mb-4 bg-[#1e1f22] px-3 py-1 rounded-full">
-                        <Coins size={14} className="text-yellow-500 mr-1" />
+                        <img src="/digitalcardus.png" alt="Digitalcardus" className="w-3.5 h-3.5 mr-1.5 object-contain" />
                         <span className="text-white font-medium text-sm">{item.price}</span>
                       </div>
 
