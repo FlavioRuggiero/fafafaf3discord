@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen, Crown } from 'lucide-react';
 import { User } from '@/types/discord';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,51 +30,61 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   const [myProfile, setMyProfile] = useState<any>(null);
   const [theirProfile, setTheirProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const syncChannelRef = useRef<any>(null);
+
+  const fetchTradeData = async () => {
+    const { data: tradeData } = await supabase.from('trades').select('*').eq('id', tradeId).single();
+    if (!tradeData) {
+      onClose();
+      return;
+    }
+    setTrade(tradeData);
+
+    const isSender = tradeData.sender_id === currentUser.id;
+    const theirId = isSender ? tradeData.receiver_id : tradeData.sender_id;
+
+    const { data: profiles } = await supabase.from('profiles').select('*').in('id', [currentUser.id, theirId]);
+    if (profiles) {
+      setMyProfile(profiles.find(p => p.id === currentUser.id));
+      setTheirProfile(profiles.find(p => p.id === theirId));
+    }
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    const fetchTradeData = async () => {
-      const { data: tradeData } = await supabase.from('trades').select('*').eq('id', tradeId).single();
-      if (!tradeData) {
-        onClose();
-        return;
-      }
-      setTrade(tradeData);
-
-      const isSender = tradeData.sender_id === currentUser.id;
-      const theirId = isSender ? tradeData.receiver_id : tradeData.sender_id;
-
-      const { data: profiles } = await supabase.from('profiles').select('*').in('id', [currentUser.id, theirId]);
-      if (profiles) {
-        setMyProfile(profiles.find(p => p.id === currentUser.id));
-        setTheirProfile(profiles.find(p => p.id === theirId));
-      }
-      setIsLoading(false);
-    };
-
     fetchTradeData();
 
-    // Sottoscrizione Realtime per gli aggiornamenti dello scambio
-    const sub = supabase.channel(`trade_${tradeId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades', filter: `id=eq.${tradeId}` }, async (payload) => {
-        // Fetch completo per evitare problemi con colonne mancanti nel payload
-        const { data } = await supabase.from('trades').select('*').eq('id', tradeId).single();
-        if (data) {
-          setTrade(data);
-          if (data.status === 'completed') {
-            showSuccess("Scambio completato con successo!");
-            setTimeout(onClose, 2000);
-          } else if (data.status === 'cancelled') {
-            showError("Lo scambio è stato annullato.");
-            onClose();
-          }
+    // Utilizziamo i Broadcast per una sincronizzazione istantanea all'interno del modale
+    const channel = supabase.channel(`trade_sync_${tradeId}`);
+    channel.on('broadcast', { event: 'trade_updated' }, async () => {
+      const { data } = await supabase.from('trades').select('*').eq('id', tradeId).single();
+      if (data) {
+        setTrade(data);
+        if (data.status === 'completed') {
+          showSuccess("Scambio completato con successo!");
+          setTimeout(onClose, 2000);
+        } else if (data.status === 'cancelled') {
+          showError("Lo scambio è stato annullato.");
+          onClose();
         }
-      })
-      .subscribe();
+      }
+    }).subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        syncChannelRef.current = channel;
+      }
+    });
 
     return () => {
-      supabase.removeChannel(sub);
+      supabase.removeChannel(channel);
     };
   }, [tradeId, currentUser.id, onClose]);
+
+  const notifyUpdate = () => {
+    if (syncChannelRef.current) {
+      syncChannelRef.current.send({ type: 'broadcast', event: 'trade_updated', payload: {} });
+    }
+  };
 
   if (isLoading || !trade || !myProfile || !theirProfile) return null;
 
@@ -96,13 +106,12 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   };
 
   const handleToggleItem = async (itemId: string, isAdding: boolean) => {
-    if (myAccepted) return; // Non puoi modificare se hai già accettato
+    if (myAccepted) return;
 
     const newItems = isAdding 
       ? [...myItems, itemId] 
       : myItems.filter((id: string) => id !== itemId);
 
-    // Aggiornamento ottimistico dell'interfaccia
     setTrade((prev: any) => ({
       ...prev,
       [isSender ? 'sender_items' : 'receiver_items']: newItems,
@@ -115,12 +124,12 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
       : { receiver_items: newItems, receiver_accepted: false, sender_accepted: false };
 
     await supabase.from('trades').update(updateField).eq('id', tradeId);
+    notifyUpdate();
   };
 
   const handleToggleAccept = async () => {
     const newAccepted = !myAccepted;
     
-    // Aggiornamento ottimistico
     setTrade((prev: any) => ({
       ...prev,
       [isSender ? 'sender_accepted' : 'receiver_accepted']: newAccepted
@@ -129,7 +138,6 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
     const updateField = isSender ? { sender_accepted: newAccepted } : { receiver_accepted: newAccepted };
     await supabase.from('trades').update(updateField).eq('id', tradeId);
 
-    // Se io sto accettando e l'altro ha già accettato, eseguiamo lo scambio
     if (newAccepted && theirAccepted) {
       const itemPrices = SHOP_ITEMS.reduce((acc, item) => ({ ...acc, [item.id]: item.price }), {});
       const { error } = await supabase.rpc('execute_trade', { 
@@ -141,10 +149,13 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
         showError("Errore durante l'esecuzione dello scambio.");
       }
     }
+    
+    notifyUpdate();
   };
 
   const handleCancelTrade = async () => {
     await supabase.from('trades').update({ status: 'cancelled' }).eq('id', tradeId);
+    notifyUpdate();
     onClose();
   };
 
@@ -190,12 +201,11 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
           <img src="/digitalcardus.png" alt="dc" className="w-2.5 h-2.5 object-contain" />
         </div>
 
-        {/* Overlay Azione */}
         {action !== 'none' && !myAccepted && (
-          <div className={`absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] ${
-            action === 'add' ? 'bg-[#23a559]/80' : 'bg-[#f23f43]/80'
+          <div className={`absolute inset-0 flex items-center justify-end pr-4 opacity-0 group-hover:opacity-100 transition-opacity ${
+            action === 'add' ? 'bg-gradient-to-l from-[#23a559]/90 to-transparent' : 'bg-gradient-to-l from-[#f23f43]/90 to-transparent'
           }`}>
-            {action === 'add' ? <Plus className="text-white drop-shadow-md" size={32} /> : <Minus className="text-white drop-shadow-md" size={32} />}
+            {action === 'add' ? <Plus className="text-white" size={20} /> : <Minus className="text-white" size={20} />}
           </div>
         )}
       </div>

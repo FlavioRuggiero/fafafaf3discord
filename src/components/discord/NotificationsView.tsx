@@ -22,38 +22,36 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
   const today = new Date().toISOString().split('T')[0];
   const canClaimReward = currentUser?.last_reward_date !== today;
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      setIsLoading(true);
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    
+    const { data: mentionData } = await supabase
+      .from('messages')
+      .select('id, content, created_at, channel_id, user_id, profiles(first_name, avatar_url), channels(name, server_id, servers(name))')
+      .or(`content.ilike.%<@${currentUser.id}>%,content.ilike.%<@everyone>%`)
+      .order('created_at', { ascending: false })
+      .limit(20);
       
-      // Fetch Mentions
-      const { data: mentionData } = await supabase
-        .from('messages')
-        .select('id, content, created_at, channel_id, user_id, profiles(first_name, avatar_url), channels(name, server_id, servers(name))')
-        .or(`content.ilike.%<@${currentUser.id}>%,content.ilike.%<@everyone>%`)
-        .order('created_at', { ascending: false })
-        .limit(20);
-        
-      if (mentionData) setMentions(mentionData);
+    if (mentionData) setMentions(mentionData);
 
-      // Fetch Pending Trades
-      const { data: tradeData } = await supabase
-        .from('trades')
-        .select('id, sender_id, created_at, profiles!trades_sender_id_fkey(first_name, avatar_url)')
-        .eq('receiver_id', currentUser.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-        
-      if (tradeData) setTrades(tradeData);
+    const { data: tradeData } = await supabase
+      .from('trades')
+      .select('id, sender_id, created_at, profiles!trades_sender_id_fkey(first_name, avatar_url)')
+      .eq('receiver_id', currentUser.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+      
+    if (tradeData) setTrades(tradeData);
 
-      setIsLoading(false);
-    };
+    setIsLoading(false);
+  };
 
+  useEffect(() => {
     fetchNotifications();
 
-    // Realtime per i trade
-    const tradeSub = supabase.channel('pending_trades')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `receiver_id=eq.${currentUser.id}` }, () => {
+    // Ascolta i broadcast per aggiornare la lista quando arriva una nuova richiesta
+    const tradeSub = supabase.channel(`active_trades_global_${currentUser.id}_notif`)
+      .on('broadcast', { event: 'trade_request' }, () => {
         fetchNotifications();
       })
       .subscribe();
@@ -63,20 +61,35 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
     };
   }, [currentUser.id]);
 
-  const handleAcceptTrade = async (tradeId: string) => {
+  const sendBroadcast = (targetId: string, event: string, payload: any) => {
+    const channel = supabase.channel(`active_trades_global_${targetId}`);
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.send({ type: 'broadcast', event, payload });
+        setTimeout(() => supabase.removeChannel(channel), 500);
+      }
+    });
+  };
+
+  const handleAcceptTrade = async (tradeId: string, senderId: string) => {
     const { error } = await supabase.from('trades').update({ status: 'active' }).eq('id', tradeId);
     if (error) {
       showError("Errore durante l'accettazione dello scambio.");
     } else {
       showSuccess("Scambio accettato!");
-      onNavigateToTrade(tradeId); // Apre istantaneamente il modale
+      onNavigateToTrade(tradeId);
+      // Notifica il mittente per aprire il modale istantaneamente
+      sendBroadcast(senderId, 'trade_accepted', { trade_id: tradeId });
     }
   };
 
   const handleDeclineTrade = async (tradeId: string) => {
     const { error } = await supabase.from('trades').delete().eq('id', tradeId);
     if (error) showError("Errore durante il rifiuto dello scambio.");
-    else showSuccess("Scambio rifiutato.");
+    else {
+      showSuccess("Scambio rifiutato.");
+      fetchNotifications();
+    }
   };
 
   return (
@@ -144,7 +157,7 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
                     <button 
-                      onClick={() => handleAcceptTrade(trade.id)}
+                      onClick={() => handleAcceptTrade(trade.id, trade.sender_id)}
                       className="w-10 h-10 bg-[#23a559] hover:bg-[#1a7c43] text-white rounded-full flex items-center justify-center transition-colors"
                       title="Accetta"
                     >

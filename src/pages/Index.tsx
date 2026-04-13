@@ -152,8 +152,7 @@ const Index = () => {
     };
   }, [currentUser?.id]);
 
-  // Listener per conteggio notifiche e scambi attivi
-  // FIX: Usiamo currentUser?.id come dipendenza per evitare che il listener si riavvii continuamente
+  // Listener per conteggio notifiche e scambi attivi tramite BROADCAST
   useEffect(() => {
     if (!currentUser?.id) return;
     
@@ -184,27 +183,17 @@ const Index = () => {
     };
     fetchActiveTrade();
 
+    // Utilizziamo i Broadcast per una reattività istantanea senza dipendere dal realtime del database
     const tradeSub = supabase.channel(`active_trades_global_${userId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
+      .on('broadcast', { event: 'trade_request' }, () => {
         fetchNotificationCount();
-        if (payload.new.status === 'active') {
-          // Controlliamo se lo scambio ci riguarda
-          if (payload.new.sender_id === userId || payload.new.receiver_id === userId) {
-            setActiveTradeId(payload.new.id);
-          } else if (!payload.new.sender_id || !payload.new.receiver_id) {
-            // Fallback se il payload non contiene tutte le colonne
-            const { data } = await supabase.from('trades').select('sender_id, receiver_id').eq('id', payload.new.id).single();
-            if (data && (data.sender_id === userId || data.receiver_id === userId)) {
-              setActiveTradeId(payload.new.id);
-            }
-          }
-        }
+        playSound('/notifica.mp3');
+        showSuccess("Hai ricevuto una nuova richiesta di scambio!");
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, (payload) => {
+      .on('broadcast', { event: 'trade_accepted' }, (payload) => {
         fetchNotificationCount();
-        if (payload.new.receiver_id === userId) {
-          playSound('/notifica.mp3');
-          showSuccess("Hai ricevuto una nuova richiesta di scambio!");
+        if (payload.payload?.trade_id) {
+          setActiveTradeId(payload.payload.trade_id);
         }
       })
       .subscribe();
@@ -265,7 +254,6 @@ const Index = () => {
   };
 
   // Gestione Supabase Presence
-  // FIX: Usiamo user?.id come dipendenza
   useEffect(() => {
     if (!user?.id) return;
 

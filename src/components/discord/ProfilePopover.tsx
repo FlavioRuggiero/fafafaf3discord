@@ -49,17 +49,26 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
   const currentXp = user.xp || 0;
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
   
-  // Filtra gli oggetti posseduti e li ordina per prezzo decrescente
   const ownedItems = (user.purchased_decorations
     ?.map(id => SHOP_ITEMS.find(i => i.id === id))
     .filter(Boolean) as typeof SHOP_ITEMS)
     ?.sort((a, b) => b.price - a.price) || [];
 
+  // Helper per inviare il broadcast in tempo reale
+  const sendBroadcast = (targetId: string, event: string, payload: any) => {
+    const channel = supabase.channel(`active_trades_global_${targetId}`);
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.send({ type: 'broadcast', event, payload });
+        setTimeout(() => supabase.removeChannel(channel), 500);
+      }
+    });
+  };
+
   const handleRequestTrade = async () => {
     if (!authUser) return;
     setIsRequestingTrade(true);
     
-    // Controlla se l'altro utente ci ha già inviato una richiesta di scambio in sospeso
     const { data: existingTrade } = await supabase
       .from('trades')
       .select('id')
@@ -69,15 +78,16 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
       .maybeSingle();
 
     if (existingTrade) {
-      // Se esiste già, la accettiamo automaticamente
       const { error } = await supabase.from('trades').update({ status: 'active' }).eq('id', existingTrade.id);
       if (error) {
         showError("Errore nell'accettazione dello scambio.");
       } else {
         showSuccess("Scambio accettato!");
+        // Notifica l'altro utente e te stesso per aprire il modale istantaneamente
+        sendBroadcast(user.id, 'trade_accepted', { trade_id: existingTrade.id });
+        sendBroadcast(authUser.id, 'trade_accepted', { trade_id: existingTrade.id });
       }
     } else {
-      // Altrimenti creiamo una nuova richiesta
       const { error } = await supabase.from('trades').insert({
         sender_id: authUser.id,
         receiver_id: user.id,
@@ -88,6 +98,8 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
         showError("Errore nell'invio della richiesta di scambio.");
       } else {
         showSuccess("Richiesta di scambio inviata!");
+        // Invia la notifica in tempo reale all'altro utente
+        sendBroadcast(user.id, 'trade_request', {});
       }
     }
     
