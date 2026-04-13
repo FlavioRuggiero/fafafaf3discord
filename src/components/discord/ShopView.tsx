@@ -212,12 +212,17 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 const isOwned = currentUser.purchased_decorations?.includes(item.id);
 
                 return (
-                  <div key={item.id} className="bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147]">
-                    <div className="mb-6 mt-2 h-24 flex items-center justify-center">
+                  <div key={item.id} className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147]">
+                    
+                    {/* Badge Categoria */}
+                    <div className="absolute top-3 left-3 bg-[#1e1f22] text-[#949ba4] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border border-[#3f4147]/50 shadow-sm">
+                      {item.category}
+                    </div>
+
+                    <div className="mb-6 mt-4 h-24 flex items-center justify-center">
                       <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
                     </div>
-                    <h3 className={`font-bold mb-1 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
-                    <p className="text-[11px] text-[#949ba4] uppercase font-bold tracking-wider mb-4">{item.category}</p>
+                    <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
                     <div className="mt-auto w-full">
                       {isOwned ? (
