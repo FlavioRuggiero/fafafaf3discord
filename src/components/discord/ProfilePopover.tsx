@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
-import { Shield } from "lucide-react";
+import { Shield, Archive, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
+import { SHOP_ITEMS } from "@/data/shopItems";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -22,8 +23,19 @@ const statusText = {
   offline: "Offline",
 };
 
+const getThemeTextClass = (id: string) => {
+  switch(id) {
+    case 'supernova': return 'theme-text-supernova';
+    case 'esquelito': return 'theme-text-esquelito';
+    case 'oceanic': return 'theme-text-oceanic';
+    case 'saturn-fire': return 'theme-text-saturn-fire';
+    default: return 'text-[#dbdee1]';
+  }
+};
+
 export const ProfilePopover = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
   const { adminId, moderatorIds } = useAuth();
+  const [showInventory, setShowInventory] = useState(false);
 
   if (!user) return <>{children}</>;
 
@@ -32,6 +44,10 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
   const xpNeeded = (user.level || 1) * 5;
   const currentXp = user.xp || 0;
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
+  
+  const ownedItems = user.purchased_decorations
+    ?.map(id => SHOP_ITEMS.find(i => i.id === id))
+    .filter(Boolean) || [];
   
   return (
     <Popover.Root>
@@ -142,6 +158,50 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
                 </div>
               </div>
             )}
+
+            {/* Sezione Inventario */}
+            <div className="mt-4 pt-4 border-t border-[#2b2d31]">
+              <button
+                onClick={() => setShowInventory(!showInventory)}
+                className="flex items-center justify-between w-full text-[11px] font-bold uppercase text-[#b5bac1] hover:text-[#dbdee1] transition-colors tracking-wider focus:outline-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Archive size={14} />
+                  Inventario ({ownedItems.length})
+                </div>
+                {showInventory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+
+              {showInventory && (
+                <div className="mt-3 max-h-40 overflow-y-auto custom-scrollbar pr-1 space-y-2">
+                  {ownedItems.length === 0 ? (
+                    <p className="text-xs text-[#949ba4] italic text-center py-2">Nessun oggetto posseduto.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                      {ownedItems.map(item => (
+                        <div key={item!.id} className="flex items-center bg-[#2b2d31] border border-[#1e1f22] rounded p-2">
+                          {item!.type === 'emoji_pack' ? (
+                            <div className="w-8 h-8 grid grid-cols-2 gap-0.5 mr-3 flex-shrink-0 bg-[#1e1f22] p-0.5 rounded">
+                              {item!.emojis?.slice(0, 4).map(e => (
+                                <img key={e} src={e} className="w-full h-full object-contain" />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 mr-3 flex-shrink-0 flex items-center justify-center">
+                              <Avatar src={user.avatar} decoration={item!.id} className="w-6 h-6" />
+                            </div>
+                          )}
+                          <span className={`text-xs font-medium truncate ${getThemeTextClass(item!.id)}`}>
+                            {item!.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
         </Popover.Content>
       </Popover.Portal>
