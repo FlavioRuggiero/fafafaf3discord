@@ -64,7 +64,7 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
           >
             <div className="absolute -bottom-10 left-4 rounded-full border-[6px] border-[#111214] bg-[#111214]">
               <Avatar src={user.avatar} decoration={user.avatar_decoration} className="w-16 h-16" />
-              <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-[#111214] ${statusColors[user.status]} z-50`} title={statusText[user.status]} />
+              <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-[#111214] ${statusColors[user.status]}`} title={statusText[user.status]} />
             </div>
           </div>
           

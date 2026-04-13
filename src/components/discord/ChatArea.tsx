@@ -1410,7 +1410,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                            />;
                   } else {
                     return (
-                      <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full bg-[#2b2d31] shadow-2xl">
+                      <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
                         <Avatar src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} decoration={focusedMember.profiles?.avatar_decoration} className="w-full h-full object-cover" />
                       </div>
                     );
@@ -1433,15 +1433,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div className="h-36 sm:h-44 bg-[#111214] flex items-center gap-4 px-4 overflow-x-auto border-t border-[#1f2023] flex-shrink-0 custom-scrollbar">
                   {displayVoiceMembers.filter(m => m.user_id !== focusedUserId).map(member => {
                     const isSpeaking = speakingStates[member.user_id];
-                    const hasDecoration = !!member.profiles?.avatar_decoration;
-                    const showSpeakingRing = isSpeaking && !hasDecoration;
                     const isLocal = member.user_id === currentUser?.id;
                     const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
                     const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
 
                     const memberContent = (
                       <div onClick={() => setFocusedUserId(member.user_id)}
-                           className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${showSpeakingRing ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
+                           className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${isSpeaking ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
                         {hasScreen && streamToPlay ? (
                           <div className="w-full h-full overflow-hidden rounded-lg pointer-events-none opacity-80">
                              <StreamPlayer 
@@ -1453,7 +1451,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                              />
                           </div>
                         ) : (
-                          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#2b2d31] ${showSpeakingRing ? 'ring-2 ring-yellow-500' : ''}`}>
+                          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
                             <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} className="w-full h-full object-cover" />
                           </div>
                         )}
@@ -1509,17 +1507,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   <div className="w-full max-w-7xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
                     {displayVoiceMembers.map(member => {
                       const isSpeaking = speakingStates[member.user_id];
-                      const hasDecoration = !!member.profiles?.avatar_decoration;
-                      const showSpeakingRing = isSpeaking && !hasDecoration;
                       const isLocal = member.user_id === currentUser?.id;
                       const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
                       const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
                       
                       const memberContent = (
-                        <div className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl aspect-video border-2 transition-all duration-150 ${showSpeakingRing ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
+                        <div className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
                           
                           {hasScreen && streamToPlay ? (
-                            <div className="w-full h-full bg-black relative overflow-hidden rounded-xl">
+                            <div className="w-full h-full bg-black relative">
                               <StreamPlayer 
                                 stream={streamToPlay} 
                                 isLocal={isLocal} 
@@ -1530,7 +1526,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                               <div className="absolute top-3 left-3 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded shadow-md uppercase tracking-wider">In onda</div>
                             </div>
                           ) : (
-                            <div className={`w-24 h-24 rounded-full bg-[#2b2d31] transition-all duration-150 ${showSpeakingRing ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
+                            <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
                               <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} className="w-full h-full object-cover" />
                             </div>
                           )}
@@ -1743,7 +1739,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
             <Hash size={32} />

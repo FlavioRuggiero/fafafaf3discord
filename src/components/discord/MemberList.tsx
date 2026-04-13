@@ -51,8 +51,8 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
             )}
             <Avatar src={user.avatar} decoration={user.avatar_decoration} className={`w-8 h-8 ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
             
-            <div className="absolute -bottom-0.5 -right-0.5 group/status z-50">
-              <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]} relative z-50`} />
+            <div className="absolute -bottom-0.5 -right-0.5 group/status">
+              <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
               
               <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
                 {statusText[user.status]}
@@ -101,7 +101,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
       <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-end px-4 flex-shrink-0">
       </div>
       
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 pr-2">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pr-2">
         {creator && (
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
