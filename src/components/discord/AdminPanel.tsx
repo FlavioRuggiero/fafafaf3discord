@@ -108,7 +108,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
       <div className="bg-[#313338] rounded-lg w-[650px] max-h-[85vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-[#1e1f22] flex justify-between items-center">
+        <div className="flex-shrink-0 p-4 border-b border-[#1e1f22] flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Shield className="text-yellow-500" />
             Pannello Amministratore
@@ -119,7 +119,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex px-4 pt-4 gap-4 border-b border-[#1e1f22] overflow-x-auto custom-scrollbar">
+        <div className="flex flex-shrink-0 px-4 pt-4 gap-4 border-b border-[#1e1f22] overflow-x-auto custom-scrollbar">
           <button
             onClick={() => setActiveTab('dc')}
             className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'dc' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
@@ -154,7 +154,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           
           {/* Selettore Cosmetico (solo nel tab cosmetici) */}
           {activeTab === 'cosmetics' && (
-            <div className="mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#1e1f22]">
+            <div className="flex-shrink-0 mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#1e1f22]">
               <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona Cosmetico da gestire</label>
               <select
                 value={selectedCosmeticId}
@@ -171,7 +171,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           )}
 
           {/* Search */}
-          <div className="relative mb-4">
+          <div className="flex-shrink-0 relative mb-4">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={16} className="text-[#949ba4]" />
             </div>
