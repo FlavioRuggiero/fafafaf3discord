@@ -6,6 +6,7 @@ import { MemberList } from "@/components/discord/MemberList";
 import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { ShopView } from "@/components/discord/ShopView";
+import { InventoryView } from "@/components/discord/InventoryView";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -855,6 +856,8 @@ const Index = () => {
         ) : activeServerId === 'home' ? (
           activeChannel?.id === 'shop' ? (
             <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'inventory' ? (
+            <InventoryView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : (
             <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
               <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">

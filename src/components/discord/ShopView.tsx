@@ -6,18 +6,12 @@ import { Leaf, Sparkles, Menu, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
+import { SHOP_ITEMS } from '@/data/shopItems';
 
 interface ShopViewProps {
   currentUser: User;
   onToggleSidebar?: () => void;
 }
-
-const SHOP_ITEMS = [
-  { id: 'pulse-red', name: 'Contorno Rosso Pulsante', price: 20, type: 'decoration' },
-  { id: 'electric', name: 'Contorno Elettrico', price: 50, type: 'decoration' },
-  { id: 'pulse-gray', name: 'Contorno Grigio Pulsante', price: 20, type: 'decoration' },
-  { id: 'dc-emit', name: 'Emanazione Digitalcardus', price: 70, type: 'decoration' },
-];
 
 export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const [isClaiming, setIsClaiming] = useState(false);
@@ -58,22 +52,6 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
     if (error) showError("Errore durante l'acquisto. Hai eseguito lo script SQL?");
     else showSuccess(`Hai acquistato ${item.name}!`);
-  };
-
-  const handleEquip = async (id: string) => {
-    const { error } = await supabase.from('profiles').update({
-      avatar_decoration: id
-    }).eq('id', currentUser.id);
-    if (error) showError("Errore durante l'equipaggiamento.");
-    else showSuccess("Contorno equipaggiato!");
-  };
-
-  const handleUnequip = async () => {
-    const { error } = await supabase.from('profiles').update({
-      avatar_decoration: null
-    }).eq('id', currentUser.id);
-    if (error) showError("Errore durante la rimozione.");
-    else showSuccess("Contorno rimosso!");
   };
 
   return (
@@ -139,7 +117,6 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
             {SHOP_ITEMS.map(item => {
               const isPurchased = currentUser.purchased_decorations?.includes(item.id);
-              const isEquipped = currentUser.avatar_decoration === item.id;
 
               return (
                 <div key={item.id} className="bg-[#1e1f22] border border-[#2b2d31] rounded-xl p-6 flex flex-col items-center text-center hover:border-[#23a559]/50 transition-colors shadow-lg">
@@ -153,13 +130,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                   </div>
 
                   <div className="mt-auto w-full">
-                    {isEquipped ? (
-                      <button onClick={handleUnequip} className="w-full py-2 rounded bg-[#35373c] text-white font-medium hover:bg-[#404249] transition-colors text-sm">
-                        Rimuovi
-                      </button>
-                    ) : isPurchased ? (
-                      <button onClick={() => handleEquip(item.id)} className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
-                        Equipaggia
+                    {isPurchased ? (
+                      <button disabled className="w-full py-2 rounded bg-[#35373c] text-[#949ba4] font-medium cursor-not-allowed text-sm">
+                        Prodotto acquistato
                       </button>
                     ) : (
                       <button onClick={() => handlePurchase(item)} className="w-full py-2 rounded bg-[#23a559] text-white font-medium hover:bg-[#1e8f4c] transition-colors text-sm">

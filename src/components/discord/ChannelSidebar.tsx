@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -719,6 +719,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             {canClaimReward && (
               <div className="w-2 h-2 rounded-full bg-[#f23f43] shadow-[0_0_5px_#f23f43]" title="Premio giornaliero disponibile!" />
             )}
+          </button>
+
+          <button
+            onClick={() => onChannelSelect({ id: 'inventory', name: 'Inventario', type: 'text', category: '', server_id: null })}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'inventory' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+          >
+            <Archive size={20} className="mr-3" />
+            <span className="font-medium">Inventario</span>
           </button>
 
           {currentUser?.id === adminId && (
