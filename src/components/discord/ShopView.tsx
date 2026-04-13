@@ -179,8 +179,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     let newPurchased = currentUser.purchased_decorations || [];
 
     if (isOwned) {
-      // Rimborso del 50% del valore dell'oggetto se già posseduto
-      refund = Math.floor(selectedItem.price / 2);
+      // Rimborso di 1/3 del valore dell'oggetto se già posseduto (arrotondato per eccesso)
+      refund = Math.ceil(selectedItem.price / 3);
       newBalance += refund;
     } else {
       newPurchased = [...newPurchased, selectedItem.id];
