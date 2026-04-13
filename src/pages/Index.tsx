@@ -153,8 +153,11 @@ const Index = () => {
   }, [currentUser?.id]);
 
   // Listener per conteggio notifiche e scambi attivi
+  // FIX: Usiamo currentUser?.id come dipendenza per evitare che il listener si riavvii continuamente
   useEffect(() => {
     if (!currentUser?.id) return;
+    
+    const userId = currentUser.id;
 
     const fetchNotificationCount = async () => {
       const userRef = currentUserRef.current;
@@ -163,7 +166,7 @@ const Index = () => {
       const today = new Date().toISOString().split('T')[0];
       let count = userRef.last_reward_date !== today ? 1 : 0;
 
-      const { count: tradeCount } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', userRef.id).eq('status', 'pending');
+      const { count: tradeCount } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('status', 'pending');
       if (tradeCount) count += tradeCount;
 
       setNotificationCount(count);
@@ -174,25 +177,32 @@ const Index = () => {
     const fetchActiveTrade = async () => {
       const { data } = await supabase.from('trades')
         .select('id')
-        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
         .eq('status', 'active')
         .limit(1);
       if (data && data.length > 0) setActiveTradeId(data[0].id);
     };
     fetchActiveTrade();
 
-    const tradeSub = supabase.channel('active_trades_global')
+    const tradeSub = supabase.channel(`active_trades_global_${userId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
         fetchNotificationCount();
-        // Fetch the trade to be absolutely sure we have the latest data
-        const { data } = await supabase.from('trades').select('status, sender_id, receiver_id').eq('id', payload.new.id).single();
-        if (data && data.status === 'active' && (data.sender_id === currentUser.id || data.receiver_id === currentUser.id)) {
-          setActiveTradeId(payload.new.id);
+        if (payload.new.status === 'active') {
+          // Controlliamo se lo scambio ci riguarda
+          if (payload.new.sender_id === userId || payload.new.receiver_id === userId) {
+            setActiveTradeId(payload.new.id);
+          } else if (!payload.new.sender_id || !payload.new.receiver_id) {
+            // Fallback se il payload non contiene tutte le colonne
+            const { data } = await supabase.from('trades').select('sender_id, receiver_id').eq('id', payload.new.id).single();
+            if (data && (data.sender_id === userId || data.receiver_id === userId)) {
+              setActiveTradeId(payload.new.id);
+            }
+          }
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, (payload) => {
         fetchNotificationCount();
-        if (payload.new.receiver_id === currentUser.id) {
+        if (payload.new.receiver_id === userId) {
           playSound('/notifica.mp3');
           showSuccess("Hai ricevuto una nuova richiesta di scambio!");
         }
@@ -255,8 +265,9 @@ const Index = () => {
   };
 
   // Gestione Supabase Presence
+  // FIX: Usiamo user?.id come dipendenza
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
     const channel = supabase.channel('global_presence', {
       config: {
@@ -291,10 +302,12 @@ const Index = () => {
       channel.untrack();
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   // Listener Realtime per la tabella Profiles e Channels
   useEffect(() => {
+    if (!user?.id) return;
+    
     const profileSubscription = supabase
       .channel('public:profiles_index')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
