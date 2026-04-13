@@ -174,10 +174,12 @@ const Index = () => {
     fetchActiveTrade();
 
     const tradeSub = supabase.channel('active_trades_global')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
         fetchNotificationCount();
-        if (payload.eventType === 'UPDATE' && payload.new.status === 'active') {
-          if (payload.new.sender_id === currentUser.id || payload.new.receiver_id === currentUser.id) {
+        if (payload.new.status === 'active') {
+          // Fetch the trade to check if it belongs to us (since payload.new might lack columns if not updated)
+          const { data } = await supabase.from('trades').select('sender_id, receiver_id').eq('id', payload.new.id).single();
+          if (data && (data.sender_id === currentUser.id || data.receiver_id === currentUser.id)) {
             setActiveTradeId(payload.new.id);
           }
         }
@@ -931,6 +933,7 @@ const Index = () => {
               onToggleSidebar={() => setShowSidebar(true)} 
               onNavigateToShop={() => setActiveChannel({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
               onNavigateToMessage={handleNavigateToMessage}
+              onNavigateToTrade={(id) => setActiveTradeId(id)}
             />
           ) : (
             <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">

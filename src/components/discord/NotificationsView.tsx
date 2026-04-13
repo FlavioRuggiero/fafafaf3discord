@@ -11,9 +11,10 @@ interface NotificationsViewProps {
   onToggleSidebar?: () => void;
   onNavigateToShop: () => void;
   onNavigateToMessage: (serverId: string, channelId: string, messageId: string) => void;
+  onNavigateToTrade: (tradeId: string) => void;
 }
 
-export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToShop, onNavigateToMessage }: NotificationsViewProps) => {
+export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToShop, onNavigateToMessage, onNavigateToTrade }: NotificationsViewProps) => {
   const [mentions, setMentions] = useState<any[]>([]);
   const [trades, setTrades] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,8 +65,12 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
 
   const handleAcceptTrade = async (tradeId: string) => {
     const { error } = await supabase.from('trades').update({ status: 'active' }).eq('id', tradeId);
-    if (error) showError("Errore durante l'accettazione dello scambio.");
-    else showSuccess("Scambio accettato! Si aprirà la finestra di scambio.");
+    if (error) {
+      showError("Errore durante l'accettazione dello scambio.");
+    } else {
+      showSuccess("Scambio accettato!");
+      onNavigateToTrade(tradeId); // Apre istantaneamente il modale
+    }
   };
 
   const handleDeclineTrade = async (tradeId: string) => {

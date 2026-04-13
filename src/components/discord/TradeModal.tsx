@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, Check } from 'lucide-react';
+import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen } from 'lucide-react';
 import { User } from '@/types/discord';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { SHOP_ITEMS } from '@/data/shopItems';
+import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
 import { Avatar } from './Avatar';
 
 interface TradeModalProps {
@@ -13,6 +13,17 @@ interface TradeModalProps {
   currentUser: User;
   onClose: () => void;
 }
+
+const getThemeTextClass = (id: string) => {
+  switch(id) {
+    case 'supernova': return 'theme-text-supernova';
+    case 'esquelito': return 'theme-text-esquelito';
+    case 'oceanic': return 'theme-text-oceanic';
+    case 'saturn-fire': return 'theme-text-saturn-fire';
+    case 'gustavo-armando': return 'theme-text-gustavo';
+    default: return 'text-white';
+  }
+};
 
 export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) => {
   const [trade, setTrade] = useState<any>(null);
@@ -42,12 +53,20 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
 
     fetchTradeData();
 
+    // Sottoscrizione Realtime per gli aggiornamenti dello scambio
     const sub = supabase.channel(`trade_${tradeId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades', filter: `id=eq.${tradeId}` }, (payload) => {
-        setTrade(payload.new);
-        if (payload.new.status === 'completed') {
-          showSuccess("Scambio completato con successo!");
-          setTimeout(onClose, 2000);
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades', filter: `id=eq.${tradeId}` }, async (payload) => {
+        // Fetch completo per evitare problemi con colonne mancanti nel payload
+        const { data } = await supabase.from('trades').select('*').eq('id', tradeId).single();
+        if (data) {
+          setTrade(data);
+          if (data.status === 'completed') {
+            showSuccess("Scambio completato con successo!");
+            setTimeout(onClose, 2000);
+          } else if (data.status === 'cancelled') {
+            showError("Lo scambio è stato annullato.");
+            onClose();
+          }
         }
       })
       .subscribe();
@@ -69,6 +88,13 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
 
   const myInventory = (myProfile.purchased_decorations || []).filter((id: string) => !myItems.includes(id));
 
+  const calculateTotalValue = (itemIds: string[]) => {
+    return itemIds.reduce((total, id) => {
+      const item = SHOP_ITEMS.find(i => i.id === id);
+      return total + (item ? item.price : 0);
+    }, 0);
+  };
+
   const handleToggleItem = async (itemId: string, isAdding: boolean) => {
     if (myAccepted) return; // Non puoi modificare se hai già accettato
 
@@ -76,22 +102,37 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
       ? [...myItems, itemId] 
       : myItems.filter((id: string) => id !== itemId);
 
-    const updateField = isSender ? { sender_items: newItems, sender_accepted: false, receiver_accepted: false } 
-                                 : { receiver_items: newItems, receiver_accepted: false, sender_accepted: false };
+    // Aggiornamento ottimistico dell'interfaccia
+    setTrade((prev: any) => ({
+      ...prev,
+      [isSender ? 'sender_items' : 'receiver_items']: newItems,
+      sender_accepted: false,
+      receiver_accepted: false
+    }));
+
+    const updateField = isSender 
+      ? { sender_items: newItems, sender_accepted: false, receiver_accepted: false } 
+      : { receiver_items: newItems, receiver_accepted: false, sender_accepted: false };
 
     await supabase.from('trades').update(updateField).eq('id', tradeId);
   };
 
   const handleToggleAccept = async () => {
     const newAccepted = !myAccepted;
-    const updateField = isSender ? { sender_accepted: newAccepted } : { receiver_accepted: newAccepted };
     
+    // Aggiornamento ottimistico
+    setTrade((prev: any) => ({
+      ...prev,
+      [isSender ? 'sender_accepted' : 'receiver_accepted']: newAccepted
+    }));
+
+    const updateField = isSender ? { sender_accepted: newAccepted } : { receiver_accepted: newAccepted };
     await supabase.from('trades').update(updateField).eq('id', tradeId);
 
     // Se io sto accettando e l'altro ha già accettato, eseguiamo lo scambio
     if (newAccepted && theirAccepted) {
       const itemPrices = SHOP_ITEMS.reduce((acc, item) => ({ ...acc, [item.id]: item.price }), {});
-      const { data, error } = await supabase.rpc('execute_trade', { 
+      const { error } = await supabase.rpc('execute_trade', { 
         p_trade_id: tradeId, 
         p_item_prices: itemPrices 
       });
@@ -102,109 +143,187 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
     }
   };
 
-  const renderItem = (itemId: string, onClick?: () => void) => {
+  const handleCancelTrade = async () => {
+    await supabase.from('trades').update({ status: 'cancelled' }).eq('id', tradeId);
+    onClose();
+  };
+
+  const renderItemCard = (itemId: string, action: 'add' | 'remove' | 'none') => {
     const item = SHOP_ITEMS.find(i => i.id === itemId);
     if (!item) return null;
 
     return (
       <div 
         key={itemId} 
-        onClick={onClick}
-        className={`bg-[#1e1f22] border border-[#3f4147] rounded p-2 flex items-center gap-3 ${onClick ? 'cursor-pointer hover:border-brand' : ''}`}
+        onClick={() => {
+          if (action === 'add') handleToggleItem(itemId, true);
+          if (action === 'remove') handleToggleItem(itemId, false);
+        }}
+        className={`bg-[#1e1f22] border border-[#3f4147] rounded-lg p-2.5 flex items-center gap-3 relative overflow-hidden group transition-all ${
+          action !== 'none' && !myAccepted ? 'cursor-pointer hover:border-brand hover:shadow-md' : ''
+        } ${myAccepted && action !== 'none' ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-[#2b2d31] rounded-md border border-[#1e1f22]">
           {item.type === 'emoji_pack' ? (
-            <span className="text-xl">📦</span>
+            <span className="text-2xl">📦</span>
           ) : item.type === 'privilege' ? (
-            <span className="text-xl">👑</span>
+            <span className="text-2xl">👑</span>
           ) : (
             <Avatar src={`https://api.dicebear.com/7.x/avataaars/svg?seed=preview`} decoration={item.id} className="w-8 h-8" />
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-white text-xs font-bold truncate">{item.name}</div>
-          <div className="text-[#949ba4] text-[10px]">{item.price} DC</div>
+        <div className="flex-1 min-w-0 z-10">
+          <div className={`text-xs font-bold truncate ${getThemeTextClass(item.id)}`}>{item.name}</div>
+          <div className="text-[#949ba4] text-[10px] flex items-center gap-1 mt-0.5">
+            {item.price} <img src="/digitalcardus.png" alt="dc" className="w-2.5 h-2.5 object-contain" />
+          </div>
         </div>
+
+        {/* Overlay Azione */}
+        {action !== 'none' && !myAccepted && (
+          <div className={`absolute inset-0 flex items-center justify-end pr-4 opacity-0 group-hover:opacity-100 transition-opacity ${
+            action === 'add' ? 'bg-gradient-to-l from-[#23a559]/90 to-transparent' : 'bg-gradient-to-l from-[#f23f43]/90 to-transparent'
+          }`}>
+            {action === 'add' ? <Plus className="text-white" size={20} /> : <Minus className="text-white" size={20} />}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-[#313338] rounded-xl w-full max-w-4xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[#313338] rounded-xl w-full max-w-5xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
         
-        <div className="p-4 border-b border-[#1e1f22] flex justify-between items-center bg-[#2b2d31]">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ArrowRightLeft className="text-brand" />
-            Scambio Sicuro
-          </h2>
-          <button onClick={onClose} className="text-[#949ba4] hover:text-white transition-colors">
-            <X size={24} />
+        {/* Header */}
+        <div className="p-5 border-b border-[#1e1f22] flex justify-between items-center bg-[#2b2d31] flex-shrink-0">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-3">
+              <ArrowRightLeft className="text-brand" size={28} />
+              Scambio Sicuro
+            </h2>
+            <p className="text-[#b5bac1] text-sm mt-1">Scambia oggetti con {theirProfile.first_name}</p>
+          </div>
+          <button onClick={handleCancelTrade} className="text-[#949ba4] hover:text-[#f23f43] transition-colors p-2 bg-[#1e1f22] rounded-full" title="Annulla Scambio">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex flex-1 min-h-[400px]">
-          {/* La mia parte */}
-          <div className="flex-1 flex flex-col border-r border-[#1e1f22]">
-            <div className="p-4 bg-[#2b2d31]/50 border-b border-[#1e1f22] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img src={myProfile.avatar_url} className="w-8 h-8 rounded-full" />
-                <span className="text-white font-bold">La tua offerta</span>
-              </div>
-              {myAccepted && <span className="text-[#23a559] text-xs font-bold uppercase flex items-center gap-1"><Check size={14}/> Pronto</span>}
-            </div>
-            <div className="p-4 flex-1 overflow-y-auto custom-scrollbar bg-[#313338]">
-              <div className="grid grid-cols-2 gap-2 mb-6">
-                {myItems.length === 0 ? (
-                  <div className="col-span-2 text-center text-[#949ba4] text-sm py-4 italic">Nessun oggetto offerto</div>
-                ) : (
-                  myItems.map((id: string) => renderItem(id, () => handleToggleItem(id, false)))
-                )}
-              </div>
-              
-              <div className="border-t border-[#1f2023] pt-4">
-                <h3 className="text-xs font-bold text-[#b5bac1] uppercase mb-3">Il tuo inventario (Clicca per aggiungere)</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {myInventory.map((id: string) => renderItem(id, () => handleToggleItem(id, true)))}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          
+          {/* Area delle Offerte (Tavolo di scambio) */}
+          <div className="flex flex-col md:flex-row p-6 gap-6 bg-[#1e1f22] flex-shrink-0">
+            
+            {/* La mia offerta */}
+            <div className={`flex-1 flex flex-col rounded-xl border-2 transition-colors duration-300 ${myAccepted ? 'border-[#23a559] bg-[#23a559]/5' : 'border-[#3f4147] bg-[#2b2d31]'}`}>
+              <div className="p-3 border-b border-[#3f4147]/50 flex items-center justify-between bg-black/20 rounded-t-xl">
+                <div className="flex items-center gap-3">
+                  <img src={myProfile.avatar_url} className="w-8 h-8 rounded-full border border-[#1e1f22]" />
+                  <span className="text-white font-bold">La tua offerta</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[#b5bac1] text-xs font-medium flex items-center gap-1">
+                    Valore: <span className="text-white">{calculateTotalValue(myItems)}</span> <img src="/digitalcardus.png" alt="dc" className="w-3 h-3" />
+                  </span>
+                  {myAccepted && <span className="bg-[#23a559] text-white text-[10px] font-bold uppercase px-2 py-1 rounded flex items-center gap-1"><Check size={12}/> Pronto</span>}
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* La loro parte */}
-          <div className="flex-1 flex flex-col">
-            <div className="p-4 bg-[#2b2d31]/50 border-b border-[#1e1f22] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full" />
-                <span className="text-white font-bold">Offerta di {theirProfile.first_name}</span>
-              </div>
-              {theirAccepted && <span className="text-[#23a559] text-xs font-bold uppercase flex items-center gap-1"><Check size={14}/> Pronto</span>}
-            </div>
-            <div className="p-4 flex-1 overflow-y-auto custom-scrollbar bg-[#313338]">
-              <div className="grid grid-cols-2 gap-2">
-                {theirItems.length === 0 ? (
-                  <div className="col-span-2 text-center text-[#949ba4] text-sm py-4 italic">Nessun oggetto offerto</div>
+              <div className="p-4 h-[220px] overflow-y-auto custom-scrollbar">
+                {myItems.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-[#949ba4] opacity-50">
+                    <PackageOpen size={40} className="mb-2" />
+                    <span className="text-sm font-medium">Nessun oggetto offerto</span>
+                    <span className="text-xs mt-1">Clicca gli oggetti in basso per aggiungerli</span>
+                  </div>
                 ) : (
-                  theirItems.map((id: string) => renderItem(id))
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {myItems.map((id: string) => renderItemCard(id, 'remove'))}
+                  </div>
                 )}
               </div>
             </div>
+
+            {/* Icona Scambio Centrale */}
+            <div className="hidden md:flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-[#2b2d31] border-4 border-[#1e1f22] flex items-center justify-center shadow-lg z-10">
+                <ArrowRightLeft className="text-[#b5bac1]" size={20} />
+              </div>
+            </div>
+
+            {/* La loro offerta */}
+            <div className={`flex-1 flex flex-col rounded-xl border-2 transition-colors duration-300 ${theirAccepted ? 'border-[#23a559] bg-[#23a559]/5' : 'border-[#3f4147] bg-[#2b2d31]'}`}>
+              <div className="p-3 border-b border-[#3f4147]/50 flex items-center justify-between bg-black/20 rounded-t-xl">
+                <div className="flex items-center gap-3">
+                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border border-[#1e1f22]" />
+                  <span className="text-white font-bold">Offerta di {theirProfile.first_name}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[#b5bac1] text-xs font-medium flex items-center gap-1">
+                    Valore: <span className="text-white">{calculateTotalValue(theirItems)}</span> <img src="/digitalcardus.png" alt="dc" className="w-3 h-3" />
+                  </span>
+                  {theirAccepted && <span className="bg-[#23a559] text-white text-[10px] font-bold uppercase px-2 py-1 rounded flex items-center gap-1"><Check size={12}/> Pronto</span>}
+                </div>
+              </div>
+              <div className="p-4 h-[220px] overflow-y-auto custom-scrollbar">
+                {theirItems.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-[#949ba4] opacity-50">
+                    <PackageOpen size={40} className="mb-2" />
+                    <span className="text-sm font-medium">In attesa di un'offerta...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {theirItems.map((id: string) => renderItemCard(id, 'none'))}
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
+
+          {/* Il mio Inventario */}
+          <div className="flex-1 flex flex-col bg-[#313338] border-t border-[#1e1f22] min-h-0">
+            <div className="p-4 pb-2 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Il tuo Inventario</h3>
+              <span className="text-xs text-[#949ba4]">Clicca un oggetto per aggiungerlo all'offerta</span>
+            </div>
+            <div className="p-4 pt-0 flex-1 overflow-y-auto custom-scrollbar">
+              {myInventory.length === 0 ? (
+                <div className="text-center text-[#949ba4] py-8 italic">Non hai altri oggetti da scambiare.</div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {myInventory.map((id: string) => renderItemCard(id, 'add'))}
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
 
-        <div className="p-4 bg-[#2b2d31] border-t border-[#1e1f22] flex justify-between items-center">
-          <p className="text-xs text-[#949ba4]">
-            {trade.status === 'completed' ? 'Scambio completato!' : 'Controlla bene gli oggetti prima di accettare.'}
-          </p>
+        {/* Footer Azioni */}
+        <div className="p-5 bg-[#2b2d31] border-t border-[#1e1f22] flex justify-between items-center flex-shrink-0">
+          <div className="flex items-center gap-2 text-[#949ba4] text-sm">
+            <AlertCircle size={16} />
+            {trade.status === 'completed' ? (
+              <span className="text-[#23a559] font-bold">Scambio completato!</span>
+            ) : (
+              <span>Controlla bene gli oggetti prima di confermare.</span>
+            )}
+          </div>
           <button 
             onClick={handleToggleAccept}
             disabled={trade.status === 'completed'}
-            className={`px-8 py-2.5 rounded font-bold transition-colors ${
+            className={`px-8 py-3 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 ${
               trade.status === 'completed' ? 'bg-[#23a559] text-white opacity-50 cursor-not-allowed' :
-              myAccepted ? 'bg-[#f23f43] hover:bg-[#da373c] text-white' : 'bg-[#5865F2] hover:bg-[#4752C4] text-white'
+              myAccepted ? 'bg-[#f23f43] hover:bg-[#da373c] text-white' : 'bg-[#5865F2] hover:bg-[#4752C4] text-white hover:-translate-y-0.5'
             }`}
           >
-            {trade.status === 'completed' ? 'Completato' : myAccepted ? 'Annulla Conferma' : 'Conferma Scambio'}
+            {trade.status === 'completed' ? (
+              <>Completato <Check size={18}/></>
+            ) : myAccepted ? (
+              <>Annulla Conferma <X size={18}/></>
+            ) : (
+              <>Conferma Scambio <Check size={18}/></>
+            )}
           </button>
         </div>
 
