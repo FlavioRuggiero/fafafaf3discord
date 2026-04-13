@@ -74,6 +74,14 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="supernova-star s3"></div>
           </>
         )}
+
+        {activeDecoration === 'esquelito' && (
+          <>
+            <div className="esquelito-skull sk1"></div>
+            <div className="esquelito-skull sk2"></div>
+            <div className="esquelito-skull sk3"></div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -285,3 +285,47 @@ body {
 .supernova-star.s1 { top: -3px; left: 20%; animation-delay: 0s; }
 .supernova-star.s2 { bottom: 10%; right: -3px; animation-delay: 0.3s; }
 .supernova-star.s3 { top: 40%; left: -4px; animation-delay: 0.6s; }
+
+/* 5. Esquelito Explosivo */
+.dec-esquelito {
+  border: 2px solid #ff4500;
+  box-shadow: 0 0 10px #ff4500, inset 0 0 10px #ff4500;
+  position: relative;
+}
+
+/* Animazioni per farli orbitare mantenendoli dritti e facendoli pulsare */
+@keyframes orbit-pulse-1 {
+  0% { transform: rotate(0deg) translateY(-25px) rotate(0deg) scale(0.8); }
+  50% { transform: rotate(180deg) translateY(-45px) rotate(-180deg) scale(1.2); }
+  100% { transform: rotate(360deg) translateY(-25px) rotate(-360deg) scale(0.8); }
+}
+@keyframes orbit-pulse-2 {
+  0% { transform: rotate(120deg) translateY(-25px) rotate(-120deg) scale(0.8); }
+  50% { transform: rotate(300deg) translateY(-45px) rotate(-300deg) scale(1.2); }
+  100% { transform: rotate(480deg) translateY(-25px) rotate(-480deg) scale(0.8); }
+}
+@keyframes orbit-pulse-3 {
+  0% { transform: rotate(240deg) translateY(-25px) rotate(-240deg) scale(0.8); }
+  50% { transform: rotate(420deg) translateY(-45px) rotate(-420deg) scale(1.2); }
+  100% { transform: rotate(600deg) translateY(-25px) rotate(-600deg) scale(0.8); }
+}
+
+.esquelito-skull {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 25;
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  margin-top: -12px;
+  margin-left: -12px;
+  filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.8));
+}
+
+.esquelito-skull.sk1 { background-image: url('/esqueleto1.png'); animation: orbit-pulse-1 3s infinite ease-in-out; }
+.esquelito-skull.sk2 { background-image: url('/esqueleto2.png'); animation: orbit-pulse-2 3s infinite ease-in-out; }
+.esquelito-skull.sk3 { background-image: url('/esquelito3.png'); animation: orbit-pulse-3 3s infinite ease-in-out; }

@@ -8,5 +8,6 @@ export const SHOP_ITEMS = [
   { id: 'rays', name: 'Raggi Elettrici', price: 80, type: 'decoration', category: 'Contorni' },
   { id: 'matrix', name: 'Hacker Matrix', price: 85, type: 'decoration', category: 'Contorni' },
   { id: 'explosive', name: 'Esplosivo Caotico', price: 100, type: 'decoration', category: 'Contorni' },
+  { id: 'esquelito', name: 'Esquelito Explosivo', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'supernova', name: 'Supernova Cosmica', price: 250, type: 'decoration', category: 'Contorni Premium' },
 ];
