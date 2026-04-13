@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,9 +28,10 @@ interface ChannelSidebarProps {
   onLeaveServer?: () => void;
   onOpenUserSettings?: () => void;
   serverPermissions?: ServerPermissions;
+  notificationCount?: number;
 }
 
-export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings, serverPermissions }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings, serverPermissions, notificationCount = 0 }: ChannelSidebarProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -707,6 +708,19 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           >
             <Home size={20} className="mr-3" />
             <span className="font-medium">Benvenuto</span>
+          </button>
+          
+          <button
+            onClick={() => onChannelSelect({ id: 'notifications', name: 'Notifiche', type: 'text', category: '', server_id: null })}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'notifications' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+          >
+            <Bell size={20} className="mr-3" />
+            <span className="font-medium flex-1 text-left">Notifiche</span>
+            {notificationCount > 0 && (
+              <span className="bg-[#f23f43] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {notificationCount}
+              </span>
+            )}
           </button>
           
           <button

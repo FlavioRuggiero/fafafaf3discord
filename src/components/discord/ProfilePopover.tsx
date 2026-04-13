@@ -3,11 +3,13 @@
 import React, { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
-import { Shield, Archive, ChevronDown, ChevronUp, Crown } from "lucide-react";
+import { Shield, Archive, ChevronDown, ChevronUp, Crown, ArrowRightLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
 import { SHOP_ITEMS } from "@/data/shopItems";
+import { supabase } from "@/integrations/supabase/client";
+import { showSuccess, showError } from "@/utils/toast";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -35,8 +37,9 @@ const getThemeTextClass = (id: string) => {
 };
 
 export const ProfilePopover = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
-  const { adminId, moderatorIds } = useAuth();
+  const { user: authUser, adminId, moderatorIds } = useAuth();
   const [showInventory, setShowInventory] = useState(false);
+  const [isRequestingTrade, setIsRequestingTrade] = useState(false);
 
   if (!user) return <>{children}</>;
 
@@ -51,6 +54,24 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
     ?.map(id => SHOP_ITEMS.find(i => i.id === id))
     .filter(Boolean) as typeof SHOP_ITEMS)
     ?.sort((a, b) => b.price - a.price) || [];
+
+  const handleRequestTrade = async () => {
+    if (!authUser) return;
+    setIsRequestingTrade(true);
+    
+    const { error } = await supabase.from('trades').insert({
+      sender_id: authUser.id,
+      receiver_id: user.id,
+      status: 'pending'
+    });
+    
+    if (error) {
+      showError("Errore nell'invio della richiesta di scambio.");
+    } else {
+      showSuccess("Richiesta di scambio inviata!");
+    }
+    setIsRequestingTrade(false);
+  };
   
   return (
     <Popover.Root>
@@ -164,16 +185,27 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
 
             {/* Sezione Inventario */}
             <div className="mt-4 pt-4 border-t border-[#2b2d31]">
-              <button
-                onClick={() => setShowInventory(!showInventory)}
-                className="flex items-center justify-between w-full text-[11px] font-bold uppercase text-[#b5bac1] hover:text-[#dbdee1] transition-colors tracking-wider focus:outline-none"
-              >
-                <div className="flex items-center gap-1.5">
-                  <Archive size={14} />
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  onClick={() => setShowInventory(!showInventory)}
+                  className="flex items-center text-[11px] font-bold uppercase text-[#b5bac1] hover:text-[#dbdee1] transition-colors tracking-wider focus:outline-none"
+                >
+                  <Archive size={14} className="mr-1.5" />
                   Inventario ({ownedItems.length})
-                </div>
-                {showInventory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
+                  {showInventory ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
+                </button>
+                
+                {authUser && authUser.id !== user.id && (
+                  <button 
+                    onClick={handleRequestTrade}
+                    disabled={isRequestingTrade}
+                    className="flex items-center gap-1 text-[10px] font-bold uppercase bg-[#2b2d31] hover:bg-[#35373c] text-[#dbdee1] px-2 py-1 rounded border border-[#1e1f22] transition-colors disabled:opacity-50"
+                  >
+                    <ArrowRightLeft size={12} />
+                    Scambia
+                  </button>
+                )}
+              </div>
 
               {showInventory && (
                 <div className="mt-3 max-h-48 overflow-y-auto custom-scrollbar pr-1">

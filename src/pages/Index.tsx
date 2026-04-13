@@ -7,6 +7,8 @@ import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { ShopView } from "@/components/discord/ShopView";
 import { InventoryView } from "@/components/discord/InventoryView";
+import { NotificationsView } from "@/components/discord/NotificationsView";
+import { TradeModal } from "@/components/discord/TradeModal";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,9 +68,12 @@ const Index = () => {
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
-  // States per Notifiche
+  // States per Notifiche e Scambi
   const [notificationSettings, setNotificationSettings] = useState<Record<string, NotificationSetting>>({});
   const [unreadServers, setUnreadServers] = useState<Set<string>>(new Set());
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
+  const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // Carica impostazioni notifiche
   useEffect(() => {
@@ -139,6 +144,48 @@ const Index = () => {
 
     return () => {
       supabase.removeChannel(sub);
+    };
+  }, [currentUser]);
+
+  // Listener per conteggio notifiche e scambi attivi
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchNotificationCount = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      let count = currentUser.last_reward_date !== today ? 1 : 0;
+
+      const { count: tradeCount } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', currentUser.id).eq('status', 'pending');
+      if (tradeCount) count += tradeCount;
+
+      setNotificationCount(count);
+    };
+
+    fetchNotificationCount();
+
+    const fetchActiveTrade = async () => {
+      const { data } = await supabase.from('trades')
+        .select('id')
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .eq('status', 'active')
+        .limit(1);
+      if (data && data.length > 0) setActiveTradeId(data[0].id);
+    };
+    fetchActiveTrade();
+
+    const tradeSub = supabase.channel('active_trades_global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, (payload) => {
+        fetchNotificationCount();
+        if (payload.eventType === 'UPDATE' && payload.new.status === 'active') {
+          if (payload.new.sender_id === currentUser.id || payload.new.receiver_id === currentUser.id) {
+            setActiveTradeId(payload.new.id);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tradeSub);
     };
   }, [currentUser]);
 
@@ -777,6 +824,25 @@ const Index = () => {
     await supabase.auth.signOut();
   };
 
+  const handleNavigateToMessage = (serverId: string, channelId: string, messageId: string) => {
+    setActiveServerId(serverId);
+    const channel = allChannels.find(c => c.id === channelId);
+    if (channel) {
+      setActiveChannel(channel);
+    } else {
+      // Se il canale non è ancora caricato, lo impostiamo appena possibile
+      const checkChannel = setInterval(() => {
+        const c = allChannelsRef.current.find(ch => ch.id === channelId);
+        if (c) {
+          setActiveChannel(c);
+          clearInterval(checkChannel);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(checkChannel), 5000);
+    }
+    setTargetMessageId(messageId);
+  };
+
   if (!currentUser) {
     return <div className="h-screen w-full bg-[#313338] flex items-center justify-center text-[#dbdee1]">Caricamento profilo...</div>;
   }
@@ -825,6 +891,7 @@ const Index = () => {
             onLeaveServer={() => handleLeaveServer(activeServer!.id)}
             onOpenUserSettings={() => setShowUserSettingsModal(true)}
             serverPermissions={serverPermissions}
+            notificationCount={notificationCount}
           />
         </div>
 
@@ -858,6 +925,13 @@ const Index = () => {
             <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'inventory' ? (
             <InventoryView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'notifications' ? (
+            <NotificationsView 
+              currentUser={currentUser} 
+              onToggleSidebar={() => setShowSidebar(true)} 
+              onNavigateToShop={() => setActiveChannel({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
+              onNavigateToMessage={handleNavigateToMessage}
+            />
           ) : (
             <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
               <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
@@ -936,6 +1010,14 @@ const Index = () => {
           user={currentUser}
           onUpdate={handleUpdateProfile}
         />
+
+        {activeTradeId && (
+          <TradeModal 
+            tradeId={activeTradeId} 
+            currentUser={currentUser} 
+            onClose={() => setActiveTradeId(null)} 
+          />
+        )}
       </div>
     </VoiceChannelProvider>
   );
