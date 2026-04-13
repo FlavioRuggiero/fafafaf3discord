@@ -158,9 +158,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       // Peso base inversamente proporzionale al quadrato del prezzo
       let weight = 50000 / (item.price * item.price); 
       
-      // Il baule premium ha 5x di probabilità in più per gli oggetti rari (prezzo >= 100)
+      // Il baule premium ha 2x di probabilità in più per gli oggetti rari (prezzo >= 100)
       if (type === 'premium' && item.price >= 100) {
-        weight *= 5;
+        weight *= 2;
       }
       
       totalWeight += weight;
@@ -449,7 +449,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 </div>
                 
                 <h3 className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">Baule Premium</h3>
-                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">5x probabilità</strong> di trovare oggetti rari!</p>
+                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">2x probabilità</strong> di trovare oggetti rari!</p>
                 
                 <button 
                   onClick={() => openChest('premium')}
