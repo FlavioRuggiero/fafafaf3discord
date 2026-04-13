@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu, Gift } from 'lucide-react';
+import { ShoppingCart, Menu, Gift, Flower2, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -86,29 +86,47 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] relative overflow-hidden h-full min-w-0">
+      {/* Sfondo decorativo floreale sfumato */}
+      <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-[#ff758c]/10 to-transparent pointer-events-none z-0"></div>
+      
       {/* Header */}
-      <div className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm bg-[#313338] z-10 flex-shrink-0">
+      <div className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm bg-[#313338]/90 backdrop-blur-sm z-20 flex-shrink-0 relative">
         <div className="flex items-center text-white font-semibold">
           {onToggleSidebar && (
             <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
               <Menu size={24} />
             </button>
           )}
-          <ShoppingCart className="mr-2 text-[#949ba4]" size={20} />
+          <ShoppingCart className="mr-2 text-[#ff758c]" size={20} />
           Cardi E-Shop
         </div>
-        <div className="flex items-center bg-[#2b2d31] px-3 py-1 rounded-full">
+        <div className="flex items-center bg-[#2b2d31] px-3 py-1 rounded-full border border-[#ff758c]/20">
           <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 mr-2 object-contain" />
           <span className="text-white font-bold">{currentUser.digitalcardus}</span>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative z-10">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Cardi E-Shop</h1>
-            <p className="text-[#b5bac1]">Acquista personalizzazioni uniche per il tuo profilo.</p>
+          
+          {/* Banner Floreale */}
+          <div className="relative w-full rounded-2xl mb-8 overflow-hidden shadow-2xl flex flex-col items-center justify-center border border-[#ffb6c1]/20 py-12">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#ff758c] to-[#ff7eb3] opacity-90"></div>
+            {/* Pattern floreale in overlay */}
+            <div className="absolute inset-0 opacity-20 mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83.83-1.66 1.66-.83-.83.83-.83zM27.314 60l.83-.83-1.66-1.66-.83.83.83.83zm0-60l.83.83-1.66 1.66-.83-.83.83-.83zM0 27.314l.83.83-1.66 1.66-.83-.83.83-.83zm60 0l.83.83-1.66 1.66-.83-.83.83-.83zM13.657 0l.83.83-1.66 1.66-.83-.83.83-.83zm0 60l.83-.83-1.66-1.66-.83.83.83.83zM0 13.657l.83.83-1.66 1.66-.83-.83.83-.83zm60 0l.83.83-1.66 1.66-.83-.83.83-.83zM40.97 0l.83.83-1.66 1.66-.83-.83.83-.83zm0 60l.83-.83-1.66-1.66-.83.83.83.83zM0 40.97l.83.83-1.66 1.66-.83-.83.83-.83zm60 0l.83.83-1.66 1.66-.83-.83.83-.83z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")` }}></div>
+            
+            <Flower2 className="absolute top-4 left-10 text-white/40 w-16 h-16 animate-[spin_10s_linear_infinite]" />
+            <Flower2 className="absolute bottom-4 right-12 text-white/30 w-24 h-24 animate-[spin_15s_linear_infinite_reverse]" />
+            <Sparkles className="absolute top-8 right-24 text-white/60 w-8 h-8 animate-pulse" />
+            <Sparkles className="absolute bottom-8 left-24 text-white/50 w-6 h-6 animate-bounce" />
+            
+            <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg relative z-10 tracking-tight mb-3 text-center px-4">
+              Cardi E-Shop <span className="text-[#ffe4e1]">Floreale</span>
+            </h1>
+            <p className="text-white/90 text-base md:text-lg font-medium drop-shadow relative z-10 text-center px-4">
+              Scopri le nuove personalizzazioni e fai fiorire il tuo profilo! 🌸
+            </p>
           </div>
 
           {/* Daily Reward Banner */}
@@ -144,7 +162,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                   const isOwned = currentUser.purchased_decorations?.includes(item.id);
 
                   return (
-                    <div key={item.id} className="bg-[#2b2d31] border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md">
+                    <div key={item.id} className="bg-[#2b2d31] border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#ff758c]/50 hover:shadow-[0_0_15px_rgba(255,117,140,0.1)]">
                       <div className="mb-6 mt-2 h-24 flex items-center justify-center">
                         <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
                       </div>
