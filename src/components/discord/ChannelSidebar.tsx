@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,8 +35,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   
-  const [pendingTradesCount, setPendingTradesCount] = useState(0);
-
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice' | 'minigame'>('text');
@@ -167,49 +165,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
     prevVcMembersRef.current = vcMembers;
   }, [vcMembers, activeVoiceChannelId, currentUser]);
-  // ----------------------------------
-
-  // --- TRADES REALTIME LISTENER ---
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const fetchPendingTrades = async () => {
-      const { count } = await supabase
-        .from('trades')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', currentUser.id)
-        .eq('status', 'pending');
-      setPendingTradesCount(count || 0);
-    };
-
-    fetchPendingTrades();
-
-    const handleTradeChange = (payload: any) => {
-      const trade = payload.new;
-      if (!trade) return;
-
-      if (trade.receiver_id === currentUser.id) {
-        fetchPendingTrades();
-      }
-
-      if (payload.eventType === 'UPDATE') {
-        const oldTrade = payload.old;
-        const justAccepted = (trade.sender_accepted && trade.receiver_accepted) && !(oldTrade?.sender_accepted && oldTrade?.receiver_accepted);
-        const justActivated = trade.status === 'active' && oldTrade?.status !== 'active';
-
-        if (justAccepted || justActivated) {
-          onChannelSelect({ id: `trade-${trade.id}`, name: 'Scambio', type: 'text', category: '', server_id: null });
-        }
-      }
-    };
-
-    const sub = supabase.channel(`trades_sidebar_${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `receiver_id=eq.${currentUser.id}` }, handleTradeChange)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `sender_id=eq.${currentUser.id}` }, handleTradeChange)
-      .subscribe();
-
-    return () => { supabase.removeChannel(sub); };
-  }, [currentUser, onChannelSelect]);
   // ----------------------------------
 
   useEffect(() => {
@@ -752,21 +707,6 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           >
             <Home size={20} className="mr-3" />
             <span className="font-medium">Benvenuto</span>
-          </button>
-
-          <button
-            onClick={() => onChannelSelect({ id: 'notifications', name: 'Notifiche', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'notifications' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
-          >
-            <div className="flex items-center">
-              <Bell size={20} className="mr-3" />
-              <span className="font-medium">Notifiche</span>
-            </div>
-            {pendingTradesCount > 0 && (
-              <div className="bg-[#f23f43] text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
-                {pendingTradesCount}
-              </div>
-            )}
           </button>
           
           <button
