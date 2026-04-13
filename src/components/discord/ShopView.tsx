@@ -150,7 +150,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     let totalWeight = 0;
     const weightedItems = SHOP_ITEMS.map(item => {
       // Peso base inversamente proporzionale al quadrato del prezzo
-      let weight = 100000 / (item.price * item.price); 
+      let weight = 50000 / (item.price * item.price); 
       
       // Il baule premium ha 5x di probabilità in più per gli oggetti rari (prezzo >= 100)
       if (type === 'premium' && item.price >= 100) {
