@@ -103,9 +103,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
         </div>
       </div>
 
-      {/* Content con Trama a Foglie e Bordi */}
+      {/* Content con Trama a Foglie */}
       <div 
-        className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative border-x-4 border-b-4 border-[#166534]/50"
+        className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative"
         style={{ 
           backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23166534' fill-opacity='0.08'%3E%3Cpath d='M40,20 C60,20 70,40 70,60 C50,60 40,40 40,20 Z' transform='rotate(15 55 40)'/%3E%3Cpath d='M140,30 Q160,10 170,40 Q150,60 140,30 Z' transform='rotate(-25 155 35)'/%3E%3Cpath d='M30,130 C40,110 60,120 70,140 C80,160 50,170 30,130 Z' transform='rotate(45 50 140)'/%3E%3Cpath d='M150,140 C170,140 180,160 180,180 C160,180 150,160 150,140 Z' transform='rotate(-60 165 160)'/%3E%3Cpath d='M90,90 Q100,80 110,95 Q95,105 90,90 Z' transform='rotate(10 100 92)'/%3E%3C/g%3E%3C/svg%3E\")",
           backgroundSize: "200px 200px"
