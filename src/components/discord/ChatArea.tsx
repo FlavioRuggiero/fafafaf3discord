@@ -2291,7 +2291,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               {filteredCommands.map((cmd, idx) => (
                 <div
                   key={cmd.command}
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
                     if (chatInputRef.current) {
                       chatInputRef.current.innerHTML = cmd.command + '&nbsp;';
                       setInputValue(cmd.command + ' ');
@@ -2322,7 +2323,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               {filteredMembers.map((member, idx) => (
                 <div
                   key={member.id}
-                  onClick={() => insertMention(member)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertMention(member);
+                  }}
                   className={`flex items-center px-3 py-1.5 cursor-pointer ${idx === mentionIndex ? 'bg-[#35373c]' : 'hover:bg-[#35373c]'}`}
                 >
                   <img src={member.avatar} className="w-6 h-6 rounded-full mr-2 object-cover" />
