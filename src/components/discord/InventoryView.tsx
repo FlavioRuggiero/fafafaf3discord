@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { Archive, Menu, Check } from 'lucide-react';
+import { Archive, Menu, Check, Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -24,6 +24,7 @@ export const getThemeTextClass = (id: string) => {
 };
 
 export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewProps) => {
+  const [itemToSell, setItemToSell] = useState<typeof SHOP_ITEMS[0] | null>(null);
   
   const handleEquip = async (id: string) => {
     const { error } = await supabase.from('profiles').update({
@@ -39,6 +40,33 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
     }).eq('id', currentUser.id);
     if (error) showError("Errore durante la rimozione.");
     else showSuccess("Contorno rimosso!");
+  };
+
+  const handleSell = async () => {
+    if (!itemToSell) return;
+
+    const refundAmount = Math.floor(itemToSell.price / 2);
+    const newDecorations = (currentUser.purchased_decorations || []).filter(id => id !== itemToSell.id);
+    
+    const updates: any = {
+      purchased_decorations: newDecorations,
+      digitalcardus: (currentUser.digitalcardus || 0) + refundAmount
+    };
+
+    // Se l'oggetto venduto era equipaggiato, rimuovilo
+    if (currentUser.avatar_decoration === itemToSell.id) {
+      updates.avatar_decoration = null;
+    }
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
+
+    if (error) {
+      showError("Errore durante la vendita dell'oggetto.");
+    } else {
+      showSuccess(`Oggetto venduto per ${refundAmount} Digitalcardus!`);
+    }
+    
+    setItemToSell(null);
   };
 
   // Filtra solo gli oggetti acquistati
@@ -124,27 +152,30 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           </div>
                         )}
                         
-                        <h3 className={`font-bold mb-2 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
-                        
-                        <div className="flex items-center justify-center gap-1.5 mb-4 bg-[#1e1f22] px-2.5 py-1 rounded-full border border-[#3f4147]">
-                          <span className="text-xs font-bold text-white">{item.price}</span>
-                          <img src="/digitalcardus.png" alt="dc" className="w-3.5 h-3.5 object-contain" />
-                        </div>
+                        <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
-                        <div className="mt-auto w-full">
+                        <div className="mt-auto w-full flex gap-2">
                           {item.type === 'emoji_pack' ? (
-                            <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
-                              Disponibile in Chat
+                            <button disabled className="flex-1 py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
+                              In Chat
                             </button>
                           ) : isEquipped ? (
-                            <button onClick={handleUnequip} className="w-full py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
+                            <button onClick={handleUnequip} className="flex-1 py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
                               Rimuovi
                             </button>
                           ) : (
-                            <button onClick={() => handleEquip(item.id)} className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
+                            <button onClick={() => handleEquip(item.id)} className="flex-1 py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
                               Equipaggia
                             </button>
                           )}
+                          
+                          <button 
+                            onClick={() => setItemToSell(item)}
+                            className="px-3 py-2 rounded bg-[#2b2d31] border border-[#f23f43] text-[#f23f43] font-medium hover:bg-[#f23f43] hover:text-white transition-colors text-sm flex items-center justify-center"
+                            title="Vendi oggetto"
+                          >
+                            Vendi
+                          </button>
                         </div>
                       </div>
                     );
@@ -155,6 +186,41 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
           )}
         </div>
       </div>
+
+      {/* Modal di Conferma Vendita */}
+      {itemToSell && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99999] p-4">
+          <div className="bg-[#313338] rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#1e1f22] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#f23f43]/20 flex items-center justify-center text-[#f23f43]">
+                <Coins size={24} />
+              </div>
+              <h2 className="text-xl font-bold text-white">Conferma Vendita</h2>
+            </div>
+            
+            <p className="text-[#dbdee1] mb-6 leading-relaxed">
+              Sei sicuro di voler vendere <strong className={getThemeTextClass(itemToSell.id)}>{itemToSell.name}</strong>? 
+              <br className="mb-2" />
+              Riceverai indietro <strong className="text-white">{Math.floor(itemToSell.price / 2)}</strong> <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 inline-block align-text-bottom" />.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setItemToSell(null)}
+                className="px-4 py-2 rounded font-medium text-white hover:underline transition-all"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={handleSell}
+                className="px-4 py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors"
+              >
+                Conferma Vendita
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
