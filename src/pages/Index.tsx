@@ -160,7 +160,8 @@ const Index = () => {
         .select('*')
         .eq('status', 'pending')
         .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-        .single();
+        .limit(1)
+        .maybeSingle();
         
       if (data) {
         setActiveTrade(data as Trade);
@@ -171,35 +172,27 @@ const Index = () => {
 
     checkActiveTrade();
 
-    const tradeSub = supabase.channel(`trades_${currentUser.id}`)
+    // Ascolta tutti i cambiamenti sulla tabella trades e filtra localmente
+    const tradeSub = supabase.channel(`trades_realtime_${currentUser.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'trades',
-        filter: `sender_id=eq.${currentUser.id}`
+        table: 'trades'
       }, (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const trade = payload.new as Trade;
-          if (trade.status === 'pending') {
-            setActiveTrade(trade);
-            fetchOtherUser(trade.receiver_id);
-          } else {
-            setActiveTrade(null);
+          if (trade.sender_id === currentUser.id || trade.receiver_id === currentUser.id) {
+            if (trade.status === 'pending') {
+              setActiveTrade(trade);
+              const otherId = trade.sender_id === currentUser.id ? trade.receiver_id : trade.sender_id;
+              fetchOtherUser(otherId);
+            } else {
+              setActiveTrade(null);
+            }
           }
-        }
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'trades',
-        filter: `receiver_id=eq.${currentUser.id}`
-      }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const trade = payload.new as Trade;
-          if (trade.status === 'pending') {
-            setActiveTrade(trade);
-            fetchOtherUser(trade.sender_id);
-          } else {
+        } else if (payload.eventType === 'DELETE') {
+          const trade = payload.old as Trade;
+          if (trade.sender_id === currentUser.id || trade.receiver_id === currentUser.id) {
             setActiveTrade(null);
           }
         }
