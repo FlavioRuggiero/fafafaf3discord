@@ -113,3 +113,15 @@ export type DMChannel = {
   user2_id: string;
   created_at: string;
 };
+
+export type Trade = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  sender_items: string[];
+  receiver_items: string[];
+  sender_accepted: boolean;
+  receiver_accepted: boolean;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: string;
+};
