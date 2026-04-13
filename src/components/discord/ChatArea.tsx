@@ -670,13 +670,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 avatar: updatedProfile.avatar_url || m.user.avatar,
                 bio: updatedProfile.bio || "",
                 banner_color: updatedProfile.banner_color || "#5865F2",
-                banner_url: updatedProfile.banner_url || undefined,
+                banner_url: updatedProfile.banner_url, // Accetta null
                 level: updatedProfile.level || 1,
                 digitalcardus: updatedProfile.digitalcardus ?? 25,
                 xp: updatedProfile.xp || 0,
                 global_role: role,
-                avatar_decoration: updatedProfile.avatar_decoration || m.user.avatar_decoration,
-                purchased_decorations: updatedProfile.purchased_decorations || m.user.purchased_decorations
+                avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
+                purchased_decorations: updatedProfile.purchased_decorations || []
               }
             };
           }

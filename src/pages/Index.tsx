@@ -255,14 +255,14 @@ const Index = () => {
             avatar: updatedProfile.avatar_url || prev.avatar,
             bio: updatedProfile.bio || "",
             banner_color: updatedProfile.banner_color || "#5865F2",
-            banner_url: updatedProfile.banner_url || undefined,
+            banner_url: updatedProfile.banner_url, // Accetta null
             level: updatedProfile.level || 1,
             digitalcardus: updatedProfile.digitalcardus ?? 25,
             xp: updatedProfile.xp || 0,
             global_role: role,
-            last_reward_date: updatedProfile.last_reward_date || prev.last_reward_date,
-            avatar_decoration: updatedProfile.avatar_decoration || prev.avatar_decoration,
-            purchased_decorations: updatedProfile.purchased_decorations || prev.purchased_decorations
+            last_reward_date: updatedProfile.last_reward_date, // Accetta null
+            avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
+            purchased_decorations: updatedProfile.purchased_decorations || []
           };
         });
       })
