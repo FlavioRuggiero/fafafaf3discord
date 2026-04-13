@@ -9,17 +9,25 @@ interface AvatarProps {
 }
 
 export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: AvatarProps) => {
-  const speakingClass = isSpeaking ? "ring-2 ring-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] z-20" : "";
+  // Se isSpeaking è un booleano, significa che siamo in un contesto vocale.
+  // Mostriamo la decorazione SOLO se non siamo in vocale, OPPURE se siamo in vocale e stiamo parlando.
+  const isVoiceContext = typeof isSpeaking === 'boolean';
+  const shouldShowDecoration = decoration && (!isVoiceContext || isSpeaking);
+  const activeDecoration = shouldShowDecoration ? decoration : null;
 
-  if (!decoration) {
+  // Il cerchio giallo si mostra se stiamo parlando E NON abbiamo una decorazione attiva
+  const showYellowRing = isSpeaking && !activeDecoration;
+  const speakingClass = showYellowRing ? "ring-2 ring-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] z-20" : (isSpeaking ? "z-20" : "");
+
+  if (!activeDecoration) {
     return <img src={src} alt={alt} className={`rounded-full object-cover ${speakingClass} ${className}`} />;
   }
 
   return (
-    <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${decoration} ${speakingClass} ${className}`}>
+    <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${activeDecoration} ${speakingClass} ${className}`}>
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
-      {decoration === 'dc-emit' && (
+      {activeDecoration === 'dc-emit' && (
         <>
           <div className="dc-particle p1"></div>
           <div className="dc-particle p2"></div>
@@ -27,7 +35,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: Ava
         </>
       )}
       
-      {decoration === 'matrix' && (
+      {activeDecoration === 'matrix' && (
         <>
           <div className="matrix-char m1">1</div>
           <div className="matrix-char m2">0</div>
@@ -36,7 +44,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: Ava
         </>
       )}
       
-      {decoration === 'explosive' && (
+      {activeDecoration === 'explosive' && (
         <>
           <div className="explode-emoji e1">💥</div>
           <div className="explode-emoji e2">🔥</div>

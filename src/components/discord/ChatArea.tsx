@@ -1436,10 +1436,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     const isLocal = member.user_id === currentUser?.id;
                     const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
                     const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
+                    const hasDecoration = !!member.profiles?.avatar_decoration;
+                    const showBorder = isSpeaking && (hasScreen || !hasDecoration);
 
                     const memberContent = (
                       <div onClick={() => setFocusedUserId(member.user_id)}
-                           className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${isSpeaking ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
+                           className={`relative flex flex-col items-center justify-center bg-[#1e1f22] rounded-xl aspect-video h-24 sm:h-32 border-2 transition-all cursor-pointer flex-shrink-0 ${showBorder ? 'border-yellow-500' : 'border-transparent hover:border-[#4e5058]'}`}>
                         {hasScreen && streamToPlay ? (
                           <div className="w-full h-full overflow-hidden rounded-lg pointer-events-none opacity-80">
                              <StreamPlayer 
@@ -1510,9 +1512,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                       const isLocal = member.user_id === currentUser?.id;
                       const hasScreen = isLocal ? !!localScreenStream : !!remoteScreenStreams[member.user_id];
                       const streamToPlay = isLocal ? localScreenStream : remoteScreenStreams[member.user_id];
+                      const hasDecoration = !!member.profiles?.avatar_decoration;
+                      const showBorder = isSpeaking && (hasScreen || !hasDecoration);
                       
                       const memberContent = (
-                        <div className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${isSpeaking ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
+                        <div className={`group relative flex flex-col items-center justify-center bg-[#111214] rounded-xl overflow-hidden aspect-video border-2 transition-all duration-150 ${showBorder ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-[#111214]'}`}>
                           
                           {hasScreen && streamToPlay ? (
                             <div className="w-full h-full bg-black relative">
