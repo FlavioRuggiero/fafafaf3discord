@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen } from 'lucide-react';
+import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen, Crown } from 'lucide-react';
 import { User } from '@/types/discord';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -148,9 +148,11 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
     onClose();
   };
 
-  const renderItemCard = (itemId: string, action: 'add' | 'remove' | 'none') => {
+  const renderItemCard = (itemId: string, action: 'add' | 'remove' | 'none', ownerProfile: any) => {
     const item = SHOP_ITEMS.find(i => i.id === itemId);
     if (!item) return null;
+
+    const avatarSrc = ownerProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ownerProfile?.id}`;
 
     return (
       <div 
@@ -159,32 +161,41 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
           if (action === 'add') handleToggleItem(itemId, true);
           if (action === 'remove') handleToggleItem(itemId, false);
         }}
-        className={`bg-[#1e1f22] border border-[#3f4147] rounded-lg p-2.5 flex items-center gap-3 relative overflow-hidden group transition-all ${
+        className={`flex flex-col items-center bg-[#2b2d31] border border-[#1e1f22] rounded p-2 text-center relative overflow-hidden group transition-all ${
           action !== 'none' && !myAccepted ? 'cursor-pointer hover:border-brand hover:shadow-md' : ''
         } ${myAccepted && action !== 'none' ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-[#2b2d31] rounded-md border border-[#1e1f22]">
-          {item.type === 'emoji_pack' ? (
-            <span className="text-2xl">📦</span>
-          ) : item.type === 'privilege' ? (
-            <span className="text-2xl">👑</span>
-          ) : (
-            <Avatar src={`https://api.dicebear.com/7.x/avataaars/svg?seed=preview`} decoration={item.id} className="w-8 h-8" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0 z-10">
-          <div className={`text-xs font-bold truncate ${getThemeTextClass(item.id)}`}>{item.name}</div>
-          <div className="text-[#949ba4] text-[10px] flex items-center gap-1 mt-0.5">
-            {item.price} <img src="/digitalcardus.png" alt="dc" className="w-2.5 h-2.5 object-contain" />
+        {item.type === 'privilege' ? (
+          <div className="w-10 h-10 flex items-center justify-center bg-[#1e1f22] rounded-full border border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)] mb-1.5">
+            <Crown size={20} className="text-yellow-500" />
           </div>
+        ) : item.type === 'emoji_pack' ? (
+          <div className="w-10 h-10 grid grid-cols-2 gap-0.5 bg-[#1e1f22] p-1 rounded mb-1.5">
+            {item.emojis?.slice(0, 4).map(e => (
+              <img key={e} src={e} className="w-full h-full object-contain" />
+            ))}
+          </div>
+        ) : (
+          <div className="w-10 h-10 flex items-center justify-center mb-1.5">
+            <Avatar src={avatarSrc} decoration={item.id} className="w-8 h-8" />
+          </div>
+        )}
+        
+        <span className={`text-[10px] font-medium truncate w-full ${getThemeTextClass(item.id)}`}>
+          {item.name}
+        </span>
+        
+        <div className="flex items-center gap-1 mt-1 bg-[#1e1f22] px-1.5 py-0.5 rounded-full border border-[#3f4147]">
+          <span className="text-[9px] font-bold text-white">{item.price}</span>
+          <img src="/digitalcardus.png" alt="dc" className="w-2.5 h-2.5 object-contain" />
         </div>
 
         {/* Overlay Azione */}
         {action !== 'none' && !myAccepted && (
-          <div className={`absolute inset-0 flex items-center justify-end pr-4 opacity-0 group-hover:opacity-100 transition-opacity ${
-            action === 'add' ? 'bg-gradient-to-l from-[#23a559]/90 to-transparent' : 'bg-gradient-to-l from-[#f23f43]/90 to-transparent'
+          <div className={`absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] ${
+            action === 'add' ? 'bg-[#23a559]/80' : 'bg-[#f23f43]/80'
           }`}>
-            {action === 'add' ? <Plus className="text-white" size={20} /> : <Minus className="text-white" size={20} />}
+            {action === 'add' ? <Plus className="text-white drop-shadow-md" size={32} /> : <Minus className="text-white drop-shadow-md" size={32} />}
           </div>
         )}
       </div>
@@ -236,8 +247,8 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
                     <span className="text-xs mt-1">Clicca gli oggetti in basso per aggiungerli</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {myItems.map((id: string) => renderItemCard(id, 'remove'))}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {myItems.map((id: string) => renderItemCard(id, 'remove', myProfile))}
                   </div>
                 )}
               </div>
@@ -271,8 +282,8 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
                     <span className="text-sm font-medium">In attesa di un'offerta...</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {theirItems.map((id: string) => renderItemCard(id, 'none'))}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {theirItems.map((id: string) => renderItemCard(id, 'none', theirProfile))}
                   </div>
                 )}
               </div>
@@ -290,8 +301,8 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
               {myInventory.length === 0 ? (
                 <div className="text-center text-[#949ba4] py-8 italic">Non hai altri oggetti da scambiare.</div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {myInventory.map((id: string) => renderItemCard(id, 'add'))}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                  {myInventory.map((id: string) => renderItemCard(id, 'add', myProfile))}
                 </div>
               )}
             </div>
