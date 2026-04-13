@@ -263,6 +263,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const customEmojis = ownedEmojiPacks.flatMap((packId: string) => SHOP_ITEMS.find(i => i.id === packId)?.emojis || []);
   const allReactionEmojis = [...EMOJIS, ...customEmojis];
 
+  // Estrai le emoji dall'input per l'anteprima
+  const inputEmojis = useMemo(() => {
+    const regex = /<emoji:([^>]+)>/g;
+    const matches = [];
+    let m;
+    while ((m = regex.exec(inputValue)) !== null) {
+      matches.push(m[1]);
+    }
+    return matches;
+  }, [inputValue]);
+
   // Auto-resize textareas
   useEffect(() => {
     if (chatInputRef.current) {
@@ -1039,6 +1050,22 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       if ((!inputValue.trim() && !selectedFile) || isUploading || isLocked || cooldownRemaining > 0) return;
       
       let finalContent = inputValue.trim();
+      
+      // Controllo permessi emoji personalizzate
+      const emojiRegex = /<emoji:([^>]+)>/g;
+      let emojiMatch;
+      let hasUnauthorized = false;
+      while ((emojiMatch = emojiRegex.exec(finalContent)) !== null) {
+        if (!customEmojis.includes(emojiMatch[1])) {
+          hasUnauthorized = true;
+          break;
+        }
+      }
+      if (hasUnauthorized) {
+        showError("Non possiedi alcune delle emoji inserite. Acquistale nello shop!");
+        return;
+      }
+
       setInputValue("");
       setShowChatEmojiPicker(false);
       
@@ -1729,7 +1756,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   else if (typingNames.length === 2) typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
   else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
 
-  const hasTopAttachment = replyingTo || filePreview;
+  const hasTopAttachment = replyingTo || filePreview || inputEmojis.length > 0;
 
   const isInputDisabled = isUploading || isLocked || cooldownRemaining > 0;
   let placeholderText = `Invia un messaggio in #${channel.name}`;
@@ -2225,6 +2252,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 >
                   <X size={14} />
                 </button>
+              </div>
+            )}
+            {inputEmojis.length > 0 && (
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Anteprima Emoji</span>
+                <div className="flex flex-wrap gap-2">
+                  {inputEmojis.map((emoji, i) => (
+                    <img key={i} src={emoji} className="w-8 h-8 object-contain bg-[#1e1f22] rounded p-1 border border-[#3f4147] shadow-sm" />
+                  ))}
+                </div>
               </div>
             )}
           </div>

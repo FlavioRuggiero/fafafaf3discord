@@ -49,6 +49,14 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] relative overflow-hidden h-full min-w-0">
+      <style>{`
+        @keyframes pop-in-emoji {
+          0% { transform: scale(0); opacity: 0; }
+          70% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+
       {/* Header */}
       <div className="h-12 flex items-center justify-between px-4 border-b border-[#1f2023] shadow-sm bg-[#313338] z-10 flex-shrink-0">
         <div className="flex items-center text-white font-semibold">
@@ -93,10 +101,22 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                         )}
                         
                         {item.type === 'emoji_pack' ? (
-                          <div className="mb-6 mt-2 h-24 w-24 grid grid-cols-2 gap-2 p-2 bg-[#1e1f22] rounded-xl border border-[#3f4147] shadow-inner transform group-hover:scale-105 transition-transform">
-                            {item.emojis?.slice(0, 4).map(e => (
-                              <img key={e} src={e} className="w-full h-full object-contain drop-shadow-md" />
-                            ))}
+                          <div className="mb-6 mt-2 relative w-24 h-24 group/pack mx-auto">
+                            {/* Vista normale (4 emoji) */}
+                            <div className="absolute inset-0 grid grid-cols-2 gap-2 p-2 bg-[#1e1f22] rounded-xl border border-[#3f4147] shadow-inner transition-all duration-300 group-hover/pack:opacity-0 group-hover/pack:scale-90">
+                              {item.emojis?.slice(0, 4).map(e => (
+                                <img key={e} src={e} className="w-full h-full object-contain drop-shadow-md" />
+                              ))}
+                            </div>
+                            
+                            {/* Vista Hover (Tutte le emoji animate) */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-[#2b2d31] rounded-xl border-2 border-brand shadow-[0_0_30px_rgba(88,101,242,0.4)] grid grid-cols-4 gap-1.5 p-3 opacity-0 pointer-events-none group-hover/pack:opacity-100 group-hover/pack:pointer-events-auto transition-all duration-300 z-50 scale-50 group-hover/pack:scale-100">
+                              {item.emojis?.map((e, i) => (
+                                <div key={e} className="flex items-center justify-center opacity-0" style={{ animation: `pop-in-emoji 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards ${i * 30}ms` }}>
+                                  <img src={e} className="w-full h-full object-contain drop-shadow-md hover:scale-125 transition-transform cursor-pointer" />
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         ) : (
                           <div className="mb-6 mt-2 h-24 flex items-center justify-center">
