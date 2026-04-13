@@ -57,7 +57,14 @@ body {
   z-index: 50;
 }
 
-/* Avatar Decorations */
+/* =========================================
+   AVATAR DECORATIONS (SCALABILI CON CQW)
+   ========================================= */
+
+.dec-wrapper {
+  container-type: inline-size;
+}
+
 @keyframes pulse-red {
   0% { box-shadow: 0 0 0 0 rgba(242, 63, 67, 0.7); }
   70% { box-shadow: 0 0 0 6px rgba(242, 63, 67, 0); }
@@ -106,12 +113,12 @@ body {
 }
 @keyframes float-up-fade {
   0% { transform: translateY(0) scale(0.5); opacity: 1; }
-  100% { transform: translateY(-20px) scale(1.2); opacity: 0; }
+  100% { transform: translateY(-40cqw) scale(1.2); opacity: 0; }
 }
 .dc-particle {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 30cqw;
+  height: 30cqw;
   background-image: url('/digitalcardus.png');
   background-size: contain;
   background-repeat: no-repeat;
@@ -133,16 +140,16 @@ body {
   position: relative;
 }
 @keyframes matrix-fall {
-  0% { transform: translateY(-10px); opacity: 0; }
+  0% { transform: translateY(-20cqw); opacity: 0; }
   20% { opacity: 1; }
   80% { opacity: 1; }
-  100% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(40cqw); opacity: 0; }
 }
 .matrix-char {
   position: absolute;
   color: #0f0;
   font-family: monospace;
-  font-size: 12px;
+  font-size: 25cqw;
   font-weight: bold;
   pointer-events: none;
   z-index: 20;
@@ -159,25 +166,22 @@ body {
   position: relative;
 }
 @keyframes explode-pop {
-  0% { transform: translate(0, 0) scale(0.5); opacity: 1; }
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
   50% { opacity: 1; }
-  100% { transform: translate(var(--tx), var(--ty)) scale(1.2); opacity: 0; }
+  100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.2); opacity: 0; }
 }
 .explode-emoji {
   position: absolute;
-  font-size: 14px;
+  font-size: 30cqw;
   pointer-events: none;
   z-index: 20;
   top: 50%;
   left: 50%;
-  margin-top: -7px;
-  margin-left: -7px;
+  transform: translate(-50%, -50%);
 }
-.explode-emoji.e1 { --tx: -20px; --ty: -20px; animation: explode-pop 0.6s infinite ease-out 0s; }
-.explode-emoji.e2 { --tx: 20px; --ty: -10px; animation: explode-pop 0.5s infinite ease-out 0.2s; }
-.explode-emoji.e3 { --tx: -10px; --ty: 20px; animation: explode-pop 0.7s infinite ease-out 0.4s; }
-
-/* NUOVI CONTORNI */
+.explode-emoji.e1 { --tx: -40cqw; --ty: -40cqw; animation: explode-pop 0.6s infinite ease-out 0s; }
+.explode-emoji.e2 { --tx: 40cqw; --ty: -20cqw; animation: explode-pop 0.5s infinite ease-out 0.2s; }
+.explode-emoji.e3 { --tx: -20cqw; --ty: 40cqw; animation: explode-pop 0.7s infinite ease-out 0.4s; }
 
 /* 1. Nastro Pericolo */
 .dec-hazard {
@@ -230,14 +234,16 @@ body {
 }
 .hand-emoji {
   position: absolute;
-  font-size: 14px;
+  font-size: 30cqw;
+  width: 30cqw;
+  text-align: center;
   z-index: 20;
   animation: wave-animation 1s infinite ease-in-out;
   transform-origin: bottom center;
 }
-.hand-emoji.h1 { top: -10px; left: 50%; margin-left: -7px; }
-.hand-emoji.h2 { bottom: -5px; left: -10px; }
-.hand-emoji.h3 { bottom: -5px; right: -10px; }
+.hand-emoji.h1 { top: -20cqw; left: calc(50% - 15cqw); }
+.hand-emoji.h2 { bottom: -10cqw; left: -20cqw; }
+.hand-emoji.h3 { bottom: -10cqw; right: -20cqw; }
 
 /* 4. Supernova Cosmica (Premium) */
 .dec-supernova {
@@ -274,17 +280,17 @@ body {
 }
 .supernova-star {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 12cqw;
+  height: 12cqw;
   background: #fff;
   border-radius: 50%;
   box-shadow: 0 0 6px 2px #0ff;
   z-index: 20;
   animation: star-pulse 1s infinite;
 }
-.supernova-star.s1 { top: -3px; left: 20%; animation-delay: 0s; }
-.supernova-star.s2 { bottom: 10%; right: -3px; animation-delay: 0.3s; }
-.supernova-star.s3 { top: 40%; left: -4px; animation-delay: 0.6s; }
+.supernova-star.s1 { top: -6cqw; left: 20%; animation-delay: 0s; }
+.supernova-star.s2 { bottom: 10%; right: -6cqw; animation-delay: 0.3s; }
+.supernova-star.s3 { top: 40%; left: -8cqw; animation-delay: 0.6s; }
 
 /* 5. Esquelito Explosivo */
 .dec-esquelito {
@@ -294,25 +300,25 @@ body {
 }
 
 @keyframes orbit-pulse-1 {
-  0% { transform: rotate(0deg) translateY(-25px) rotate(0deg) scale(0.8); }
-  50% { transform: rotate(180deg) translateY(-45px) rotate(-180deg) scale(1.2); }
-  100% { transform: rotate(360deg) translateY(-25px) rotate(-360deg) scale(0.8); }
+  0% { transform: translate(-50%, -50%) rotate(0deg) translateY(-60cqw) rotate(0deg) scale(0.8); }
+  50% { transform: translate(-50%, -50%) rotate(180deg) translateY(-100cqw) rotate(-180deg) scale(1.2); }
+  100% { transform: translate(-50%, -50%) rotate(360deg) translateY(-60cqw) rotate(-360deg) scale(0.8); }
 }
 @keyframes orbit-pulse-2 {
-  0% { transform: rotate(120deg) translateY(-25px) rotate(-120deg) scale(0.8); }
-  50% { transform: rotate(300deg) translateY(-45px) rotate(-300deg) scale(1.2); }
-  100% { transform: rotate(480deg) translateY(-25px) rotate(-480deg) scale(0.8); }
+  0% { transform: translate(-50%, -50%) rotate(120deg) translateY(-60cqw) rotate(-120deg) scale(0.8); }
+  50% { transform: translate(-50%, -50%) rotate(300deg) translateY(-100cqw) rotate(-300deg) scale(1.2); }
+  100% { transform: translate(-50%, -50%) rotate(480deg) translateY(-60cqw) rotate(-480deg) scale(0.8); }
 }
 @keyframes orbit-pulse-3 {
-  0% { transform: rotate(240deg) translateY(-25px) rotate(-240deg) scale(0.8); }
-  50% { transform: rotate(420deg) translateY(-45px) rotate(-420deg) scale(1.2); }
-  100% { transform: rotate(600deg) translateY(-25px) rotate(-600deg) scale(0.8); }
+  0% { transform: translate(-50%, -50%) rotate(240deg) translateY(-60cqw) rotate(-240deg) scale(0.8); }
+  50% { transform: translate(-50%, -50%) rotate(420deg) translateY(-100cqw) rotate(-420deg) scale(1.2); }
+  100% { transform: translate(-50%, -50%) rotate(600deg) translateY(-60cqw) rotate(-600deg) scale(0.8); }
 }
 
 .esquelito-skull {
   position: absolute;
-  width: 24px;
-  height: 24px;
+  width: 50cqw;
+  height: 50cqw;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
@@ -320,8 +326,6 @@ body {
   pointer-events: none;
   top: 50%;
   left: 50%;
-  margin-top: -12px;
-  margin-left: -12px;
   filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.8));
 }
 
@@ -392,7 +396,7 @@ body {
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 1.2em;
+  font-size: 30cqw;
   filter: drop-shadow(0 0 4px rgba(14, 165, 233, 0.8));
 }
 
@@ -407,14 +411,14 @@ body {
 
 /* Bollicine che salgono */
 @keyframes bubble-rise {
-  0% { transform: translateY(10px) scale(0.5); opacity: 0; }
+  0% { transform: translateY(20cqw) scale(0.5); opacity: 0; }
   50% { opacity: 1; }
-  100% { transform: translateY(-20px) scale(1); opacity: 0; }
+  100% { transform: translateY(-40cqw) scale(1); opacity: 0; }
 }
 .oceanic-bubble {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 12cqw;
+  height: 12cqw;
   background: #bae6fd;
   border-radius: 50%;
   box-shadow: 0 0 4px #38bdf8;
