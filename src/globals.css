@@ -113,6 +113,26 @@ body {
   animation: pulse-gray 2s infinite;
 }
 
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); }
+}
+.dec-pulse-green {
+  border: 2px solid #23a559;
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-pink {
+  0% { box-shadow: 0 0 0 0 rgba(235, 69, 158, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(235, 69, 158, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(235, 69, 158, 0); }
+}
+.dec-pulse-pink {
+  border: 2px solid #eb459e;
+  animation: pulse-pink 2s infinite;
+}
+
 @keyframes spin-slow {
   100% { transform: rotate(360deg); }
 }
@@ -210,6 +230,25 @@ body {
 .explode-emoji.e1 { --tx: -40cqw; --ty: -40cqw; animation: explode-pop 0.6s infinite ease-out 0s; }
 .explode-emoji.e2 { --tx: 40cqw; --ty: -20cqw; animation: explode-pop 0.5s infinite ease-out 0.2s; }
 .explode-emoji.e3 { --tx: -20cqw; --ty: 40cqw; animation: explode-pop 0.7s infinite ease-out 0.4s; }
+
+/* Riflesso Olografico */
+.dec-holographic {
+  position: relative;
+}
+.dec-holographic::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #ff00a0, #00a0ff, #00ff55, #ff00a0);
+  animation: spin-slow 4s linear infinite;
+  z-index: 0;
+}
+.dec-holographic img {
+  position: relative;
+  z-index: 1;
+  border: 2px solid #111214;
+}
 
 /* 1. Nastro Pericolo */
 .dec-hazard {
@@ -392,6 +431,7 @@ body {
   border: 2px solid #0c4a6e;
 }
 
+/* Animazione per l'orbita 3D delle gocce d'acqua */
 @keyframes orbit-wrapper {
   0% { transform: rotate(0deg); z-index: 25; }
   24% { z-index: 25; }
@@ -402,6 +442,7 @@ body {
   100% { transform: rotate(360deg); z-index: 25; }
 }
 
+/* Contro-rotazione per mantenere la goccia dritta e scalarla per l'effetto profondità */
 @keyframes counter-rotate {
   0% { transform: translateX(-50%) rotate(0deg) scale(1.3); }
   25% { transform: translateX(-50%) rotate(-90deg) scale(0.9); }
@@ -412,7 +453,7 @@ body {
 
 .water-drop-wrapper {
   position: absolute;
-  inset: -20%;
+  inset: -20%; /* Rende l'orbita più larga dell'avatar */
   pointer-events: none;
   z-index: 25;
 }
@@ -435,6 +476,7 @@ body {
 .water-drop-wrapper.w3 { animation: orbit-wrapper 3s infinite linear -2s; }
 .water-drop-wrapper.w3 .water-drop-inner { animation: counter-rotate 3s infinite linear -2s; }
 
+/* Bollicine che salgono */
 @keyframes bubble-rise {
   0% { transform: translateY(20cqw) scale(0.5); opacity: 0; }
   50% { opacity: 1; }
