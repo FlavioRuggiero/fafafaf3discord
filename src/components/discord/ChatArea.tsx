@@ -243,8 +243,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const editInputRef = useRef<HTMLTextAreaElement>(null);
-  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const editInputRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLDivElement>(null);
   
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
@@ -263,31 +263,63 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const customEmojis = ownedEmojiPacks.flatMap((packId: string) => SHOP_ITEMS.find(i => i.id === packId)?.emojis || []);
   const allReactionEmojis = [...EMOJIS, ...customEmojis];
 
-  // Estrai le emoji dall'input per l'anteprima
-  const inputEmojis = useMemo(() => {
-    const regex = /<emoji:([^>]+)>/g;
-    const matches = [];
-    let m;
-    while ((m = regex.exec(inputValue)) !== null) {
-      matches.push(m[1]);
+  // Funzioni per gestire il contentEditable
+  const parseContentEditable = (element: HTMLElement): string => {
+    let text = '';
+    for (const node of Array.from(element.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent?.replace(/\u00A0/g, ' ') || '';
+      } else if (node.nodeName === 'IMG') {
+        text += (node as HTMLImageElement).alt;
+      } else if (node.nodeName === 'BR') {
+        text += '\n';
+      } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+        if (node !== element.firstChild) text += '\n';
+        text += parseContentEditable(node as HTMLElement);
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        text += parseContentEditable(node as HTMLElement);
+      }
     }
-    return matches;
-  }, [inputValue]);
+    return text;
+  };
 
-  // Auto-resize textareas
-  useEffect(() => {
-    if (chatInputRef.current) {
-      chatInputRef.current.style.height = 'auto';
-      chatInputRef.current.style.height = `${Math.min(chatInputRef.current.scrollHeight, 300)}px`;
-    }
-  }, [inputValue]);
+  const insertHtmlAtCursor = (html: string, ref: React.RefObject<HTMLDivElement>, triggerInput: (el: HTMLDivElement) => void) => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    
+    const selection = window.getSelection();
+    if (!selection) return;
 
-  useEffect(() => {
-    if (editInputRef.current) {
-      editInputRef.current.style.height = 'auto';
-      editInputRef.current.style.height = `${Math.min(editInputRef.current.scrollHeight, 300)}px`;
+    let range;
+    if (selection.rangeCount > 0 && el.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+      range = selection.getRangeAt(0);
+    } else {
+      range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
     }
-  }, [editContent]);
+
+    range.deleteContents();
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    let node, lastNode;
+    while ((node = tempDiv.firstChild)) {
+      lastNode = frag.appendChild(node);
+    }
+    range.insertNode(frag);
+    
+    if (lastNode) {
+      range = range.cloneRange();
+      range.setStartAfter(lastNode);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    triggerInput(el);
+  };
 
   // Commands Logic
   const availableCommands = useMemo(() => {
@@ -331,15 +363,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   useEffect(() => {
     if (!isLoading && !editingMessageId && channel?.type !== 'voice') scrollToBottom();
   }, [realMessages, propMessages, typingUsers, isLoading, channel?.type]);
-
-  useEffect(() => {
-    if (editingMessageId && editInputRef.current) {
-      editInputRef.current.focus();
-      // Posiziona il cursore alla fine
-      editInputRef.current.selectionStart = editInputRef.current.value.length;
-      editInputRef.current.selectionEnd = editInputRef.current.value.length;
-    }
-  }, [editingMessageId]);
 
   useEffect(() => {
     return () => {
@@ -489,6 +512,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     setFilePreview(null);
     setFileType(null);
     setPendingMentions([]);
+    if (chatInputRef.current) chatInputRef.current.innerHTML = '';
+    setInputValue('');
 
     const fetchMessages = async () => {
       let { data, error } = await supabase
@@ -782,23 +807,29 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const value = parseContentEditable(e.currentTarget);
     setInputValue(value);
     
-    // Logica per le menzioni
-    const cursorPosition = e.target.selectionStart || 0;
-    const textBeforeCursor = value.slice(0, cursorPosition);
-    const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
-
-    if (match) {
-      setMentionQuery(match[1].toLowerCase());
-      setMentionIndex(0);
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = range.cloneRange();
+      preCaretRange.selectNodeContents(e.currentTarget);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      const textBeforeCursor = preCaretRange.toString();
+      
+      const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
+      if (match) {
+        setMentionQuery(match[1].toLowerCase());
+        setMentionIndex(0);
+      } else {
+        setMentionQuery(null);
+      }
     } else {
       setMentionQuery(null);
     }
 
-    // Reset command index se cambia l'input
     if (value.startsWith('/')) {
       setCommandIndex(0);
     }
@@ -815,17 +846,25 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleEditInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
+  const handleEditInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const value = parseContentEditable(e.currentTarget);
     setEditContent(value);
     
-    const cursorPosition = e.target.selectionStart || 0;
-    const textBeforeCursor = value.slice(0, cursorPosition);
-    const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
-
-    if (match) {
-      setMentionQuery(match[1].toLowerCase());
-      setMentionIndex(0);
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = range.cloneRange();
+      preCaretRange.selectNodeContents(e.currentTarget);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      const textBeforeCursor = preCaretRange.toString();
+      
+      const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
+      if (match) {
+        setMentionQuery(match[1].toLowerCase());
+        setMentionIndex(0);
+      } else {
+        setMentionQuery(null);
+      }
     } else {
       setMentionQuery(null);
     }
@@ -838,42 +877,60 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const insertMention = (member: User) => {
     const isEditing = editingMessageId !== null;
-    const inputRef = isEditing ? editInputRef : chatInputRef;
-    const currentValue = isEditing ? editContent : inputValue;
+    const ref = isEditing ? editInputRef : chatInputRef;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
     
-    if (!inputRef.current) return;
-    const cursorPosition = inputRef.current.selectionStart || 0;
-    const textBeforeCursor = currentValue.slice(0, cursorPosition);
-    const textAfterCursor = currentValue.slice(cursorPosition);
-
-    const match = textBeforeCursor.match(/@([a-zA-Z0-9_ ]*)$/);
-    if (match) {
-      const newTextBefore = textBeforeCursor.slice(0, match.index) + `@${member.name} `;
-      if (isEditing) {
-        setEditContent(newTextBefore + textAfterCursor);
-      } else {
-        setInputValue(newTextBefore + textAfterCursor);
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    const node = range.endContainer;
+    
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      const offset = range.endOffset;
+      const textBefore = text.slice(0, offset);
+      const match = textBefore.match(/@([a-zA-Z0-9_ ]*)$/);
+      
+      if (match) {
+        range.setStart(node, offset - match[0].length);
+        range.deleteContents();
+        
+        const mentionText = document.createTextNode(`@${member.name} `);
+        range.insertNode(mentionText);
+        
+        range.setStartAfter(mentionText);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        setMentionQuery(null);
+        setPendingMentions(prev => {
+          if (!prev.some(m => m.id === member.id)) {
+            return [...prev, { name: member.name, id: member.id }];
+          }
+          return prev;
+        });
+        
+        if (isEditing) {
+          handleEditInput({ currentTarget: el } as any);
+        } else {
+          handleInput({ currentTarget: el } as any);
+        }
       }
-      setMentionQuery(null);
-      setPendingMentions(prev => {
-        if (!prev.some(m => m.id === member.id)) {
-          return [...prev, { name: member.name, id: member.id }];
-        }
-        return prev;
-      });
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.selectionStart = newTextBefore.length;
-          inputRef.current.selectionEnd = newTextBefore.length;
-          inputRef.current.focus();
-        }
-      }, 0);
     }
   };
 
   const handleChatEmojiSelect = (emojiObject: any) => {
-    setInputValue(prev => prev + emojiObject.emoji);
-    chatInputRef.current?.focus();
+    const ref = editingMessageId ? editInputRef : chatInputRef;
+    const trigger = editingMessageId ? 
+      (el: HTMLDivElement) => handleEditInput({ currentTarget: el } as any) : 
+      (el: HTMLDivElement) => handleInput({ currentTarget: el } as any);
+      
+    insertHtmlAtCursor(emojiObject.emoji, ref, trigger);
+    setShowChatEmojiPicker(false);
   };
 
   const validateAndSetFile = (file: File) => {
@@ -936,21 +993,31 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>, ref: React.RefObject<HTMLDivElement>, triggerInput: (el: HTMLDivElement) => void) => {
+    e.preventDefault();
+    
     if (isUploading || channel?.type === 'voice') return;
     
     const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          e.preventDefault();
-          validateAndSetFile(file);
-          return;
+    let hasImage = false;
+    
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            validateAndSetFile(file);
+            hasImage = true;
+            return;
+          }
         }
       }
+    }
+    
+    if (!hasImage) {
+      const text = e.clipboardData.getData('text/plain');
+      const html = text.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/\n/g, '<br>');
+      insertHtmlAtCursor(html, ref, triggerInput);
     }
   };
 
@@ -999,7 +1066,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
   };
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (showCommandMenu) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1013,11 +1080,21 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        setInputValue(filteredCommands[commandIndex].command + ' ');
-        setTimeout(() => chatInputRef.current?.focus(), 0);
+        if (chatInputRef.current) {
+          chatInputRef.current.innerHTML = filteredCommands[commandIndex].command + '&nbsp;';
+          setInputValue(filteredCommands[commandIndex].command + ' ');
+          
+          const range = document.createRange();
+          range.selectNodeContents(chatInputRef.current);
+          range.collapse(false);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
         return;
       }
       if (e.key === 'Escape') {
+        if (chatInputRef.current) chatInputRef.current.innerHTML = '';
         setInputValue('');
         return;
       }
@@ -1066,6 +1143,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         return;
       }
 
+      if (chatInputRef.current) chatInputRef.current.innerHTML = '';
       setInputValue("");
       setShowChatEmojiPicker(false);
       
@@ -1229,12 +1307,31 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     
     setPendingMentions(existingMentions);
     setEditContent(contentToEdit);
+
+    const htmlContent = contentToEdit
+      .replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')
+      .replace(/<emoji:(.*?)>/g, '<img src="$1" alt="<emoji:$1>" class="w-7 h-7 inline-block align-middle mx-0.5" contenteditable="false" />')
+      .replace(/\n/g, '<br>');
+      
+    setTimeout(() => {
+      if (editInputRef.current) {
+        editInputRef.current.innerHTML = htmlContent;
+        editInputRef.current.focus();
+        const range = document.createRange();
+        range.selectNodeContents(editInputRef.current);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }, 0);
   };
 
   const cancelEditing = () => {
     setEditingMessageId(null);
     setEditContent("");
     setPendingMentions([]);
+    if (editInputRef.current) editInputRef.current.innerHTML = '';
   };
 
   const saveEdit = async (msgId: string) => {
@@ -1287,7 +1384,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
-  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, msgId: string) => {
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, msgId: string) => {
     if (showMentions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1756,7 +1853,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   else if (typingNames.length === 2) typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
   else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
 
-  const hasTopAttachment = replyingTo || filePreview || inputEmojis.length > 0;
+  const hasTopAttachment = replyingTo || filePreview;
 
   const isInputDisabled = isUploading || isLocked || cooldownRemaining > 0;
   let placeholderText = `Invia un messaggio in #${channel.name}`;
@@ -2086,13 +2183,15 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   {isEditing ? (
                     <div className="mt-1 mr-4">
                       <div className="bg-[#383a40] p-2.5 rounded-md border border-[#1f2023]">
-                        <textarea
+                        <div
                           ref={editInputRef}
-                          value={editContent}
-                          onChange={handleEditInputChange}
+                          contentEditable={true}
+                          onInput={handleEditInput}
                           onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
-                          rows={1}
-                          className="w-full bg-transparent border-none outline-none text-[#dbdee1] resize-none custom-scrollbar"
+                          onPaste={(e) => handlePaste(e, editInputRef, (el) => handleEditInput({ currentTarget: el } as any))}
+                          className="w-full bg-transparent border-none outline-none text-[#dbdee1] custom-scrollbar max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words"
+                          role="textbox"
+                          aria-multiline="true"
                         />
                       </div>
                       <div className="text-[11px] text-[#b5bac1] mt-1.5">
@@ -2188,8 +2287,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div
                   key={cmd.command}
                   onClick={() => {
-                    setInputValue(cmd.command + ' ');
-                    setTimeout(() => chatInputRef.current?.focus(), 0);
+                    if (chatInputRef.current) {
+                      chatInputRef.current.innerHTML = cmd.command + '&nbsp;';
+                      setInputValue(cmd.command + ' ');
+                      const range = document.createRange();
+                      range.selectNodeContents(chatInputRef.current);
+                      range.collapse(false);
+                      const sel = window.getSelection();
+                      sel?.removeAllRanges();
+                      sel?.addRange(range);
+                    }
                   }}
                   className={`flex flex-col px-3 py-2 cursor-pointer ${idx === commandIndex ? 'bg-[#35373c]' : 'hover:bg-[#35373c]'}`}
                 >
@@ -2254,16 +2361,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 </button>
               </div>
             )}
-            {inputEmojis.length > 0 && (
-              <div className="flex flex-col gap-1 mt-1">
-                <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Anteprima Emoji</span>
-                <div className="flex flex-wrap gap-2">
-                  {inputEmojis.map((emoji, i) => (
-                    <img key={i} src={emoji} className="w-8 h-8 object-contain bg-[#1e1f22] rounded p-1 border border-[#3f4147] shadow-sm" />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -2296,17 +2393,24 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 onChange={handleFileSelect} 
               />
               
-              <textarea
-                ref={chatInputRef}
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                disabled={isInputDisabled}
-                placeholder={placeholderText}
-                rows={1}
-                className="flex-1 min-w-0 bg-transparent border-none outline-none text-[#dbdee1] placeholder-[#80848e] disabled:opacity-50 resize-none custom-scrollbar py-1.5"
-              />
+              <div className="relative flex-1 min-w-0 bg-transparent py-1.5">
+                {inputValue.length === 0 && (
+                  <div className="absolute inset-0 pointer-events-none text-[#80848e] py-1.5 px-1">
+                    {placeholderText}
+                  </div>
+                )}
+                <div
+                  ref={chatInputRef}
+                  contentEditable={!isInputDisabled}
+                  onInput={handleInput}
+                  onKeyDown={handleKeyDown}
+                  onPaste={(e) => handlePaste(e, chatInputRef, (el) => handleInput({ currentTarget: el } as any))}
+                  className="w-full border-none outline-none text-[#dbdee1] custom-scrollbar px-1 max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words"
+                  role="textbox"
+                  aria-multiline="true"
+                />
+              </div>
+
               <Popover.Root open={showChatEmojiPicker} onOpenChange={setShowChatEmojiPicker}>
                 <Popover.Trigger asChild>
                   <button disabled={isInputDisabled} className="p-1 hover:text-[#dbdee1] text-[#b5bac1] transition-colors ml-2 flex-shrink-0 focus:outline-none disabled:opacity-50 mb-1" title="Scegli Emoji">
@@ -2388,8 +2492,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                                   <button 
                                     key={emoji} 
                                     onClick={() => { 
-                                      setInputValue(prev => prev + `<emoji:${emoji}>`); 
-                                      chatInputRef.current?.focus(); 
+                                      const imgHtml = `<img src="${emoji}" alt="<emoji:${emoji}>" class="w-7 h-7 inline-block align-middle mx-0.5" contenteditable="false" />`;
+                                      const ref = editingMessageId ? editInputRef : chatInputRef;
+                                      const trigger = editingMessageId ? 
+                                        (el: HTMLDivElement) => handleEditInput({ currentTarget: el } as any) : 
+                                        (el: HTMLDivElement) => handleInput({ currentTarget: el } as any);
+                                        
+                                      insertHtmlAtCursor(imgHtml, ref, trigger);
                                       setShowChatEmojiPicker(false); 
                                     }} 
                                     className="aspect-square flex items-center justify-center hover:bg-[#35373c] rounded-lg transition-colors p-1"
