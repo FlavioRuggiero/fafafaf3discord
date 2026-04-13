@@ -6,7 +6,7 @@ import { ShoppingCart, Menu, Gift, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
-import { SHOP_ITEMS } from '@/data/shopItems';
+import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
 
 interface ShopViewProps {
   currentUser: User;
@@ -28,7 +28,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const [isClaiming, setIsClaiming] = useState(false);
   
   // Stati per la rotazione dello shop
-  const [activeItems, setActiveItems] = useState<typeof SHOP_ITEMS>([]);
+  const [activeItems, setActiveItems] = useState<ShopItem[]>([]);
   const [countdown, setCountdown] = useState<string>("");
 
   const today = new Date().toISOString().split('T')[0];
@@ -100,7 +100,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     }
   };
 
-  const handlePurchase = async (item: typeof SHOP_ITEMS[0]) => {
+  const handlePurchase = async (item: ShopItem) => {
     if (currentUser.digitalcardus < item.price) {
       showError("Non hai abbastanza digitalcardus!");
       return;
@@ -212,16 +212,25 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 const isOwned = currentUser.purchased_decorations?.includes(item.id);
 
                 return (
-                  <div key={item.id} className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147]">
+                  <div key={item.id} className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147] group">
                     
                     {/* Badge Categoria */}
                     <div className="absolute top-3 left-3 bg-[#1e1f22] text-[#949ba4] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border border-[#3f4147]/50 shadow-sm">
                       {item.category}
                     </div>
 
-                    <div className="mb-6 mt-4 h-24 flex items-center justify-center">
-                      <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
-                    </div>
+                    {item.type === 'emoji_pack' ? (
+                      <div className="mb-6 mt-4 h-24 w-24 grid grid-cols-2 gap-2 p-2 bg-[#1e1f22] rounded-xl border border-[#3f4147] shadow-inner transform group-hover:scale-105 transition-transform">
+                        {item.emojis?.slice(0, 4).map(e => (
+                          <img key={e} src={e} className="w-full h-full object-contain drop-shadow-md" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mb-6 mt-4 h-24 flex items-center justify-center">
+                        <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
+                      </div>
+                    )}
+                    
                     <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
                     <div className="mt-auto w-full">

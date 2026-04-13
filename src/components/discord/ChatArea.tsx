@@ -15,6 +15,7 @@ import { BombParty } from "./BombParty";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
+import { SHOP_ITEMS } from "@/data/shopItems";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "🎉"];
 
@@ -191,6 +192,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
   
   const [showChatEmojiPicker, setShowChatEmojiPicker] = useState(false);
+  const [emojiTab, setEmojiTab] = useState<'default' | 'custom'>('default');
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
   const [showScreenSelectModal, setShowScreenSelectModal] = useState(false);
@@ -255,6 +257,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     const memberInfo = serverMembers?.find(m => m.id === baseUser.id);
     return { ...baseUser, server_roles: memberInfo?.server_roles || [] };
   };
+
+  // Emoji personalizzate
+  const ownedEmojiPacks = currentUserProfile?.purchased_decorations?.filter((id: string) => id.startsWith('emoji-pack-')) || [];
+  const customEmojis = ownedEmojiPacks.flatMap((packId: string) => SHOP_ITEMS.find(i => i.id === packId)?.emojis || []);
+  const allReactionEmojis = [...EMOJIS, ...customEmojis];
 
   // Auto-resize textareas
   useEffect(() => {
@@ -1336,7 +1343,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const renderContentWithMentions = (text: string) => {
     if (!text) return null;
-    const regex = /(<@[a-zA-Z0-9-]+>|<@everyone>)/g;
+    const regex = /(<@[a-zA-Z0-9-]+>|<@everyone>|<emoji:[^>]+>)/g;
     const parts = text.split(regex);
     
     return parts.map((part, i) => {
@@ -1346,6 +1353,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             @tutti
           </span>
         );
+      }
+      const emojiMatch = part.match(/^<emoji:(.+)>$/);
+      if (emojiMatch) {
+        return <img key={i} src={emojiMatch[1]} className="w-7 h-7 inline-block align-middle mx-0.5" alt="emoji" />;
       }
       const match = part.match(/^<@([a-zA-Z0-9-]+)>$/);
       if (match) {
@@ -1939,20 +1950,20 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                         side="top" 
                         align="end" 
                         sideOffset={5} 
-                        className="bg-[#2b2d31] border border-[#1e1f22] p-2 rounded-lg shadow-xl z-[99999] w-[200px]"
+                        className="bg-[#2b2d31] border border-[#1e1f22] p-2 rounded-lg shadow-xl z-[99999] w-[280px]"
                         onInteractOutside={() => setOpenPopoverId(null)}
                       >
-                        <div className="grid grid-cols-4 gap-1">
-                          {EMOJIS.map(emoji => (
+                        <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                          {allReactionEmojis.map(emoji => (
                             <button 
                               key={emoji}
                               onClick={() => {
                                 toggleReaction(msg.id, emoji);
                                 setOpenPopoverId(null);
                               }}
-                              className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-xl transition-colors focus:outline-none"
+                              className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-2xl transition-colors focus:outline-none"
                             >
-                              {emoji}
+                              {emoji.startsWith('/') ? <img src={emoji} className="w-7 h-7 object-contain" /> : emoji}
                             </button>
                           ))}
                         </div>
@@ -2107,7 +2118,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                           onClick={() => toggleReaction(msg.id, emoji)}
                           className={`flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${hasReacted ? 'bg-brand/20 border-brand text-brand' : 'bg-[#2b2d31] border-transparent text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'} transition-colors`}
                         >
-                          <span className="mr-1.5 text-sm">{emoji}</span>
+                          {emoji.startsWith('/') ? (
+                            <img src={emoji} className="w-4 h-4 mr-1.5 object-contain" />
+                          ) : (
+                            <span className="mr-1.5 text-sm">{emoji}</span>
+                          )}
                           <span>{count}</span>
                         </button>
                       ))}
@@ -2269,12 +2284,50 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     className="z-[99999] border-none shadow-2xl bg-transparent"
                     onInteractOutside={() => setShowChatEmojiPicker(false)}
                   >
-                    <EmojiPicker 
-                      theme={Theme.DARK} 
-                      onEmojiClick={handleChatEmojiSelect} 
-                      searchPlaceHolder="Cerca emoji..." 
-                      lazyLoadEmojis={true} 
-                    />
+                    <div className="bg-[#2b2d31] border border-[#1e1f22] rounded-lg shadow-xl overflow-hidden flex flex-col w-[350px] h-[450px]">
+                      <div className="flex border-b border-[#1f2023]">
+                        <button onClick={() => setEmojiTab('default')} className={`flex-1 py-3 text-sm font-bold transition-colors ${emojiTab === 'default' ? 'bg-[#35373c] text-white border-b-2 border-brand' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] border-b-2 border-transparent'}`}>Standard</button>
+                        <button onClick={() => setEmojiTab('custom')} className={`flex-1 py-3 text-sm font-bold transition-colors ${emojiTab === 'custom' ? 'bg-[#35373c] text-white border-b-2 border-brand' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] border-b-2 border-transparent'}`}>Personalizzate</button>
+                      </div>
+                      <div className="flex-1 overflow-hidden bg-[#2b2d31]">
+                        {emojiTab === 'default' ? (
+                          <EmojiPicker 
+                            theme={Theme.DARK} 
+                            onEmojiClick={handleChatEmojiSelect} 
+                            searchPlaceHolder="Cerca emoji..." 
+                            lazyLoadEmojis={true}
+                            width="100%"
+                            height="100%"
+                          />
+                        ) : (
+                          <div className="p-3 overflow-y-auto h-full custom-scrollbar">
+                            {customEmojis.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center h-full text-[#949ba4] text-center px-4">
+                                <span className="text-4xl mb-3">🛒</span>
+                                <p className="text-sm font-medium text-white mb-1">Nessuna emoji personalizzata</p>
+                                <p className="text-xs">Acquista i pacchetti emoji nel Cardi E-Shop per usarli qui!</p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-5 gap-2">
+                                {customEmojis.map(emoji => (
+                                  <button 
+                                    key={emoji} 
+                                    onClick={() => { 
+                                      setInputValue(prev => prev + `<emoji:${emoji}>`); 
+                                      chatInputRef.current?.focus(); 
+                                      setShowChatEmojiPicker(false); 
+                                    }} 
+                                    className="aspect-square flex items-center justify-center hover:bg-[#35373c] rounded-lg transition-colors p-1"
+                                  >
+                                    <img src={emoji} className="w-full h-full object-contain" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </Popover.Content>
                 </Popover.Portal>
               </Popover.Root>

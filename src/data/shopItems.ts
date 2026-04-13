@@ -1,4 +1,13 @@
-export const SHOP_ITEMS = [
+export type ShopItem = {
+  id: string;
+  name: string;
+  price: number;
+  type: 'decoration' | 'emoji_pack';
+  category: string;
+  emojis?: string[];
+};
+
+export const SHOP_ITEMS: ShopItem[] = [
   { id: 'pulse-red', name: 'Contorno Rosso Pulsante', price: 20, type: 'decoration', category: 'Contorni' },
   { id: 'pulse-gray', name: 'Contorno Grigio Pulsante', price: 20, type: 'decoration', category: 'Contorni' },
   { id: 'pulse-green', name: 'Contorno Verde Pulsante', price: 20, type: 'decoration', category: 'Contorni' },
@@ -15,4 +24,13 @@ export const SHOP_ITEMS = [
   { id: 'supernova', name: 'Supernova Cosmica', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'oceanic', name: 'Vortice Oceanico', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'saturn-fire', name: 'Saturno a Fuoco', price: 250, type: 'decoration', category: 'Contorni Premium' },
+  
+  // Pacchetti Emoji
+  { id: 'emoji-pack-1', name: 'Pacchetto Emoji Vol. 1', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 1}.png`) },
+  { id: 'emoji-pack-2', name: 'Pacchetto Emoji Vol. 2', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 17}.png`) },
+  { id: 'emoji-pack-3', name: 'Pacchetto Emoji Vol. 3', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 33}.png`) },
+  { id: 'emoji-pack-4', name: 'Pacchetto Emoji Vol. 4', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 49}.png`) },
+  { id: 'emoji-pack-5', name: 'Pacchetto Emoji Vol. 5', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 65}.png`) },
+  { id: 'emoji-pack-6', name: 'Pacchetto Emoji Vol. 6', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 81}.png`) },
+  { id: 'emoji-pack-7', name: 'Pacchetto Emoji Vol. 7', price: 150, type: 'emoji_pack', category: 'Pacchetti Emoji', emojis: Array.from({length: 16}, (_, i) => `/emojis/${i + 97}.png`) },
 ];

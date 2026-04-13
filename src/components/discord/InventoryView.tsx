@@ -85,19 +85,33 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                     const isEquipped = currentUser.avatar_decoration === item.id;
 
                     return (
-                      <div key={item.id} className={`bg-[#2b2d31] border ${isEquipped ? 'border-brand' : 'border-[#1e1f22]'} rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md relative`}>
+                      <div key={item.id} className={`bg-[#2b2d31] border ${isEquipped ? 'border-brand' : 'border-[#1e1f22]'} rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md relative group`}>
                         {isEquipped && (
                           <div className="absolute top-3 right-3 bg-brand text-white p-1 rounded-full shadow-md">
                             <Check size={14} />
                           </div>
                         )}
-                        <div className="mb-6 mt-2 h-24 flex items-center justify-center">
-                          <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
-                        </div>
+                        
+                        {item.type === 'emoji_pack' ? (
+                          <div className="mb-6 mt-2 h-24 w-24 grid grid-cols-2 gap-2 p-2 bg-[#1e1f22] rounded-xl border border-[#3f4147] shadow-inner transform group-hover:scale-105 transition-transform">
+                            {item.emojis?.slice(0, 4).map(e => (
+                              <img key={e} src={e} className="w-full h-full object-contain drop-shadow-md" />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mb-6 mt-2 h-24 flex items-center justify-center">
+                            <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
+                          </div>
+                        )}
+                        
                         <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
                         <div className="mt-auto w-full">
-                          {isEquipped ? (
+                          {item.type === 'emoji_pack' ? (
+                            <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
+                              Disponibile in Chat
+                            </button>
+                          ) : isEquipped ? (
                             <button onClick={handleUnequip} className="w-full py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
                               Rimuovi
                             </button>
