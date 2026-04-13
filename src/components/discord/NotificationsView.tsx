@@ -34,11 +34,13 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
       
     if (mentionData) setMentions(mentionData);
 
+    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: tradeData } = await supabase
       .from('trades')
       .select('id, sender_id, created_at, profiles!trades_sender_id_fkey(first_name, avatar_url)')
       .eq('receiver_id', currentUser.id)
       .eq('status', 'pending')
+      .gt('created_at', twoMinsAgo) // Prende solo quelle non scadute
       .order('created_at', { ascending: false });
       
     if (tradeData) setTrades(tradeData);
@@ -55,7 +57,14 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
       })
       .subscribe();
 
+    // Rimuove localmente le richieste scadute ogni 10 secondi
+    const expireInterval = setInterval(() => {
+      const twoMinsAgoMs = Date.now() - 2 * 60 * 1000;
+      setTrades(prev => prev.filter(t => new Date(t.created_at).getTime() > twoMinsAgoMs));
+    }, 10000);
+
     return () => {
+      clearInterval(expireInterval);
       supabase.removeChannel(tradeSub);
     };
   }, [currentUser.id]);
@@ -71,6 +80,13 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
   };
 
   const handleAcceptTrade = async (tradeId: string, senderId: string) => {
+    const trade = trades.find(t => t.id === tradeId);
+    if (trade && new Date(trade.created_at).getTime() < Date.now() - 2 * 60 * 1000) {
+      showError("Questa richiesta di scambio è scaduta.");
+      setTrades(prev => prev.filter(t => t.id !== tradeId));
+      return;
+    }
+
     // Rimuovi subito dalla UI per evitare doppi click
     setTrades(prev => prev.filter(t => t.id !== tradeId));
 

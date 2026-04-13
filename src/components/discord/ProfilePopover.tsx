@@ -68,25 +68,46 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
     if (!authUser) return;
     setIsRequestingTrade(true);
     
+    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+
+    // 1. Controlla se ho già inviato una richiesta a questo utente negli ultimi 2 minuti
+    const { data: alreadySent } = await supabase
+      .from('trades')
+      .select('id')
+      .eq('sender_id', authUser.id)
+      .eq('receiver_id', user.id)
+      .eq('status', 'pending')
+      .gt('created_at', twoMinsAgo)
+      .maybeSingle();
+
+    if (alreadySent) {
+      showError("Hai già inviato una richiesta a questo utente. Attendi che risponda o che scada (2 min).");
+      setIsRequestingTrade(false);
+      return;
+    }
+
+    // 2. Controlla se LUI ha inviato una richiesta a ME negli ultimi 2 minuti
     const { data: existingTrade } = await supabase
       .from('trades')
       .select('id')
       .eq('sender_id', user.id)
       .eq('receiver_id', authUser.id)
       .eq('status', 'pending')
+      .gt('created_at', twoMinsAgo)
       .maybeSingle();
 
     if (existingTrade) {
+      // Accetta la sua richiesta
       const { error } = await supabase.from('trades').update({ status: 'active' }).eq('id', existingTrade.id);
       if (error) {
         showError("Errore nell'accettazione dello scambio.");
       } else {
         showSuccess("Scambio accettato!");
         sendBroadcast(user.id, 'trade_accepted', { trade_id: existingTrade.id });
-        // Apri istantaneamente per te stesso tramite evento locale
         window.dispatchEvent(new CustomEvent('open_trade', { detail: existingTrade.id }));
       }
     } else {
+      // Crea una nuova richiesta
       const { error } = await supabase.from('trades').insert({
         sender_id: authUser.id,
         receiver_id: user.id,
@@ -96,7 +117,7 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
       if (error) {
         showError("Errore nell'invio della richiesta di scambio.");
       } else {
-        showSuccess("Richiesta di scambio inviata!");
+        showSuccess("Richiesta di scambio inviata! (Scade in 2 minuti)");
         sendBroadcast(user.id, 'trade_request', {});
       }
     }

@@ -80,35 +80,9 @@ const Index = () => {
   const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
   
   // Calcolo dinamico delle notifiche
-  const [tradeCount, setTradeCount] = useState(0);
-  const [mentionCount, setMentionCount] = useState(0);
-  
+  const [pendingTradeCount, setPendingTradeCount] = useState(0);
   const today = new Date().toISOString().split('T')[0];
-  const dailyRewardCount = currentUser && currentUser.last_reward_date !== today ? 1 : 0;
-  
-  const notificationCount = tradeCount + mentionCount + dailyRewardCount;
-  
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-  const prevNotifCountRef = useRef(0);
-
-  // Gestione intelligente della scomparsa del badge notifiche
-  useEffect(() => {
-    if (notificationCount === 0) {
-      setHasUnreadNotifications(false);
-    } else if (notificationCount > prevNotifCountRef.current) {
-      if (activeChannel?.id !== 'notifications') {
-        setHasUnreadNotifications(true);
-      }
-    }
-    prevNotifCountRef.current = notificationCount;
-  }, [notificationCount, activeChannel?.id]);
-
-  useEffect(() => {
-    if (activeChannel?.id === 'notifications') {
-      setHasUnreadNotifications(false);
-      setMentionCount(0); // Resetta le menzioni di sessione quando visualizzate
-    }
-  }, [activeChannel?.id]);
+  const notificationCount = (currentUser?.last_reward_date !== today ? 1 : 0) + pendingTradeCount;
 
   // Carica impostazioni notifiche
   useEffect(() => {
@@ -140,7 +114,7 @@ const Index = () => {
   const notificationSettingsRef = useRef(notificationSettings);
   useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
 
-  // Listener globale per le notifiche (Messaggi e Menzioni)
+  // Listener globale per le notifiche (Messaggi)
   useEffect(() => {
     if (!currentUser?.id) return;
 
@@ -156,10 +130,6 @@ const Index = () => {
 
       // Controllo menzione tramite ID univoco o @everyone
       const isMentioned = newMsg.content.includes(`<@${currentUser.id}>`) || newMsg.content.includes('<@everyone>');
-
-      if (isMentioned) {
-        setMentionCount(prev => prev + 1);
-      }
 
       if (setting !== 'none') {
         // Se non stiamo guardando questo server, segnalo come non letto
@@ -186,18 +156,26 @@ const Index = () => {
     };
   }, [currentUser?.id]);
 
-  // Listener per conteggio scambi attivi
+  // Listener per conteggio notifiche e scambi attivi
   useEffect(() => {
     if (!currentUser?.id) return;
     
     const userId = currentUser.id;
 
     const fetchTradeCount = async () => {
-      const { count } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('status', 'pending');
-      setTradeCount(count || 0);
+      const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      const { count } = await supabase.from('trades')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userId)
+        .eq('status', 'pending')
+        .gt('created_at', twoMinsAgo); // Solo quelle non scadute
+      setPendingTradeCount(count || 0);
     };
 
     fetchTradeCount();
+    
+    // Controlla ogni 30 secondi se ci sono richieste scadute da rimuovere dal contatore
+    const expireInterval = setInterval(fetchTradeCount, 30000);
 
     const fetchActiveTrade = async () => {
       const { data } = await supabase.from('trades')
@@ -237,6 +215,7 @@ const Index = () => {
       .subscribe();
 
     return () => {
+      clearInterval(expireInterval);
       supabase.removeChannel(tradeSub);
     };
   }, [currentUser?.id]);
@@ -954,7 +933,7 @@ const Index = () => {
             onLeaveServer={() => handleLeaveServer(activeServer!.id)}
             onOpenUserSettings={() => setShowUserSettingsModal(true)}
             serverPermissions={serverPermissions}
-            notificationCount={hasUnreadNotifications ? notificationCount : 0}
+            notificationCount={notificationCount}
           />
         </div>
 
