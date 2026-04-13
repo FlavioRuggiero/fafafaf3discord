@@ -2287,7 +2287,45 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     <div className="bg-[#2b2d31] border border-[#1e1f22] rounded-lg shadow-xl overflow-hidden flex flex-col w-[350px] h-[450px]">
                       <div className="flex border-b border-[#1f2023]">
                         <button onClick={() => setEmojiTab('default')} className={`flex-1 py-3 text-sm font-bold transition-colors ${emojiTab === 'default' ? 'bg-[#35373c] text-white border-b-2 border-brand' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] border-b-2 border-transparent'}`}>Standard</button>
-                        <button onClick={() => setEmojiTab('custom')} className={`flex-1 py-3 text-sm font-bold transition-colors ${emojiTab === 'custom' ? 'bg-[#35373c] text-white border-b-2 border-brand' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1] border-b-2 border-transparent'}`}>Personalizzate</button>
+                        
+                        <button 
+                          onClick={() => setEmojiTab('custom')} 
+                          className={`relative overflow-hidden flex-1 py-3 text-sm font-bold transition-all duration-300 group ${emojiTab === 'custom' ? 'bg-[#35373c] text-white border-b-2 border-brand' : 'text-yellow-400 hover:bg-[#35373c] hover:text-yellow-300 border-b-2 border-transparent'}`}
+                        >
+                          <style>{`
+                            @keyframes shimmer-btn {
+                              0% { transform: translateX(-100%); }
+                              100% { transform: translateX(100%); }
+                            }
+                            @keyframes float-emoji-1 {
+                              0% { transform: translateY(10px) scale(0.5) rotate(0deg); opacity: 0; }
+                              50% { opacity: 0.8; }
+                              100% { transform: translateY(-25px) scale(1.2) rotate(20deg); opacity: 0; }
+                            }
+                            @keyframes float-emoji-2 {
+                              0% { transform: translateY(10px) scale(0.5) rotate(0deg); opacity: 0; }
+                              50% { opacity: 0.6; }
+                              100% { transform: translateY(-20px) scale(1) rotate(-15deg); opacity: 0; }
+                            }
+                            @keyframes float-emoji-3 {
+                              0% { transform: translateY(5px) scale(0.5) rotate(0deg); opacity: 0; }
+                              50% { opacity: 0.7; }
+                              100% { transform: translateY(-30px) scale(1.1) rotate(10deg); opacity: 0; }
+                            }
+                          `}</style>
+                          
+                          {/* Shimmer effect */}
+                          <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" style={{ animation: 'shimmer-btn 2.5s infinite' }}></div>
+                          
+                          {/* Floating Emojis */}
+                          <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-80 group-hover:opacity-100 transition-opacity">
+                            {SHOP_ITEMS.find(i => i.type === 'emoji_pack')?.emojis?.[0] && <img src={SHOP_ITEMS.find(i => i.type === 'emoji_pack')!.emojis![0]} className="absolute left-[15%] bottom-0 w-4 h-4 object-contain drop-shadow-md" style={{ animation: 'float-emoji-1 3s ease-in-out infinite' }} />}
+                            {SHOP_ITEMS.find(i => i.type === 'emoji_pack')?.emojis?.[1] && <img src={SHOP_ITEMS.find(i => i.type === 'emoji_pack')!.emojis![1]} className="absolute left-[50%] bottom-0 w-3 h-3 object-contain drop-shadow-md" style={{ animation: 'float-emoji-2 2.5s ease-in-out infinite 0.5s' }} />}
+                            {SHOP_ITEMS.find(i => i.type === 'emoji_pack')?.emojis?.[2] && <img src={SHOP_ITEMS.find(i => i.type === 'emoji_pack')!.emojis![2]} className="absolute right-[20%] bottom-0 w-4 h-4 object-contain drop-shadow-md" style={{ animation: 'float-emoji-3 3.5s ease-in-out infinite 1s' }} />}
+                          </div>
+
+                          <span className="relative z-10 drop-shadow-[0_0_5px_rgba(250,204,21,0.6)]">Personalizzate</span>
+                        </button>
                       </div>
                       <div className="flex-1 overflow-hidden bg-[#2b2d31]">
                         {emojiTab === 'default' ? (
