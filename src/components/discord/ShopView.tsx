@@ -103,10 +103,16 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative">
-        {/* Sfumatura verde elegante in alto */}
-        <div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-[#23a559]/20 via-[#23a559]/5 to-transparent pointer-events-none z-0"></div>
+      {/* Content con Trama a Foglie */}
+      <div 
+        className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative"
+        style={{ 
+          backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23166534' fill-opacity='0.08'%3E%3Cpath d='M40,20 C60,20 70,40 70,60 C50,60 40,40 40,20 Z' transform='rotate(15 55 40)'/%3E%3Cpath d='M140,30 Q160,10 170,40 Q150,60 140,30 Z' transform='rotate(-25 155 35)'/%3E%3Cpath d='M30,130 C40,110 60,120 70,140 C80,160 50,170 30,130 Z' transform='rotate(45 50 140)'/%3E%3Cpath d='M150,140 C170,140 180,160 180,180 C160,180 150,160 150,140 Z' transform='rotate(-60 165 160)'/%3E%3Cpath d='M90,90 Q100,80 110,95 Q95,105 90,90 Z' transform='rotate(10 100 92)'/%3E%3C/g%3E%3C/svg%3E\")",
+          backgroundSize: "200px 200px"
+        }}
+      >
+        {/* Sfumatura verde espansiva e angolata verso sinistra */}
+        <div className="absolute -top-20 -right-20 w-[120%] h-[700px] bg-gradient-to-bl from-[#23a559]/25 via-[#23a559]/5 to-transparent pointer-events-none z-0 transform -rotate-3"></div>
 
         <div className="max-w-5xl mx-auto relative z-10">
           <div className="mb-10 mt-4 text-center sm:text-left">
@@ -119,7 +125,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           </div>
 
           {/* Daily Reward Banner */}
-          <div className="mb-10 bg-gradient-to-r from-[#2b2d31] to-[#1e1f22] border border-[#3f4147] rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between shadow-lg relative overflow-hidden">
+          <div className="mb-10 bg-gradient-to-r from-[#2b2d31]/90 to-[#1e1f22]/90 backdrop-blur-sm border border-[#3f4147] rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
             <div className="flex items-center mb-4 sm:mb-0 relative z-10">
               <div className="w-16 h-16 bg-[#23a559]/20 rounded-full flex items-center justify-center mr-4 border border-[#23a559]/30">
@@ -145,13 +151,13 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
           {categories.map(category => (
             <div key={category} className="mb-10">
-              <h2 className="text-xl font-bold text-white mb-4 border-b border-[#3f4147] pb-2">{category}</h2>
+              <h2 className="text-xl font-bold text-white mb-4 border-b border-[#3f4147]/50 pb-2">{category}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {SHOP_ITEMS.filter(item => item.category === category).map(item => {
                   const isOwned = currentUser.purchased_decorations?.includes(item.id);
 
                   return (
-                    <div key={item.id} className="bg-[#2b2d31] border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md">
+                    <div key={item.id} className="bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147]">
                       <div className="mb-6 mt-2 h-24 flex items-center justify-center">
                         <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
                       </div>
