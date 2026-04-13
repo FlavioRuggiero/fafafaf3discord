@@ -170,7 +170,9 @@ const Index = () => {
       level: p.level || 1,
       digitalcardus: p.digitalcardus ?? 25,
       xp: p.xp || 0,
-      server_roles: userRoles
+      server_roles: userRoles,
+      avatar_decoration: p.avatar_decoration || null,
+      purchased_decorations: p.purchased_decorations || []
     };
   });
 
@@ -258,7 +260,9 @@ const Index = () => {
             digitalcardus: updatedProfile.digitalcardus ?? 25,
             xp: updatedProfile.xp || 0,
             global_role: role,
-            last_reward_date: updatedProfile.last_reward_date || prev.last_reward_date
+            last_reward_date: updatedProfile.last_reward_date || prev.last_reward_date,
+            avatar_decoration: updatedProfile.avatar_decoration || prev.avatar_decoration,
+            purchased_decorations: updatedProfile.purchased_decorations || prev.purchased_decorations
           };
         });
       })
@@ -322,7 +326,9 @@ const Index = () => {
         level: profile?.level || 1,
         digitalcardus: profile?.digitalcardus ?? 25,
         xp: profile?.xp || 0,
-        last_reward_date: profile?.last_reward_date || null
+        last_reward_date: profile?.last_reward_date || null,
+        avatar_decoration: profile?.avatar_decoration || null,
+        purchased_decorations: profile?.purchased_decorations || []
       };
       
       setCurrentUser(loadedUser);

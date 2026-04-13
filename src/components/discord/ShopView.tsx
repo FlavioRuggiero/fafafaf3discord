@@ -2,14 +2,22 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { Leaf, Sparkles, TreePine, Menu, Gift } from 'lucide-react';
+import { Leaf, Sparkles, Menu, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { Avatar } from './Avatar';
 
 interface ShopViewProps {
   currentUser: User;
   onToggleSidebar?: () => void;
 }
+
+const SHOP_ITEMS = [
+  { id: 'pulse-red', name: 'Contorno Rosso Pulsante', price: 20, type: 'decoration' },
+  { id: 'electric', name: 'Contorno Elettrico', price: 50, type: 'decoration' },
+  { id: 'pulse-gray', name: 'Contorno Grigio Pulsante', price: 20, type: 'decoration' },
+  { id: 'dc-emit', name: 'Emanazione Digitalcardus', price: 70, type: 'decoration' },
+];
 
 export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const [isClaiming, setIsClaiming] = useState(false);
@@ -33,6 +41,39 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       showError("Hai già riscattato il premio di oggi.");
     }
     setIsClaiming(false);
+  };
+
+  const handlePurchase = async (item: any) => {
+    if ((currentUser.digitalcardus || 0) < item.price) {
+      return showError("Non hai abbastanza Digitalcardus!");
+    }
+    const newDC = (currentUser.digitalcardus || 0) - item.price;
+    const newPurchased = [...(currentUser.purchased_decorations || []), item.id];
+
+    const { error } = await supabase.from('profiles').update({
+      digitalcardus: newDC,
+      purchased_decorations: newPurchased,
+      avatar_decoration: item.id
+    }).eq('id', currentUser.id);
+
+    if (error) showError("Errore durante l'acquisto. Hai eseguito lo script SQL?");
+    else showSuccess(`Hai acquistato ${item.name}!`);
+  };
+
+  const handleEquip = async (id: string) => {
+    const { error } = await supabase.from('profiles').update({
+      avatar_decoration: id
+    }).eq('id', currentUser.id);
+    if (error) showError("Errore durante l'equipaggiamento.");
+    else showSuccess("Contorno equipaggiato!");
+  };
+
+  const handleUnequip = async () => {
+    const { error } = await supabase.from('profiles').update({
+      avatar_decoration: null
+    }).eq('id', currentUser.id);
+    if (error) showError("Errore durante la rimozione.");
+    else showSuccess("Contorno rimosso!");
   };
 
   return (
@@ -61,7 +102,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#23a559]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-1/2 right-0 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-4xl mx-auto relative z-10 h-full flex flex-col">
+        <div className="max-w-5xl mx-auto relative z-10 h-full flex flex-col">
           <div className="text-center mb-10 mt-4 md:mt-8">
             <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#23a559] to-emerald-400 mb-4 flex items-center justify-center drop-shadow-sm">
               <Sparkles className="mr-3 text-[#23a559]" />
@@ -74,7 +115,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           </div>
 
           {/* Daily Reward Card */}
-          <div className="bg-gradient-to-r from-[#23a559]/20 to-emerald-600/20 border border-[#23a559]/30 rounded-2xl p-6 mb-8 flex flex-col md:flex-row items-center justify-between shadow-lg">
+          <div className="bg-gradient-to-r from-[#23a559]/20 to-emerald-600/20 border border-[#23a559]/30 rounded-2xl p-6 mb-12 flex flex-col md:flex-row items-center justify-between shadow-lg">
             <div className="flex items-center mb-4 md:mb-0 text-center md:text-left flex-col md:flex-row">
               <div className="w-16 h-16 bg-[#2b2d31] rounded-full flex items-center justify-center border-2 border-[#23a559] shadow-inner md:mr-6 mb-3 md:mb-0">
                 <Gift className="text-[#23a559] w-8 h-8" />
@@ -93,18 +134,44 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
             </button>
           </div>
 
-          <div className="bg-[#1e1f22]/80 backdrop-blur-md border border-[#23a559]/20 rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-2xl flex-1 min-h-[300px]">
-            <div className="relative mb-6">
-              <div className="absolute inset-0 bg-[#23a559]/20 blur-xl rounded-full"></div>
-              <div className="w-24 h-24 bg-[#2b2d31] rounded-full flex items-center justify-center border-2 border-[#23a559]/30 relative z-10 shadow-inner">
-                <TreePine className="text-[#23a559] w-12 h-12" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-3">Lo shop è attualmente vuoto</h2>
-            <p className="text-[#949ba4] max-w-md">
-              I folletti stanno ancora piantando i semi per i nuovi oggetti. Torna più tardi per scoprire i frutti del loro lavoro!
-            </p>
+          <h2 className="text-2xl font-bold text-white mb-6 border-b border-[#3f4147] pb-2">Decorazioni Profilo</h2>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+            {SHOP_ITEMS.map(item => {
+              const isPurchased = currentUser.purchased_decorations?.includes(item.id);
+              const isEquipped = currentUser.avatar_decoration === item.id;
+
+              return (
+                <div key={item.id} className="bg-[#1e1f22] border border-[#2b2d31] rounded-xl p-6 flex flex-col items-center text-center hover:border-[#23a559]/50 transition-colors shadow-lg">
+                  <div className="mb-6 mt-2 h-24 flex items-center justify-center">
+                    <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
+                  </div>
+                  <h3 className="text-white font-bold mb-1 text-sm">{item.name}</h3>
+                  <div className="flex items-center text-[#23a559] font-bold mb-4 text-sm">
+                    <img src="/digitalcardus.png" className="w-4 h-4 mr-1.5" />
+                    {item.price} DC
+                  </div>
+
+                  <div className="mt-auto w-full">
+                    {isEquipped ? (
+                      <button onClick={handleUnequip} className="w-full py-2 rounded bg-[#35373c] text-white font-medium hover:bg-[#404249] transition-colors text-sm">
+                        Rimuovi
+                      </button>
+                    ) : isPurchased ? (
+                      <button onClick={() => handleEquip(item.id)} className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
+                        Equipaggia
+                      </button>
+                    ) : (
+                      <button onClick={() => handlePurchase(item)} className="w-full py-2 rounded bg-[#23a559] text-white font-medium hover:bg-[#1e8f4c] transition-colors text-sm">
+                        Acquista
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
         </div>
       </div>
     </div>

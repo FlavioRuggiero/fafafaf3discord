@@ -36,6 +36,8 @@ export type User = {
   xp?: number;
   server_roles?: ServerRole[];
   last_reward_date?: string | null;
+  avatar_decoration?: string | null;
+  purchased_decorations?: string[];
 };
 
 export type Server = {
@@ -83,6 +85,8 @@ export type Profile = {
   level?: number | null;
   xp?: number | null;
   last_reward_date?: string | null;
+  avatar_decoration?: string | null;
+  purchased_decorations?: string[];
 };
 
 export type ServerMember = {

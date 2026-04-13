@@ -6,6 +6,7 @@ import { Crown, Shield } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar } from "./Avatar";
 
 interface MemberListProps {
   users: User[];
@@ -48,7 +49,7 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
                 <Crown size={16} className="fill-yellow-400" />
               </div>
             )}
-            <img src={user.avatar} alt={user.name} className={`w-8 h-8 rounded-full object-cover ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
+            <Avatar src={user.avatar} decoration={user.avatar_decoration} className={`w-8 h-8 ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
             
             <div className="absolute -bottom-0.5 -right-0.5 group/status">
               <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />

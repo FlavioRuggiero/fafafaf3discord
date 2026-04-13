@@ -14,6 +14,7 @@ import { ProfilePopover } from "./ProfilePopover";
 import { BombParty } from "./BombParty";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar } from "./Avatar";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "🎉"];
 
@@ -339,7 +340,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setCurrentUser(session.user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role')
+          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations')
           .eq('id', session.user.id)
           .single();
         setCurrentUserProfile(profile);
@@ -409,7 +410,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         const userIds = membersData.map((m: any) => m.user_id);
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, role')
+          .select('id, first_name, last_name, avatar_url, role, avatar_decoration')
           .in('id', userIds);
 
         const combinedData = membersData.map((m: any) => ({
@@ -464,7 +465,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           created_at,
           updated_at,
           user_id,
-          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role)
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
@@ -477,7 +478,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             content,
             created_at,
             user_id,
-            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role)
+            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations)
           `)
           .eq('channel_id', channel.id)
           .order('created_at', { ascending: true });
@@ -521,7 +522,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               digitalcardus: m.profiles?.digitalcardus ?? 25,
               xp: m.profiles?.xp || 0,
               global_role: role,
-              status: "online" as const
+              status: "online" as const,
+              avatar_decoration: m.profiles?.avatar_decoration || null,
+              purchased_decorations: m.profiles?.purchased_decorations || []
             }
           };
         });
@@ -567,7 +570,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations')
           .eq('id', payload.new.user_id)
           .single();
           
@@ -597,7 +600,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             digitalcardus: profileData?.digitalcardus ?? 25,
             xp: profileData?.xp || 0,
             global_role: role,
-            status: "online"
+            status: "online",
+            avatar_decoration: profileData?.avatar_decoration || null,
+            purchased_decorations: profileData?.purchased_decorations || []
           }
         };
         
@@ -669,7 +674,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 level: updatedProfile.level || 1,
                 digitalcardus: updatedProfile.digitalcardus ?? 25,
                 xp: updatedProfile.xp || 0,
-                global_role: role
+                global_role: role,
+                avatar_decoration: updatedProfile.avatar_decoration || m.user.avatar_decoration,
+                purchased_decorations: updatedProfile.purchased_decorations || m.user.purchased_decorations
               }
             };
           }
@@ -1094,7 +1101,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             digitalcardus: currentUserProfile?.digitalcardus ?? 25,
             xp: currentUserProfile?.xp || 0,
             global_role: role,
-            status: "online"
+            status: "online",
+            avatar_decoration: currentUserProfile?.avatar_decoration || null,
+            purchased_decorations: currentUserProfile?.purchased_decorations || []
           }
         };
         
@@ -1402,7 +1411,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   } else {
                     return (
                       <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
-                        <img src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} className="w-full h-full object-cover" />
+                        <Avatar src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} decoration={focusedMember.profiles?.avatar_decoration} className="w-full h-full object-cover" />
                       </div>
                     );
                   }
@@ -1443,7 +1452,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                           </div>
                         ) : (
                           <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
-                            <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                            <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} className="w-full h-full object-cover" />
                           </div>
                         )}
                         <div className="absolute bottom-1.5 left-1.5 flex items-center bg-black/70 backdrop-blur-md rounded px-2 py-1">
@@ -1518,7 +1527,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                             </div>
                           ) : (
                             <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
-                              <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} className="w-full h-full object-cover" />
+                              <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} className="w-full h-full object-cover" />
                             </div>
                           )}
 
@@ -1963,7 +1972,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                   <div className="absolute left-[36px] top-1/2 w-[32px] h-[14px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md -translate-y-[2px]"></div>
                   {repliedMessage ? (
                     <>
-                      <img src={repliedMessage.user.avatar} className="w-4 h-4 rounded-full mr-1.5 object-cover" alt="" />
+                      <Avatar src={repliedMessage.user.avatar} decoration={repliedMessage.user.avatar_decoration} className="w-4 h-4 mr-1.5 object-cover" alt="" />
                       <span className="font-medium text-[#dbdee1] text-xs mr-2 hover:underline opacity-80 group-hover/reply:opacity-100 whitespace-nowrap">{repliedMessage.user.name}</span>
                       <span className="text-[#b5bac1] text-xs truncate max-w-[50%] md:max-w-[70%] opacity-80 group-hover/reply:opacity-100 group-hover/reply:text-white">
                         {repliedMessageContent}
@@ -1978,7 +1987,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <div className="flex items-start">
                 {!isSameUserAsPrevious || isEditing ? (
                   <ProfilePopover user={getUserWithRoles(msg.user)}>
-                    <img src={msg.user.avatar} alt={msg.user.name} className="w-10 h-10 rounded-full mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
+                    <Avatar src={msg.user.avatar} decoration={msg.user.avatar_decoration} alt={msg.user.name} className="w-10 h-10 mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
                   </ProfilePopover>
                 ) : (
                   <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
@@ -2273,7 +2282,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <p className="text-[#dbdee1] text-[15px] mb-4">Sei sicuro di voler eliminare questo messaggio?</p>
               
               <div className="bg-[#2b2d31] border border-[#1e1f22] p-3 rounded flex items-start gap-3 shadow-inner">
-                <img src={msgToDeleteData.user.avatar} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                <Avatar src={msgToDeleteData.user.avatar} decoration={msgToDeleteData.user.avatar_decoration} className="w-10 h-10 object-cover flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="font-medium text-[#dbdee1]">{msgToDeleteData.user.name}</span>

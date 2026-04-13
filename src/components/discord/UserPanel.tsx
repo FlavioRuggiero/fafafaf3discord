@@ -4,6 +4,7 @@ import React from "react";
 import { Mic, MicOff, Headphones, Settings } from "lucide-react";
 import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
+import { Avatar } from "./Avatar";
 
 interface UserPanelProps {
   currentUser: User;
@@ -44,7 +45,7 @@ export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) =
         </div>
 
         <div className="relative">
-          <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} alt="Avatar" className="w-8 h-8 rounded-full bg-[#1e1f22] object-cover" />
+          <Avatar src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} decoration={currentUser?.avatar_decoration} className="w-8 h-8" />
           <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
         </div>
         <div className="ml-2 flex flex-col min-w-0">
