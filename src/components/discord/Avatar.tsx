@@ -75,6 +75,27 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           </>
         )}
       </div>
+
+      {/* Esquelito Explosivo (fuori dal clipEffects per permettere l'orbita esterna) */}
+      {activeDecoration === 'esquelito' && (
+        <div className="esquelito-wrapper">
+          <div className="esquelito-arm a1">
+            <div className="esquelito-pulser p1">
+              <img src="/esqueleto1.png" className="esquelito-skull" alt="" />
+            </div>
+          </div>
+          <div className="esquelito-arm a2">
+            <div className="esquelito-pulser p2">
+              <img src="/esqueleto2.png" className="esquelito-skull" alt="" />
+            </div>
+          </div>
+          <div className="esquelito-arm a3">
+            <div className="esquelito-pulser p3">
+              <img src="/esquelito3.png" className="esquelito-skull" alt="" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
