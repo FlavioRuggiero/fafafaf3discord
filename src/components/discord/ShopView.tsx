@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
 import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
+import { playSound } from '@/utils/sounds';
 
 interface ShopViewProps {
   currentUser: User;
@@ -34,7 +35,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   // Stati per i Bauli
   const [chestReward, setChestReward] = useState<ShopItem | null>(null);
   const [chestRefund, setChestRefund] = useState<number | null>(null);
-  const [isOpeningChest, setIsOpeningChest] = useState(false);
+  const [openingChestType, setOpeningChestType] = useState<'standard' | 'premium' | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
   const canClaimReward = currentUser?.last_reward_date !== today;
@@ -142,17 +143,18 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       return;
     }
 
-    setIsOpeningChest(true);
+    setOpeningChestType(type);
+    playSound('/openingsound.mp3');
 
-    // Calcolo delle probabilità
+    // Calcolo delle probabilità con curva esponenziale per rendere gli oggetti costosi molto rari
     let totalWeight = 0;
     const weightedItems = SHOP_ITEMS.map(item => {
-      // Peso base inversamente proporzionale al prezzo (oggetti costosi = più rari)
-      let weight = 1000 / item.price; 
+      // Peso base inversamente proporzionale al quadrato del prezzo
+      let weight = 100000 / (item.price * item.price); 
       
-      // Il baule premium ha 1.5x di probabilità in più per gli oggetti rari (prezzo >= 100)
+      // Il baule premium ha 5x di probabilità in più per gli oggetti rari (prezzo >= 100)
       if (type === 'premium' && item.price >= 100) {
-        weight *= 1.5;
+        weight *= 5;
       }
       
       totalWeight += weight;
@@ -192,16 +194,24 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
     if (error) {
       showError("Errore durante l'apertura del baule.");
-      setIsOpeningChest(false);
+      setOpeningChestType(null);
       return;
     }
 
-    // Mostra l'animazione e il premio
+    // Mostra l'animazione e il premio dopo 1.5 secondi
     setTimeout(() => {
+      if (isOwned) {
+        playSound('/pullclone.mp3');
+      } else if (selectedItem.price >= 200) {
+        playSound('/pullrare.mp3');
+      } else {
+        playSound('/pullcommon.mp3');
+      }
+      
       setChestReward(selectedItem);
       setChestRefund(isOwned ? refund : null);
-      setIsOpeningChest(false);
-    }, 1000); // Finto delay per l'animazione di apertura
+      setOpeningChestType(null);
+    }, 1500);
   };
 
   return (
@@ -383,7 +393,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
               <div className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-all shadow-md hover:border-blue-500/50 group overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
                 
-                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${isOpeningChest ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
+                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${openingChestType === 'standard' ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.3)] transform rotate-3 group-hover:rotate-6 transition-transform"></div>
                   <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-blue-400 flex items-center justify-center">
                     <Package size={48} className="text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
@@ -395,9 +405,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 
                 <button 
                   onClick={() => openChest('standard')}
-                  disabled={isOpeningChest || currentUser.digitalcardus < 20}
+                  disabled={openingChestType !== null || currentUser.digitalcardus < 20}
                   className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
-                    currentUser.digitalcardus < 20 
+                    currentUser.digitalcardus < 20 || openingChestType !== null
                       ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
                       : 'bg-blue-600 text-white hover:bg-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)]'
                   }`}
@@ -412,7 +422,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
               <div className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-all shadow-md hover:border-yellow-500/50 group overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 to-transparent pointer-events-none"></div>
                 
-                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${isOpeningChest ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
+                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${openingChestType === 'premium' ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
                   <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 via-orange-500 to-purple-600 rounded-xl shadow-[0_0_30px_rgba(234,179,8,0.4)] transform -rotate-3 group-hover:-rotate-6 transition-transform"></div>
                   <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-yellow-400 flex items-center justify-center overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-tr from-yellow-500/20 to-transparent opacity-50 animate-pulse"></div>
@@ -422,13 +432,13 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 </div>
                 
                 <h3 className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">Baule Premium</h3>
-                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">1.5x probabilità</strong> di trovare oggetti rari!</p>
+                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">5x probabilità</strong> di trovare oggetti rari!</p>
                 
                 <button 
                   onClick={() => openChest('premium')}
-                  disabled={isOpeningChest || currentUser.digitalcardus < 50}
+                  disabled={openingChestType !== null || currentUser.digitalcardus < 50}
                   className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
-                    currentUser.digitalcardus < 50 
+                    currentUser.digitalcardus < 50 || openingChestType !== null
                       ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
                       : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white hover:from-yellow-400 hover:to-orange-500 hover:shadow-[0_0_20px_rgba(234,179,8,0.5)]'
                   }`}
