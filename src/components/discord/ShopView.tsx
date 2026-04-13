@@ -295,76 +295,6 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
             </button>
           </div>
 
-          {/* Bauli Misteriosi */}
-          <div className="mb-10">
-            <h2 className="text-xl font-bold text-white mb-4 border-b border-[#3f4147]/50 pb-3 flex items-center gap-2">
-              <Sparkles className="text-yellow-400" size={20} />
-              Bauli Misteriosi
-            </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Baule Standard */}
-              <div className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-all shadow-md hover:border-blue-500/50 group overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
-                
-                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${isOpeningChest ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.3)] transform rotate-3 group-hover:rotate-6 transition-transform"></div>
-                  <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-blue-400 flex items-center justify-center">
-                    <Package size={48} className="text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                  </div>
-                </div>
-                
-                <h3 className="font-bold text-lg text-blue-400 mb-2">Baule Standard</h3>
-                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale del negozio. Tenta la fortuna!</p>
-                
-                <button 
-                  onClick={() => openChest('standard')}
-                  disabled={isOpeningChest || currentUser.digitalcardus < 20}
-                  className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
-                    currentUser.digitalcardus < 20 
-                      ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
-                      : 'bg-blue-600 text-white hover:bg-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)]'
-                  }`}
-                >
-                  <Unlock size={18} />
-                  Apri - 20
-                  <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
-                </button>
-              </div>
-
-              {/* Baule Premium */}
-              <div className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-all shadow-md hover:border-yellow-500/50 group overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 to-transparent pointer-events-none"></div>
-                
-                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${isOpeningChest ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
-                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 via-orange-500 to-purple-600 rounded-xl shadow-[0_0_30px_rgba(234,179,8,0.4)] transform -rotate-3 group-hover:-rotate-6 transition-transform"></div>
-                  <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-yellow-400 flex items-center justify-center overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-yellow-500/20 to-transparent opacity-50 animate-pulse"></div>
-                    <Package size={56} className="text-yellow-400 drop-shadow-[0_0_12px_rgba(234,179,8,0.8)]" />
-                    <Sparkles size={24} className="absolute top-2 right-2 text-yellow-200 animate-bounce" />
-                  </div>
-                </div>
-                
-                <h3 className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">Baule Premium</h3>
-                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">1.5x probabilità</strong> di trovare oggetti rari!</p>
-                
-                <button 
-                  onClick={() => openChest('premium')}
-                  disabled={isOpeningChest || currentUser.digitalcardus < 50}
-                  className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
-                    currentUser.digitalcardus < 50 
-                      ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
-                      : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white hover:from-yellow-400 hover:to-orange-500 hover:shadow-[0_0_20px_rgba(234,179,8,0.5)]'
-                  }`}
-                >
-                  <Unlock size={18} />
-                  Apri - 50
-                  <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* Shop Items Rotation */}
           <div className="mb-10">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b border-[#3f4147]/50 pb-3 gap-3">
@@ -438,6 +368,76 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Bauli Misteriosi */}
+          <div className="mb-10">
+            <h2 className="text-xl font-bold text-white mb-4 border-b border-[#3f4147]/50 pb-3 flex items-center gap-2">
+              <Sparkles className="text-yellow-400" size={20} />
+              Bauli Misteriosi
+            </h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Baule Standard */}
+              <div className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-all shadow-md hover:border-blue-500/50 group overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
+                
+                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${isOpeningChest ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.3)] transform rotate-3 group-hover:rotate-6 transition-transform"></div>
+                  <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-blue-400 flex items-center justify-center">
+                    <Package size={48} className="text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                  </div>
+                </div>
+                
+                <h3 className="font-bold text-lg text-blue-400 mb-2">Baule Standard</h3>
+                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale del negozio. Tenta la fortuna!</p>
+                
+                <button 
+                  onClick={() => openChest('standard')}
+                  disabled={isOpeningChest || currentUser.digitalcardus < 20}
+                  className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
+                    currentUser.digitalcardus < 20 
+                      ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
+                      : 'bg-blue-600 text-white hover:bg-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)]'
+                  }`}
+                >
+                  <Unlock size={18} />
+                  Apri - 20
+                  <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
+                </button>
+              </div>
+
+              {/* Baule Premium */}
+              <div className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-all shadow-md hover:border-yellow-500/50 group overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 to-transparent pointer-events-none"></div>
+                
+                <div className={`relative w-32 h-32 mx-auto mb-4 transition-transform duration-300 ${isOpeningChest ? 'animate-chest-shake' : 'group-hover:scale-110'}`}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 via-orange-500 to-purple-600 rounded-xl shadow-[0_0_30px_rgba(234,179,8,0.4)] transform -rotate-3 group-hover:-rotate-6 transition-transform"></div>
+                  <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-yellow-400 flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-yellow-500/20 to-transparent opacity-50 animate-pulse"></div>
+                    <Package size={56} className="text-yellow-400 drop-shadow-[0_0_12px_rgba(234,179,8,0.8)]" />
+                    <Sparkles size={24} className="absolute top-2 right-2 text-yellow-200 animate-bounce" />
+                  </div>
+                </div>
+                
+                <h3 className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">Baule Premium</h3>
+                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">1.5x probabilità</strong> di trovare oggetti rari!</p>
+                
+                <button 
+                  onClick={() => openChest('premium')}
+                  disabled={isOpeningChest || currentUser.digitalcardus < 50}
+                  className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
+                    currentUser.digitalcardus < 50 
+                      ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white hover:from-yellow-400 hover:to-orange-500 hover:shadow-[0_0_20px_rgba(234,179,8,0.5)]'
+                  }`}
+                >
+                  <Unlock size={18} />
+                  Apri - 50
+                  <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
+                </button>
+              </div>
             </div>
           </div>
           
