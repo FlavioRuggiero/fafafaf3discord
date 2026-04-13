@@ -29,6 +29,7 @@ const getThemeTextClass = (id: string) => {
     case 'esquelito': return 'theme-text-esquelito';
     case 'oceanic': return 'theme-text-oceanic';
     case 'saturn-fire': return 'theme-text-saturn-fire';
+    case 'gustavo-armando': return 'theme-text-gustavo';
     default: return 'text-[#dbdee1]';
   }
 };

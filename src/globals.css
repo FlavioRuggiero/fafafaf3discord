@@ -84,6 +84,12 @@ body {
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
 }
+.theme-text-gustavo {
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+}
 
 /* =========================================
    AVATAR DECORATIONS (SCALABILI CON CQW)
@@ -615,3 +621,44 @@ body {
 .fire-particle.f1 { bottom: 0; left: 20%; animation-delay: 0s; }
 .fire-particle.f2 { bottom: -10cqw; right: 25%; animation-delay: 0.5s; }
 .fire-particle.f3 { bottom: 10cqw; left: 50%; animation-delay: 1s; }
+
+/* 8. Gustavo Armando (Premium) */
+.dec-gustavo-armando {
+  border: 2px solid #a855f7;
+  box-shadow: 0 0 10px #a855f7, inset 0 0 10px #a855f7;
+  position: relative;
+}
+
+@keyframes gustavo-snap {
+  0% { transform: translate(30cqw, -30cqw) rotate(10deg); }
+  18% { transform: translate(30cqw, -30cqw) rotate(10deg); }
+  20% { transform: translate(-40cqw, 20cqw) rotate(-15deg); }
+  38% { transform: translate(-40cqw, 20cqw) rotate(-15deg); }
+  40% { transform: translate(20cqw, 40cqw) rotate(5deg); }
+  58% { transform: translate(20cqw, 40cqw) rotate(5deg); }
+  60% { transform: translate(-30cqw, -20cqw) rotate(-10deg); }
+  78% { transform: translate(-30cqw, -20cqw) rotate(-10deg); }
+  80% { transform: translate(40cqw, 10cqw) rotate(20deg); }
+  98% { transform: translate(40cqw, 10cqw) rotate(20deg); }
+  100% { transform: translate(30cqw, -30cqw) rotate(10deg); }
+}
+
+.gustavo-sprite {
+  position: absolute;
+  width: 60cqw;
+  height: 120cqw;
+  background-image: url('/adrotto.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 30;
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  margin-top: -60cqw;
+  margin-left: -30cqw;
+}
+
+.gustavo-main { animation: gustavo-snap 3.5s infinite; }
+.gustavo-trail.t1 { animation: gustavo-snap 3.5s infinite; animation-delay: 0.04s; opacity: 0.5; filter: blur(1px); }
+.gustavo-trail.t2 { animation: gustavo-snap 3.5s infinite; animation-delay: 0.08s; opacity: 0.2; filter: blur(3px); }

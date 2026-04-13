@@ -47,6 +47,14 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         </>
       )}
 
+      {activeDecoration === 'gustavo-armando' && !clipEffects && (
+        <>
+          <div className="gustavo-sprite gustavo-trail t2"></div>
+          <div className="gustavo-sprite gustavo-trail t1"></div>
+          <div className="gustavo-sprite gustavo-main"></div>
+        </>
+      )}
+
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
       {/* Se clipEffects è true (es. nel UserPanel in basso), intrappoliamo le particelle nel cerchio per non sballare il layout */}
@@ -128,6 +136,14 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           <>
             <div className="saturn-wrapper back"><div className="saturn-ring-inner"></div></div>
             <div className="saturn-wrapper front"><div className="saturn-ring-inner"></div></div>
+          </>
+        )}
+
+        {activeDecoration === 'gustavo-armando' && clipEffects && (
+          <>
+            <div className="gustavo-sprite gustavo-trail t2"></div>
+            <div className="gustavo-sprite gustavo-trail t1"></div>
+            <div className="gustavo-sprite gustavo-main"></div>
           </>
         )}
       </div>
