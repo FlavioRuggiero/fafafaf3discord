@@ -59,17 +59,38 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
     if (!authUser) return;
     setIsRequestingTrade(true);
     
-    const { error } = await supabase.from('trades').insert({
-      sender_id: authUser.id,
-      receiver_id: user.id,
-      status: 'pending'
-    });
-    
-    if (error) {
-      showError("Errore nell'invio della richiesta di scambio.");
+    // Controlla se l'altro utente ci ha già inviato una richiesta di scambio in sospeso
+    const { data: existingTrade } = await supabase
+      .from('trades')
+      .select('id')
+      .eq('sender_id', user.id)
+      .eq('receiver_id', authUser.id)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (existingTrade) {
+      // Se esiste già, la accettiamo automaticamente
+      const { error } = await supabase.from('trades').update({ status: 'active' }).eq('id', existingTrade.id);
+      if (error) {
+        showError("Errore nell'accettazione dello scambio.");
+      } else {
+        showSuccess("Scambio accettato!");
+      }
     } else {
-      showSuccess("Richiesta di scambio inviata!");
+      // Altrimenti creiamo una nuova richiesta
+      const { error } = await supabase.from('trades').insert({
+        sender_id: authUser.id,
+        receiver_id: user.id,
+        status: 'pending'
+      });
+      
+      if (error) {
+        showError("Errore nell'invio della richiesta di scambio.");
+      } else {
+        showSuccess("Richiesta di scambio inviata!");
+      }
     }
+    
     setIsRequestingTrade(false);
   };
   

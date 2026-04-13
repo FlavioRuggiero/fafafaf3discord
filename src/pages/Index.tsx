@@ -28,6 +28,7 @@ const Index = () => {
   // Refs per evitare stale closures negli eventi realtime
   const adminIdRef = useRef(adminId);
   const moderatorIdsRef = useRef(moderatorIds);
+  const currentUserRef = useRef(currentUser);
 
   useEffect(() => {
     adminIdRef.current = adminId;
@@ -36,6 +37,10 @@ const Index = () => {
   useEffect(() => {
     moderatorIdsRef.current = moderatorIds;
   }, [moderatorIds]);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   // States per Server e Canali dal DB
   const [servers, setServers] = useState<Server[]>([]);
@@ -105,9 +110,9 @@ const Index = () => {
   const notificationSettingsRef = useRef(notificationSettings);
   useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
 
-  // Listener globale per le notifiche
+  // Listener globale per le notifiche (Messaggi)
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.id) return;
 
     const handleNewMessage = (payload: any) => {
       const newMsg = payload.new;
@@ -145,17 +150,20 @@ const Index = () => {
     return () => {
       supabase.removeChannel(sub);
     };
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // Listener per conteggio notifiche e scambi attivi
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.id) return;
 
     const fetchNotificationCount = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      let count = currentUser.last_reward_date !== today ? 1 : 0;
+      const userRef = currentUserRef.current;
+      if (!userRef) return;
 
-      const { count: tradeCount } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', currentUser.id).eq('status', 'pending');
+      const today = new Date().toISOString().split('T')[0];
+      let count = userRef.last_reward_date !== today ? 1 : 0;
+
+      const { count: tradeCount } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', userRef.id).eq('status', 'pending');
       if (tradeCount) count += tradeCount;
 
       setNotificationCount(count);
@@ -176,12 +184,17 @@ const Index = () => {
     const tradeSub = supabase.channel('active_trades_global')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
         fetchNotificationCount();
-        if (payload.new.status === 'active') {
-          // Fetch the trade to check if it belongs to us (since payload.new might lack columns if not updated)
-          const { data } = await supabase.from('trades').select('sender_id, receiver_id').eq('id', payload.new.id).single();
-          if (data && (data.sender_id === currentUser.id || data.receiver_id === currentUser.id)) {
-            setActiveTradeId(payload.new.id);
-          }
+        // Fetch the trade to be absolutely sure we have the latest data
+        const { data } = await supabase.from('trades').select('status, sender_id, receiver_id').eq('id', payload.new.id).single();
+        if (data && data.status === 'active' && (data.sender_id === currentUser.id || data.receiver_id === currentUser.id)) {
+          setActiveTradeId(payload.new.id);
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, (payload) => {
+        fetchNotificationCount();
+        if (payload.new.receiver_id === currentUser.id) {
+          playSound('/notifica.mp3');
+          showSuccess("Hai ricevuto una nuova richiesta di scambio!");
         }
       })
       .subscribe();
@@ -189,7 +202,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(tradeSub);
     };
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
   const serverMembersList: User[] = serverProfiles.map(p => {
