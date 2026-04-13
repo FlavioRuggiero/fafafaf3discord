@@ -2,9 +2,10 @@ export type ShopItem = {
   id: string;
   name: string;
   price: number;
-  type: 'decoration' | 'emoji_pack';
+  type: 'decoration' | 'emoji_pack' | 'privilege';
   category: string;
   emojis?: string[];
+  description?: string;
 };
 
 export const SHOP_ITEMS: ShopItem[] = [
@@ -30,6 +31,16 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'saturn-fire', name: 'Saturno a Fuoco', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'gustavo-armando', name: 'Gustavo armando', price: 300, type: 'decoration', category: 'Contorni Premium' },
   
+  // Privilegi
+  { 
+    id: 'privilege-banner', 
+    name: 'Banner Modificabile', 
+    price: 500, 
+    type: 'privilege', 
+    category: 'Privilegi',
+    description: 'Ti permette di caricare un\'immagine o una GIF personalizzata come banner del tuo profilo, anche se non sei Admin.'
+  },
+
   // Pacchetti Emoji
   { 
     id: 'emoji-pack-1', 

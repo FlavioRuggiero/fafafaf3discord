@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { Archive, Menu, Check, Coins, DollarSign } from 'lucide-react';
+import { Archive, Menu, Check, Coins, DollarSign, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
 import { SHOP_ITEMS } from '@/data/shopItems';
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface InventoryViewProps {
   currentUser: User;
@@ -142,7 +143,18 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           <img src="/digitalcardus.png" alt="dc" className="w-3.5 h-3.5 object-contain" />
                         </button>
                         
-                        {item.type === 'emoji_pack' ? (
+                        {item.type === 'privilege' ? (
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <div className="mb-6 mt-2 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)] mx-auto cursor-help relative z-20">
+                                <Crown size={40} className="text-yellow-500" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-sm max-w-xs text-center z-[99999]">
+                              {item.description}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : item.type === 'emoji_pack' ? (
                           <div className="mb-6 mt-2 relative w-24 h-24 group/pack mx-auto">
                             {/* Vista normale (4 emoji) */}
                             <div className="absolute inset-0 grid grid-cols-2 gap-2 p-2 bg-[#1e1f22] rounded-xl border border-[#3f4147] shadow-inner transition-all duration-300 group-hover/pack:opacity-0 group-hover/pack:scale-90">
@@ -169,7 +181,11 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                         <h3 className={`font-bold mb-4 text-sm relative z-20 ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
                         <div className="mt-auto w-full relative z-30">
-                          {item.type === 'emoji_pack' ? (
+                          {item.type === 'privilege' ? (
+                            <button disabled className="w-full py-2 rounded bg-[#23a559] text-white font-medium opacity-80 cursor-default text-sm">
+                              Privilegio Attivo
+                            </button>
+                          ) : item.type === 'emoji_pack' ? (
                             <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
                               In Chat
                             </button>

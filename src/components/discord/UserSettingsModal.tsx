@@ -59,6 +59,8 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
   if (!isOpen || !user) return null;
 
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
+  const hasBannerPrivilege = user.purchased_decorations?.includes('privilege-banner');
+  const canEditBanner = isAdmin || hasBannerPrivilege;
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -139,17 +141,17 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
                   <div className="relative mb-12">
                     {/* Banner Section */}
                     <div 
-                      className={`h-[120px] w-full relative bg-cover bg-center ${isAdmin ? 'cursor-pointer group' : ''}`}
+                      className={`h-[120px] w-full relative bg-cover bg-center ${canEditBanner ? 'cursor-pointer group' : ''}`}
                       style={{ backgroundColor: bannerColor, backgroundImage: bannerPreview ? `url(${bannerPreview})` : undefined }}
-                      onClick={() => isAdmin && !isUpdating && bannerInputRef.current?.click()}
+                      onClick={() => canEditBanner && !isUpdating && bannerInputRef.current?.click()}
                     >
-                      {isAdmin && (
+                      {canEditBanner && (
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                           <Upload size={24} className="text-white" />
                           <span className="ml-2 text-white font-medium text-sm">Cambia Banner</span>
                         </div>
                       )}
-                      {isAdmin && bannerPreview && (
+                      {canEditBanner && bannerPreview && (
                         <button 
                           type="button" 
                           onClick={(e) => { e.stopPropagation(); setBannerFile(null); setBannerPreview(null); }}
@@ -178,7 +180,7 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
 
                   <form id="user-settings-form" onSubmit={handleSubmit} className="px-6 pb-6 space-y-6">
                     <input type="file" ref={avatarInputRef} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" onChange={handleAvatarChange} />
-                    {isAdmin && (
+                    {canEditBanner && (
                       <input type="file" ref={bannerInputRef} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" onChange={handleBannerChange} />
                     )}
 

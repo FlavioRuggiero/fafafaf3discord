@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X } from 'lucide-react';
+import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
 import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
 import { playSound } from '@/utils/sounds';
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ShopViewProps {
   currentUser: User;
@@ -330,7 +331,18 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                       {item.category}
                     </div>
 
-                    {item.type === 'emoji_pack' ? (
+                    {item.type === 'privilege' ? (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)] mx-auto cursor-help">
+                            <Crown size={40} className="text-yellow-500" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-sm max-w-xs text-center z-[99999]">
+                          {item.description}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : item.type === 'emoji_pack' ? (
                       <div className="mb-6 mt-2 relative w-24 h-24 group/pack mx-auto">
                         {/* Vista normale (4 emoji) */}
                         <div className="absolute inset-0 grid grid-cols-2 gap-2 p-2 bg-[#1e1f22] rounded-xl border border-[#3f4147] shadow-inner transition-all duration-300 group-hover/pack:opacity-0 group-hover/pack:scale-90">
@@ -467,7 +479,11 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
             <h2 className="text-3xl font-black text-white mb-2">Hai trovato!</h2>
             
             <div className="my-8 relative z-10">
-              {chestReward.type === 'emoji_pack' ? (
+              {chestReward.type === 'privilege' ? (
+                <div className="w-32 h-32 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]">
+                  <Crown size={64} className="text-yellow-500" />
+                </div>
+              ) : chestReward.type === 'emoji_pack' ? (
                 <div className="w-32 h-32 grid grid-cols-2 gap-2 p-3 bg-[#1e1f22] rounded-xl border-2 border-brand shadow-[0_0_20px_rgba(88,101,242,0.3)]">
                   {chestReward.emojis?.slice(0, 4).map(e => (
                     <img key={e} src={e} className="w-full h-full object-contain drop-shadow-md" />
