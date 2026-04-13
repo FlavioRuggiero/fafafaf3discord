@@ -13,6 +13,16 @@ interface InventoryViewProps {
   onToggleSidebar?: () => void;
 }
 
+export const getThemeTextClass = (id: string) => {
+  switch(id) {
+    case 'supernova': return 'theme-text-supernova';
+    case 'esquelito': return 'theme-text-esquelito';
+    case 'oceanic': return 'theme-text-oceanic';
+    case 'saturn-fire': return 'theme-text-saturn-fire';
+    default: return 'text-white';
+  }
+};
+
 export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewProps) => {
   
   const handleEquip = async (id: string) => {
@@ -84,7 +94,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                         <div className="mb-6 mt-2 h-24 flex items-center justify-center">
                           <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
                         </div>
-                        <h3 className="text-white font-bold mb-4 text-sm">{item.name}</h3>
+                        <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
                         <div className="mt-auto w-full">
                           {isEquipped ? (

@@ -58,6 +58,34 @@ body {
 }
 
 /* =========================================
+   TEXT THEMES PER CONTORNI PREMIUM
+   ========================================= */
+.theme-text-supernova {
+  background: linear-gradient(90deg, #aa00ff, #00ffff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(170, 0, 255, 0.4);
+}
+.theme-text-esquelito {
+  background: linear-gradient(90deg, #ff4500, #ff8c00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(255, 69, 0, 0.4);
+}
+.theme-text-oceanic {
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
+}
+.theme-text-saturn-fire {
+  background: linear-gradient(90deg, #ff0000, #ffd700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+}
+
+/* =========================================
    AVATAR DECORATIONS (SCALABILI CON CQW)
    ========================================= */
 
@@ -364,7 +392,6 @@ body {
   border: 2px solid #0c4a6e;
 }
 
-/* Animazione per l'orbita 3D delle gocce d'acqua */
 @keyframes orbit-wrapper {
   0% { transform: rotate(0deg); z-index: 25; }
   24% { z-index: 25; }
@@ -375,7 +402,6 @@ body {
   100% { transform: rotate(360deg); z-index: 25; }
 }
 
-/* Contro-rotazione per mantenere la goccia dritta e scalarla per l'effetto profondità */
 @keyframes counter-rotate {
   0% { transform: translateX(-50%) rotate(0deg) scale(1.3); }
   25% { transform: translateX(-50%) rotate(-90deg) scale(0.9); }
@@ -386,7 +412,7 @@ body {
 
 .water-drop-wrapper {
   position: absolute;
-  inset: -20%; /* Rende l'orbita più larga dell'avatar */
+  inset: -20%;
   pointer-events: none;
   z-index: 25;
 }
@@ -409,7 +435,6 @@ body {
 .water-drop-wrapper.w3 { animation: orbit-wrapper 3s infinite linear -2s; }
 .water-drop-wrapper.w3 .water-drop-inner { animation: counter-rotate 3s infinite linear -2s; }
 
-/* Bollicine che salgono */
 @keyframes bubble-rise {
   0% { transform: translateY(20cqw) scale(0.5); opacity: 0; }
   50% { opacity: 1; }
@@ -428,3 +453,68 @@ body {
 .oceanic-bubble.b1 { bottom: 10%; left: 20%; animation-delay: 0s; }
 .oceanic-bubble.b2 { bottom: 5%; right: 25%; animation-delay: 0.7s; }
 .oceanic-bubble.b3 { bottom: 15%; left: 50%; animation-delay: 1.4s; }
+
+/* 7. Saturno a Fuoco (Premium) */
+.dec-saturn-fire {
+  border: 2px solid #ff4500;
+  position: relative;
+  animation: fire-pulse 1.5s infinite alternate;
+}
+@keyframes fire-pulse {
+  0% { box-shadow: 0 0 10px #ff4500, inset 0 0 10px #ff4500; border-color: #ff4500; }
+  100% { box-shadow: 0 0 20px #ff8c00, inset 0 0 20px #ff8c00; border-color: #ff8c00; }
+}
+
+.saturn-wrapper {
+  position: absolute;
+  inset: -40%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+/* Usiamo clip-path per tagliare a metà l'anello e creare l'effetto 3D di intersezione */
+.saturn-wrapper.front {
+  z-index: 25;
+  clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%);
+}
+.saturn-wrapper.back {
+  z-index: 5;
+  clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);
+}
+.saturn-ring-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 8cqw solid transparent;
+  border-top-color: #ff8c00;
+  border-bottom-color: #ff4500;
+  border-left-color: #ffd700;
+  border-right-color: #ff0000;
+  box-shadow: 0 0 15px #ff4500, inset 0 0 15px #ff4500;
+  animation: saturn-spin 3s linear infinite;
+}
+@keyframes saturn-spin {
+  0% { transform: rotateX(75deg) rotateY(15deg) rotateZ(0deg); }
+  100% { transform: rotateX(75deg) rotateY(15deg) rotateZ(360deg); }
+}
+
+/* Particelle di fuoco */
+@keyframes fire-rise {
+  0% { transform: translateY(10cqw) scale(0.5); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-30cqw) scale(1.5); opacity: 0; }
+}
+.fire-particle {
+  position: absolute;
+  width: 15cqw;
+  height: 15cqw;
+  background: radial-gradient(circle, #ffd700 0%, #ff4500 60%, transparent 100%);
+  border-radius: 50%;
+  z-index: 20;
+  animation: fire-rise 1.5s infinite ease-in;
+  mix-blend-mode: screen;
+}
+.fire-particle.f1 { bottom: 0; left: 20%; animation-delay: 0s; }
+.fire-particle.f2 { bottom: -10cqw; right: 25%; animation-delay: 0.5s; }
+.fire-particle.f3 { bottom: 10cqw; left: 50%; animation-delay: 1s; }

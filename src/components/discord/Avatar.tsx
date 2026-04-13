@@ -40,6 +40,13 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         </>
       )}
 
+      {activeDecoration === 'saturn-fire' && !clipEffects && (
+        <>
+          <div className="saturn-wrapper back"><div className="saturn-ring-inner"></div></div>
+          <div className="saturn-wrapper front"><div className="saturn-ring-inner"></div></div>
+        </>
+      )}
+
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
       {/* Se clipEffects è true (es. nel UserPanel in basso), intrappoliamo le particelle nel cerchio per non sballare il layout */}
@@ -106,6 +113,21 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="water-drop-wrapper w1"><div className="water-drop-inner">💧</div></div>
             <div className="water-drop-wrapper w2"><div className="water-drop-inner">💧</div></div>
             <div className="water-drop-wrapper w3"><div className="water-drop-inner">💧</div></div>
+          </>
+        )}
+
+        {activeDecoration === 'saturn-fire' && (
+          <>
+            <div className="fire-particle f1"></div>
+            <div className="fire-particle f2"></div>
+            <div className="fire-particle f3"></div>
+          </>
+        )}
+
+        {activeDecoration === 'saturn-fire' && clipEffects && (
+          <>
+            <div className="saturn-wrapper back"><div className="saturn-ring-inner"></div></div>
+            <div className="saturn-wrapper front"><div className="saturn-ring-inner"></div></div>
           </>
         )}
       </div>
