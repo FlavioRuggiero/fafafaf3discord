@@ -104,11 +104,18 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Cardi E-Shop</h1>
-            <p className="text-[#b5bac1]">Acquista personalizzazioni uniche per il tuo profilo.</p>
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative">
+        {/* Sfumatura verde elegante in alto */}
+        <div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-[#23a559]/20 via-[#23a559]/5 to-transparent pointer-events-none z-0"></div>
+
+        <div className="max-w-5xl mx-auto relative z-10">
+          <div className="mb-10 mt-4 text-center sm:text-left">
+            <h1 className="text-4xl sm:text-5xl font-extrabold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-[#23a559] to-[#4ade80] drop-shadow-[0_0_15px_rgba(35,165,89,0.4)]">
+              Cardi E-Shop
+            </h1>
+            <p className="text-[#dbdee1] text-lg font-medium">
+              Acquista personalizzazioni uniche ed eleganti per il tuo profilo.
+            </p>
           </div>
 
           {/* Daily Reward Banner */}
