@@ -74,7 +74,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative custom-scrollbar">
         {/* Nature Background Decorations */}
         <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-[#23a559]/10 to-transparent pointer-events-none" />
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#23a559]/10 rounded-full blur-3xl pointer-events-none" />
