@@ -1410,8 +1410,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                            />;
                   } else {
                     return (
-                      <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-[#2b2d31] shadow-2xl">
-                        <Avatar src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} decoration={focusedMember.profiles?.avatar_decoration} className="w-full h-full object-cover" />
+                      <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full bg-[#2b2d31] shadow-2xl">
+                        <Avatar src={focusedMember.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${focusedMember.user_id}`} decoration={focusedMember.profiles?.avatar_decoration} isSpeaking={speakingStates[focusedMember.user_id]} className="w-full h-full object-cover" />
                       </div>
                     );
                   }
@@ -1451,8 +1451,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                              />
                           </div>
                         ) : (
-                          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#2b2d31] ${isSpeaking ? 'ring-2 ring-yellow-500' : ''}`}>
-                            <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} className="w-full h-full object-cover" />
+                          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#2b2d31]`}>
+                            <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} isSpeaking={isSpeaking} className="w-full h-full object-cover" />
                           </div>
                         )}
                         <div className="absolute bottom-1.5 left-1.5 flex items-center bg-black/70 backdrop-blur-md rounded px-2 py-1">
@@ -1495,7 +1495,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               )}
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-[#000000] flex flex-col">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 custom-scrollbar bg-[#000000] flex flex-col">
               <div className="flex-1 flex items-start justify-center pt-8">
                 {displayVoiceMembers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-[#949ba4] animate-in fade-in zoom-in-95 duration-300 mt-20">
@@ -1526,8 +1526,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                               <div className="absolute top-3 left-3 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded shadow-md uppercase tracking-wider">In onda</div>
                             </div>
                           ) : (
-                            <div className={`w-24 h-24 rounded-full overflow-hidden bg-[#2b2d31] transition-all duration-150 ${isSpeaking ? 'ring-4 ring-yellow-500' : 'ring-0'}`}>
-                              <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} className="w-full h-full object-cover" />
+                            <div className={`w-24 h-24 rounded-full bg-[#2b2d31] transition-all duration-150`}>
+                              <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} isSpeaking={isSpeaking} className="w-full h-full object-cover" />
                             </div>
                           )}
 
@@ -1739,7 +1739,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
         <div className="mb-8 mt-4">
           <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
             <Hash size={32} />

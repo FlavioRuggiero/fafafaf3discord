@@ -14,6 +14,7 @@ import { playSound } from "@/utils/sounds";
 import { ProfilePopover } from "./ProfilePopover";
 import { AdminPanel } from "./AdminPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar } from "./Avatar";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -699,7 +700,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             Trova o inizia una conversazione
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 flex flex-col">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-2 flex flex-col">
           <button
             onClick={() => onChannelSelect({ id: 'home', name: 'Benvenuto', type: 'text', category: '', server_id: null })}
             className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'home' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
@@ -830,7 +831,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-2 space-y-4">
         {categories.length === 0 ? (
           <div className="text-center text-[#949ba4] text-xs py-4 px-2">Nessun canale in questo server</div>
         ) : (
@@ -1001,9 +1002,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                   <div className="w-full">
                                     <ProfilePopover user={userForCard} side="right" align="center">
                                       <div className="flex items-center group/member animate-in fade-in-0 zoom-in-95 duration-300 cursor-pointer">
-                                        <div className={`relative rounded-full transition-all duration-100 ${isSpeaking ? 'ring-2 ring-yellow-500' : 'ring-2 ring-transparent'}`}>
-                                          <img src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} alt="Avatar" className="w-6 h-6 rounded-full bg-[#1e1f22] object-cover" />
-                                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                                        <div className="relative rounded-full transition-all duration-100">
+                                          <Avatar src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user_id}`} decoration={member.profiles?.avatar_decoration} isSpeaking={isSpeaking} className="w-6 h-6 object-cover" />
+                                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559] z-30" />
                                         </div>
                                         <div className="ml-2 flex items-center gap-1 flex-1 min-w-0">
                                           <span className="text-sm text-[#949ba4] group-hover/member:text-[#dbdee1] truncate">{member.profiles?.first_name || 'Utente'}</span>

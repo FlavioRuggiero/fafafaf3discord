@@ -46,7 +46,7 @@ export const UserPanel = ({ currentUser, onOpenUserSettings }: UserPanelProps) =
 
         <div className="relative">
           <Avatar src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`} decoration={currentUser?.avatar_decoration} className="w-8 h-8" />
-          <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559]" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559] z-30" />
         </div>
         <div className="ml-2 flex flex-col min-w-0">
           <span className="text-sm font-semibold text-white truncate leading-tight">{currentUser?.name}</span>

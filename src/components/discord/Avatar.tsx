@@ -5,15 +5,18 @@ interface AvatarProps {
   alt?: string;
   className?: string;
   decoration?: string | null;
+  isSpeaking?: boolean;
 }
 
-export const Avatar = ({ src, alt, className = "", decoration }: AvatarProps) => {
+export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: AvatarProps) => {
+  const speakingClass = isSpeaking ? "ring-2 ring-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] z-20" : "";
+
   if (!decoration) {
-    return <img src={src} alt={alt} className={`rounded-full object-cover ${className}`} />;
+    return <img src={src} alt={alt} className={`rounded-full object-cover ${speakingClass} ${className}`} />;
   }
 
   return (
-    <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${decoration} ${className}`}>
+    <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${decoration} ${speakingClass} ${className}`}>
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
       {decoration === 'dc-emit' && (
