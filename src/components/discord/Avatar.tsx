@@ -30,6 +30,16 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
 
   return (
     <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${activeDecoration} ${speakingClass} ${className}`}>
+      
+      {/* Particelle globali (possono andare dietro o davanti all'immagine z-10) */}
+      {activeDecoration === 'oceanic' && !clipEffects && (
+        <>
+          <div className="water-drop-wrapper w1"><div className="water-drop-inner">💧</div></div>
+          <div className="water-drop-wrapper w2"><div className="water-drop-inner">💧</div></div>
+          <div className="water-drop-wrapper w3"><div className="water-drop-inner">💧</div></div>
+        </>
+      )}
+
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
       {/* Se clipEffects è true (es. nel UserPanel in basso), intrappoliamo le particelle nel cerchio per non sballare il layout */}
@@ -80,6 +90,22 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="esquelito-skull sk1"></div>
             <div className="esquelito-skull sk2"></div>
             <div className="esquelito-skull sk3"></div>
+          </>
+        )}
+
+        {activeDecoration === 'oceanic' && (
+          <>
+            <div className="oceanic-bubble b1"></div>
+            <div className="oceanic-bubble b2"></div>
+            <div className="oceanic-bubble b3"></div>
+          </>
+        )}
+
+        {activeDecoration === 'oceanic' && clipEffects && (
+          <>
+            <div className="water-drop-wrapper w1"><div className="water-drop-inner">💧</div></div>
+            <div className="water-drop-wrapper w2"><div className="water-drop-inner">💧</div></div>
+            <div className="water-drop-wrapper w3"><div className="water-drop-inner">💧</div></div>
           </>
         )}
       </div>

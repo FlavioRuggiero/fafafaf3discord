@@ -293,7 +293,6 @@ body {
   position: relative;
 }
 
-/* Animazioni per farli orbitare mantenendoli dritti e facendoli pulsare */
 @keyframes orbit-pulse-1 {
   0% { transform: rotate(0deg) translateY(-25px) rotate(0deg) scale(0.8); }
   50% { transform: rotate(180deg) translateY(-45px) rotate(-180deg) scale(1.2); }
@@ -329,3 +328,99 @@ body {
 .esquelito-skull.sk1 { background-image: url('/esqueleto1.png'); animation: orbit-pulse-1 3s infinite ease-in-out; }
 .esquelito-skull.sk2 { background-image: url('/esqueleto2.png'); animation: orbit-pulse-2 3s infinite ease-in-out; }
 .esquelito-skull.sk3 { background-image: url('/esquelito3.png'); animation: orbit-pulse-3 3s infinite ease-in-out; }
+
+/* 6. Vortice Oceanico (Premium) */
+.dec-oceanic {
+  border: 2px solid #0ea5e9;
+  box-shadow: 0 0 10px #0ea5e9, inset 0 0 10px #0ea5e9;
+  position: relative;
+}
+.dec-oceanic::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(transparent, #38bdf8, #0284c7, transparent 50%);
+  animation: spin-slow 2s linear infinite;
+  z-index: 0;
+}
+.dec-oceanic::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(transparent, #bae6fd, transparent, #bae6fd, transparent);
+  animation: spin-slow 3s linear infinite reverse;
+  z-index: 0;
+  opacity: 0.5;
+}
+.dec-oceanic img {
+  position: relative;
+  z-index: 10;
+  border: 2px solid #0c4a6e;
+}
+
+/* Animazione per l'orbita 3D delle gocce d'acqua */
+@keyframes orbit-wrapper {
+  0% { transform: rotate(0deg); z-index: 25; }
+  24% { z-index: 25; }
+  25% { transform: rotate(90deg); z-index: 5; }
+  50% { transform: rotate(180deg); z-index: 5; }
+  74% { z-index: 5; }
+  75% { transform: rotate(270deg); z-index: 25; }
+  100% { transform: rotate(360deg); z-index: 25; }
+}
+
+/* Contro-rotazione per mantenere la goccia dritta e scalarla per l'effetto profondità */
+@keyframes counter-rotate {
+  0% { transform: translateX(-50%) rotate(0deg) scale(1.3); }
+  25% { transform: translateX(-50%) rotate(-90deg) scale(0.9); }
+  50% { transform: translateX(-50%) rotate(-180deg) scale(0.6); }
+  75% { transform: translateX(-50%) rotate(-270deg) scale(0.9); }
+  100% { transform: translateX(-50%) rotate(-360deg) scale(1.3); }
+}
+
+.water-drop-wrapper {
+  position: absolute;
+  inset: -20%; /* Rende l'orbita più larga dell'avatar */
+  pointer-events: none;
+  z-index: 25;
+}
+
+.water-drop-inner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.2em;
+  filter: drop-shadow(0 0 4px rgba(14, 165, 233, 0.8));
+}
+
+.water-drop-wrapper.w1 { animation: orbit-wrapper 3s infinite linear; }
+.water-drop-wrapper.w1 .water-drop-inner { animation: counter-rotate 3s infinite linear; }
+
+.water-drop-wrapper.w2 { animation: orbit-wrapper 3s infinite linear -1s; }
+.water-drop-wrapper.w2 .water-drop-inner { animation: counter-rotate 3s infinite linear -1s; }
+
+.water-drop-wrapper.w3 { animation: orbit-wrapper 3s infinite linear -2s; }
+.water-drop-wrapper.w3 .water-drop-inner { animation: counter-rotate 3s infinite linear -2s; }
+
+/* Bollicine che salgono */
+@keyframes bubble-rise {
+  0% { transform: translateY(10px) scale(0.5); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(-20px) scale(1); opacity: 0; }
+}
+.oceanic-bubble {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #bae6fd;
+  border-radius: 50%;
+  box-shadow: 0 0 4px #38bdf8;
+  z-index: 20;
+  animation: bubble-rise 2s infinite ease-in;
+}
+.oceanic-bubble.b1 { bottom: 10%; left: 20%; animation-delay: 0s; }
+.oceanic-bubble.b2 { bottom: 5%; right: 25%; animation-delay: 0.7s; }
+.oceanic-bubble.b3 { bottom: 15%; left: 50%; animation-delay: 1.4s; }
