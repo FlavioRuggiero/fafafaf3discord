@@ -52,6 +52,9 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           <div className="gustavo-sprite gustavo-trail t2"></div>
           <div className="gustavo-sprite gustavo-trail t1"></div>
           <div className="gustavo-sprite gustavo-main"></div>
+          <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner"></div></div>
         </>
       )}
 
@@ -144,6 +147,9 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="gustavo-sprite gustavo-trail t2"></div>
             <div className="gustavo-sprite gustavo-trail t1"></div>
             <div className="gustavo-sprite gustavo-main"></div>
+            <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner"></div></div>
           </>
         )}
       </div>
