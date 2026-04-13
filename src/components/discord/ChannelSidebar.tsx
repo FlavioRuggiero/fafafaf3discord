@@ -688,6 +688,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     return '';
   };
 
+  const today = new Date().toISOString().split('T')[0];
+  const canClaimReward = currentUser?.last_reward_date !== today;
+
   if (!activeServer) {
     return (
       <div className="w-[240px] bg-[#2b2d31] flex flex-col flex-shrink-0 z-10 relative h-full border-r border-[#1f2023]">
@@ -707,10 +710,15 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           
           <button
             onClick={() => onChannelSelect({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'shop' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'shop' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
           >
-            <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain" />
-            <span className="font-medium">Cardi E-Shop</span>
+            <div className="flex items-center">
+              <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain" />
+              <span className="font-medium">Cardi E-Shop</span>
+            </div>
+            {canClaimReward && (
+              <div className="w-2 h-2 rounded-full bg-[#f23f43] shadow-[0_0_5px_#f23f43]" title="Premio giornaliero disponibile!" />
+            )}
           </button>
 
           {currentUser?.id === adminId && (
