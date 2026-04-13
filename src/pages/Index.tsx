@@ -7,9 +7,8 @@ import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/
 import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
 import { ShopView } from "@/components/discord/ShopView";
 import { InventoryView } from "@/components/discord/InventoryView";
-import { TradeModal } from "@/components/discord/TradeModal";
 import { INITIAL_MESSAGES } from "@/data/mockData";
-import { Message, User, Server, Channel, ServerRole, ServerPermissions, Trade } from "@/types/discord";
+import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
@@ -24,6 +23,7 @@ const Index = () => {
   const { user, adminId, moderatorIds } = useAuth();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Refs per evitare stale closures negli eventi realtime
   const adminIdRef = useRef(adminId);
   const moderatorIdsRef = useRef(moderatorIds);
 
@@ -35,6 +35,7 @@ const Index = () => {
     moderatorIdsRef.current = moderatorIds;
   }, [moderatorIds]);
 
+  // States per Server e Canali dal DB
   const [servers, setServers] = useState<Server[]>([]);
   const [publicServers, setPublicServers] = useState<Server[]>([]);
   const [activeServerId, setActiveServerId] = useState<string>('home');
@@ -46,12 +47,15 @@ const Index = () => {
 
   const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({});
   
+  // State per gestire la Presence in tempo reale e i profili
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [serverProfiles, setServerProfiles] = useState<any[]>([]);
   
+  // State per i ruoli
   const [serverRoles, setServerRoles] = useState<ServerRole[]>([]);
   const [memberRoles, setMemberRoles] = useState<{user_id: string, role_id: string}[]>([]);
 
+  // States per UI
   const [showMembers, setShowMembers] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
@@ -62,13 +66,11 @@ const Index = () => {
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
+  // States per Notifiche
   const [notificationSettings, setNotificationSettings] = useState<Record<string, NotificationSetting>>({});
   const [unreadServers, setUnreadServers] = useState<Set<string>>(new Set());
 
-  // Trade State
-  const [activeTrade, setActiveTrade] = useState<Trade | null>(null);
-  const [tradeOtherUser, setTradeOtherUser] = useState<User | null>(null);
-
+  // Carica impostazioni notifiche
   useEffect(() => {
     if (user) {
       const saved = localStorage.getItem(`notification-settings-${user.id}`);
@@ -88,6 +90,7 @@ const Index = () => {
     });
   };
 
+  // Refs per il listener globale
   const allChannelsRef = useRef(allChannels);
   useEffect(() => { allChannelsRef.current = allChannels; }, [allChannels]);
 
@@ -97,22 +100,25 @@ const Index = () => {
   const notificationSettingsRef = useRef(notificationSettings);
   useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
 
+  // Listener globale per le notifiche
   useEffect(() => {
     if (!currentUser) return;
 
     const handleNewMessage = (payload: any) => {
       const newMsg = payload.new;
-      if (newMsg.user_id === currentUser.id) return;
+      if (newMsg.user_id === currentUser.id) return; // Non notificare i propri messaggi
 
       const channel = allChannelsRef.current.find(c => c.id === newMsg.channel_id);
       if (!channel || !channel.server_id) return;
 
       const serverId = channel.server_id;
-      const setting = notificationSettingsRef.current[serverId] || 'mentions';
+      const setting = notificationSettingsRef.current[serverId] || 'mentions'; // Default: solo menzioni
 
+      // Controllo menzione tramite ID univoco o @everyone
       const isMentioned = newMsg.content.includes(`<@${currentUser.id}>`) || newMsg.content.includes('<@everyone>');
 
       if (setting !== 'none') {
+        // Se non stiamo guardando questo server, segnalo come non letto
         if (activeServerIdRef.current !== serverId) {
           setUnreadServers(prev => new Set(prev).add(serverId));
         }
@@ -136,81 +142,7 @@ const Index = () => {
     };
   }, [currentUser]);
 
-  // Listener per gli Scambi (Trades)
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const fetchOtherUser = async (otherId: string) => {
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', otherId).single();
-      if (profile) {
-        setTradeOtherUser({
-          id: profile.id,
-          name: profile.first_name || 'Utente',
-          avatar: profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
-          status: 'online',
-          purchased_decorations: profile.purchased_decorations || [],
-          avatar_decoration: profile.avatar_decoration
-        });
-      }
-    };
-
-    const checkActiveTrade = async () => {
-      const { data } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('status', 'pending')
-        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-        .single();
-        
-      if (data) {
-        setActiveTrade(data as Trade);
-        const otherId = data.sender_id === currentUser.id ? data.receiver_id : data.sender_id;
-        fetchOtherUser(otherId);
-      }
-    };
-
-    checkActiveTrade();
-
-    const tradeSub = supabase.channel(`trades_${currentUser.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'trades',
-        filter: `sender_id=eq.${currentUser.id}`
-      }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const trade = payload.new as Trade;
-          if (trade.status === 'pending') {
-            setActiveTrade(trade);
-            fetchOtherUser(trade.receiver_id);
-          } else {
-            setActiveTrade(null);
-          }
-        }
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'trades',
-        filter: `receiver_id=eq.${currentUser.id}`
-      }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const trade = payload.new as Trade;
-          if (trade.status === 'pending') {
-            setActiveTrade(trade);
-            fetchOtherUser(trade.sender_id);
-          } else {
-            setActiveTrade(null);
-          }
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(tradeSub);
-    };
-  }, [currentUser?.id]);
-
+  // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
   const serverMembersList: User[] = serverProfiles.map(p => {
     const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
     const name = p.first_name || "Utente";
@@ -245,6 +177,7 @@ const Index = () => {
     };
   });
 
+  // Calcolo dei permessi per l'utente corrente nel server attivo
   const currentUserMember = serverMembersList.find(m => m.id === currentUser?.id);
   const isOwner = activeServer?.created_by === currentUser?.id;
   const isGlobalAdmin = currentUser?.global_role === 'ADMIN' || currentUser?.global_role === 'CREATOR';
@@ -259,6 +192,7 @@ const Index = () => {
     can_bypass_restrictions: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_bypass_restrictions) ?? false),
   };
 
+  // Gestione Supabase Presence
   useEffect(() => {
     if (!user) return;
 
@@ -297,6 +231,7 @@ const Index = () => {
     };
   }, [user]);
 
+  // Listener Realtime per la tabella Profiles e Channels
   useEffect(() => {
     const profileSubscription = supabase
       .channel('public:profiles_index')
@@ -321,13 +256,13 @@ const Index = () => {
             avatar: updatedProfile.avatar_url || prev.avatar,
             bio: updatedProfile.bio || "",
             banner_color: updatedProfile.banner_color || "#5865F2",
-            banner_url: updatedProfile.banner_url,
+            banner_url: updatedProfile.banner_url, // Accetta null
             level: updatedProfile.level || 1,
             digitalcardus: updatedProfile.digitalcardus ?? 25,
             xp: updatedProfile.xp || 0,
             global_role: role,
-            last_reward_date: updatedProfile.last_reward_date,
-            avatar_decoration: updatedProfile.avatar_decoration,
+            last_reward_date: updatedProfile.last_reward_date, // Accetta null
+            avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
             purchased_decorations: updatedProfile.purchased_decorations || []
           };
         });
@@ -351,15 +286,21 @@ const Index = () => {
     };
   }, [user?.id]);
 
+  // Caricamento dati iniziali e premi giornalieri
   const hasInitializedRef = useRef(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user) return;
       
+      // Eseguiamo la pulizia solo una volta per sessione
       if (!hasInitializedRef.current) {
         hasInitializedRef.current = true;
+        
+        // 1. Aggiorna data ultimo accesso
         await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
+        
+        // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
         await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
       }
       
@@ -418,6 +359,7 @@ const Index = () => {
     loadInitialData();
   }, [user, adminId, moderatorIds]);
 
+  // Caricamento Membri e Sottoscrizione Realtime
   useEffect(() => {
     if (!activeServerId || activeServerId === 'home') {
       setServerProfiles([]);
@@ -457,6 +399,7 @@ const Index = () => {
 
     fetchServerData();
 
+    // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
     const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
       .on('postgres_changes', {
         event: '*',
@@ -493,6 +436,7 @@ const Index = () => {
     };
   }, [activeServerId]);
 
+  // AGGIORNAMENTO: Sincronizza istantaneamente il canale attivo quando allChannels cambia
   useEffect(() => {
     if (activeServerId !== 'home') {
       const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
@@ -501,6 +445,7 @@ const Index = () => {
           if (!current || current.server_id !== activeServerId) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
           }
+          // Trova il canale aggiornato per riflettere le nuove impostazioni (cooldown, is_locked)
           const updatedCurrent = newServerChannels.find(c => c.id === current.id);
           if (!updatedCurrent) {
              return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
@@ -548,6 +493,7 @@ const Index = () => {
     
     setIsCreatingServer(true);
 
+    // Controllo di sicurezza in tempo reale dal database
     const { data: checkProfile } = await supabase.from('profiles').select('role').eq('id', currentUser.id).single();
     const isReallyAdmin = currentUser.id === adminIdRef.current;
     const isReallyMod = checkProfile?.role === 'moderator';
@@ -556,6 +502,7 @@ const Index = () => {
       showError("Permesso negato: non sei più un moderatore o admin.");
       setIsCreatingServer(false);
       setShowCreateModal(false);
+      // Aggiorniamo lo stato locale per far sparire il pulsante
       setCurrentUser(prev => prev ? { ...prev, global_role: 'USER' } : null);
       return;
     }
@@ -989,16 +936,6 @@ const Index = () => {
           user={currentUser}
           onUpdate={handleUpdateProfile}
         />
-
-        {/* Modal Scambio */}
-        {activeTrade && tradeOtherUser && (
-          <TradeModal 
-            trade={activeTrade}
-            currentUser={currentUser}
-            otherUser={tradeOtherUser}
-            onClose={() => setActiveTrade(null)}
-          />
-        )}
       </div>
     </VoiceChannelProvider>
   );
