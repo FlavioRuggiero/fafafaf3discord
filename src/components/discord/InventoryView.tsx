@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { Archive, Menu, Check, Coins } from 'lucide-react';
+import { Archive, Menu, Check, Coins, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -122,11 +122,23 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
 
                     return (
                       <div key={item.id} className={`bg-[#2b2d31] border ${isEquipped ? 'border-brand' : 'border-[#1e1f22]'} rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md relative group`}>
+                        
+                        {/* Spunta equipaggiato (spostata a sinistra) */}
                         {isEquipped && (
-                          <div className="absolute top-3 right-3 bg-brand text-white p-1 rounded-full shadow-md">
+                          <div className="absolute top-3 left-3 bg-brand text-white p-1 rounded-full shadow-md z-10">
                             <Check size={14} />
                           </div>
                         )}
+
+                        {/* Pulsante Vendi (in alto a destra) */}
+                        <button 
+                          onClick={() => setItemToSell(item)}
+                          className="absolute top-3 right-3 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2 py-1 rounded-md border border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-[60]"
+                          title="Vendi oggetto"
+                        >
+                          <DollarSign size={14} />
+                          <img src="/digitalcardus.png" alt="dc" className="w-3.5 h-3.5 object-contain" />
+                        </button>
                         
                         {item.type === 'emoji_pack' ? (
                           <div className="mb-6 mt-2 relative w-24 h-24 group/pack mx-auto">
@@ -154,28 +166,20 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                         
                         <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
-                        <div className="mt-auto w-full flex gap-2">
+                        <div className="mt-auto w-full">
                           {item.type === 'emoji_pack' ? (
-                            <button disabled className="flex-1 py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
+                            <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
                               In Chat
                             </button>
                           ) : isEquipped ? (
-                            <button onClick={handleUnequip} className="flex-1 py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
+                            <button onClick={handleUnequip} className="w-full py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
                               Rimuovi
                             </button>
                           ) : (
-                            <button onClick={() => handleEquip(item.id)} className="flex-1 py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
+                            <button onClick={() => handleEquip(item.id)} className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
                               Equipaggia
                             </button>
                           )}
-                          
-                          <button 
-                            onClick={() => setItemToSell(item)}
-                            className="px-3 py-2 rounded bg-[#2b2d31] border border-[#f23f43] text-[#f23f43] font-medium hover:bg-[#f23f43] hover:text-white transition-colors text-sm flex items-center justify-center"
-                            title="Vendi oggetto"
-                          >
-                            Vendi
-                          </button>
                         </div>
                       </div>
                     );
