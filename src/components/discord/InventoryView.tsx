@@ -124,7 +124,12 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           </div>
                         )}
                         
-                        <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
+                        <h3 className={`font-bold mb-2 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
+                        
+                        <div className="flex items-center justify-center gap-1.5 mb-4 bg-[#1e1f22] px-2.5 py-1 rounded-full border border-[#3f4147]">
+                          <span className="text-xs font-bold text-white">{item.price}</span>
+                          <img src="/digitalcardus.png" alt="dc" className="w-3.5 h-3.5 object-contain" />
+                        </div>
 
                         <div className="mt-auto w-full">
                           {item.type === 'emoji_pack' ? (

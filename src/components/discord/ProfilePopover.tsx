@@ -45,9 +45,11 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
   const currentXp = user.xp || 0;
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
   
-  const ownedItems = user.purchased_decorations
+  // Filtra gli oggetti posseduti e li ordina per prezzo decrescente
+  const ownedItems = (user.purchased_decorations
     ?.map(id => SHOP_ITEMS.find(i => i.id === id))
-    .filter(Boolean) || [];
+    .filter(Boolean) as typeof SHOP_ITEMS)
+    ?.sort((a, b) => b.price - a.price) || [];
   
   return (
     <Popover.Root>
@@ -173,27 +175,31 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
               </button>
 
               {showInventory && (
-                <div className="mt-3 max-h-40 overflow-y-auto custom-scrollbar pr-1 space-y-2">
+                <div className="mt-3 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                   {ownedItems.length === 0 ? (
                     <p className="text-xs text-[#949ba4] italic text-center py-2">Nessun oggetto posseduto.</p>
                   ) : (
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {ownedItems.map(item => (
-                        <div key={item!.id} className="flex items-center bg-[#2b2d31] border border-[#1e1f22] rounded p-2">
-                          {item!.type === 'emoji_pack' ? (
-                            <div className="w-8 h-8 grid grid-cols-2 gap-0.5 mr-3 flex-shrink-0 bg-[#1e1f22] p-0.5 rounded">
-                              {item!.emojis?.slice(0, 4).map(e => (
+                        <div key={item.id} className="flex flex-col items-center bg-[#2b2d31] border border-[#1e1f22] rounded p-2 text-center">
+                          {item.type === 'emoji_pack' ? (
+                            <div className="w-10 h-10 grid grid-cols-2 gap-0.5 bg-[#1e1f22] p-1 rounded mb-1.5">
+                              {item.emojis?.slice(0, 4).map(e => (
                                 <img key={e} src={e} className="w-full h-full object-contain" />
                               ))}
                             </div>
                           ) : (
-                            <div className="w-8 h-8 mr-3 flex-shrink-0 flex items-center justify-center">
-                              <Avatar src={user.avatar} decoration={item!.id} className="w-6 h-6" />
+                            <div className="w-10 h-10 flex items-center justify-center mb-1.5">
+                              <Avatar src={user.avatar} decoration={item.id} className="w-8 h-8" />
                             </div>
                           )}
-                          <span className={`text-xs font-medium truncate ${getThemeTextClass(item!.id)}`}>
-                            {item!.name}
+                          <span className={`text-[10px] font-medium truncate w-full ${getThemeTextClass(item.id)}`}>
+                            {item.name}
                           </span>
+                          <div className="flex items-center gap-1 mt-1 bg-[#1e1f22] px-1.5 py-0.5 rounded-full border border-[#3f4147]">
+                            <span className="text-[9px] font-bold text-white">{item.price}</span>
+                            <img src="/digitalcardus.png" alt="dc" className="w-2.5 h-2.5 object-contain" />
+                          </div>
                         </div>
                       ))}
                     </div>
