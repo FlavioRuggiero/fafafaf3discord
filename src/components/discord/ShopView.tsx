@@ -105,8 +105,11 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative">
-        {/* Sfumatura verde elegante in alto */}
-        <div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-[#23a559]/20 via-[#23a559]/5 to-transparent pointer-events-none z-0"></div>
+        
+        {/* Sfumature verdi eleganti (più lunghe sui bordi) */}
+        <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#23a559]/15 to-transparent pointer-events-none z-0"></div>
+        <div className="absolute top-0 left-0 w-1/2 md:w-1/3 h-[600px] bg-gradient-to-br from-[#23a559]/20 via-[#23a559]/5 to-transparent pointer-events-none z-0"></div>
+        <div className="absolute top-0 right-0 w-1/2 md:w-1/3 h-[600px] bg-gradient-to-bl from-[#23a559]/20 via-[#23a559]/5 to-transparent pointer-events-none z-0"></div>
 
         <div className="max-w-5xl mx-auto relative z-10">
           <div className="mb-10 mt-4 text-center sm:text-left">
