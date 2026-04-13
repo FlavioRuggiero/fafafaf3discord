@@ -711,14 +711,26 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           
           <button
             onClick={() => onChannelSelect({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'shop' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+            className={`relative w-full flex items-center justify-between px-3 py-2 rounded cursor-pointer mb-2 transition-colors overflow-hidden group ${activeChannelId === 'shop' ? 'text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
           >
-            <div className="flex items-center">
-              <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain" />
+            {/* Sfondo base */}
+            <div className={`absolute inset-0 transition-colors ${activeChannelId === 'shop' ? 'bg-[#404249]' : 'group-hover:bg-[#35373c]'}`}></div>
+            
+            {/* Sfumatura verde e foglie */}
+            <div 
+              className={`absolute inset-0 transition-opacity duration-300 ${activeChannelId === 'shop' ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}`}
+              style={{
+                backgroundImage: `linear-gradient(to left, rgba(35, 165, 89, 0.3), transparent), url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23166534' fill-opacity='0.15'%3E%3Cpath d='M40,20 C60,20 70,40 70,60 C50,60 40,40 40,20 Z' transform='rotate(15 55 40)'/%3E%3Cpath d='M140,30 Q160,10 170,40 Q150,60 140,30 Z' transform='rotate(-25 155 35)'/%3E%3Cpath d='M30,130 C40,110 60,120 70,140 C80,160 50,170 30,130 Z' transform='rotate(45 50 140)'/%3E%3Cpath d='M150,140 C170,140 180,160 180,180 C160,180 150,160 150,140 Z' transform='rotate(-60 165 160)'/%3E%3Cpath d='M90,90 Q100,80 110,95 Q95,105 90,90 Z' transform='rotate(10 100 92)'/%3E%3C/g%3E%3C/svg%3E")`,
+                backgroundSize: 'auto, 100px 100px'
+              }}
+            ></div>
+
+            <div className="relative z-10 flex items-center">
+              <img src="/digitalcardus.png" alt="dc" className="w-5 h-5 mr-3 object-contain drop-shadow-md" />
               <span className="font-medium">Cardi E-Shop</span>
             </div>
             {canClaimReward && (
-              <div className="w-2 h-2 rounded-full bg-[#f23f43] shadow-[0_0_5px_#f23f43]" title="Premio giornaliero disponibile!" />
+              <div className="relative z-10 w-2 h-2 rounded-full bg-[#f23f43] shadow-[0_0_5px_#f23f43]" title="Premio giornaliero disponibile!" />
             )}
           </button>
 
