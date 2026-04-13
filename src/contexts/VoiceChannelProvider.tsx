@@ -338,13 +338,18 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
   }, [requestMicrophone, currentUser]);
 
   // VAD (Voice Activity Detection) Loop
+  const currentUserId = currentUser?.id;
+
   useEffect(() => {
-    if (!activeVoiceChannelId || !localStreamRef.current || !currentUser) {
-      if (currentUser && speakingStates[currentUser.id]) {
+    if (!activeVoiceChannelId || !localStreamRef.current || !currentUserId) {
+      if (currentUserId) {
         setSpeakingStates(prev => {
-          const next = { ...prev };
-          delete next[currentUser.id];
-          return next;
+          if (prev[currentUserId]) {
+            const next = { ...prev };
+            delete next[currentUserId];
+            return next;
+          }
+          return prev;
         });
       }
       return;
@@ -355,6 +360,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
     // Cloniamo la traccia per l'analisi, così possiamo disabilitare la traccia principale (per mutare)
     // senza interrompere il flusso di dati verso l'analizzatore.
     const analysisTrack = stream.getAudioTracks()[0].clone();
+    analysisTrack.enabled = true; // FIX: Forza l'abilitazione della traccia clonata per evitare deadlock
     const analysisStream = new MediaStream([analysisTrack]);
     
     const audioContext = new AudioContext();
@@ -397,8 +403,8 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       }
 
       setSpeakingStates(prev => {
-        if (!!prev[currentUser.id] === isSpeaking) return prev;
-        return { ...prev, [currentUser.id]: isSpeaking };
+        if (!!prev[currentUserId] === isSpeaking) return prev;
+        return { ...prev, [currentUserId]: isSpeaking };
       });
 
       animationFrameId = requestAnimationFrame(checkVolume);
@@ -413,18 +419,18 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
       if (audioContext.state !== 'closed') {
         audioContext.close();
       }
-      if (currentUser) {
+      if (currentUserId) {
         setSpeakingStates(prev => {
-          if (prev[currentUser.id]) {
+          if (prev[currentUserId]) {
             const next = { ...prev };
-            delete next[currentUser.id];
+            delete next[currentUserId];
             return next;
           }
           return prev;
         });
       }
     };
-  }, [activeVoiceChannelId, currentUser]);
+  }, [activeVoiceChannelId, currentUserId]); // Dipende solo dall'ID, non dall'intero oggetto currentUser
 
   const toggleMute = useCallback(async () => {
     if (!currentUser) return;
