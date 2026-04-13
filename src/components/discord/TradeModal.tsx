@@ -176,10 +176,10 @@ export const TradeModal = ({ trade, currentUser, otherUser, onClose }: TradeModa
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-[#313338] rounded-xl w-full max-w-4xl max-h-[90vh] shadow-2xl border border-[#1e1f22] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[#313338] rounded-xl w-full max-w-4xl shadow-2xl border border-[#1e1f22] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="p-4 border-b border-[#1e1f22] flex justify-between items-center bg-[#2b2d31] flex-shrink-0">
+        <div className="p-4 border-b border-[#1e1f22] flex justify-between items-center bg-[#2b2d31]">
           <div className="flex items-center gap-3">
             <ArrowRightLeft className="text-brand" size={24} />
             <h2 className="text-xl font-bold text-white">Scambio in corso</h2>
@@ -189,11 +189,11 @@ export const TradeModal = ({ trade, currentUser, otherUser, onClose }: TradeModa
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
+        <div className="flex flex-col md:flex-row h-[500px]">
           
           {/* Left Side: My Offer */}
-          <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-[#1e1f22] relative min-h-[450px] md:min-h-0">
-            <div className="p-4 flex items-center gap-3 border-b border-[#1e1f22] bg-[#2b2d31]/50 flex-shrink-0">
+          <div className="flex-1 flex flex-col border-r border-[#1e1f22] relative">
+            <div className="p-4 flex items-center gap-3 border-b border-[#1e1f22] bg-[#2b2d31]/50">
               <Avatar src={currentUser.avatar} decoration={currentUser.avatar_decoration} className="w-10 h-10" />
               <div>
                 <div className="text-white font-bold">{currentUser.name}</div>
@@ -202,13 +202,13 @@ export const TradeModal = ({ trade, currentUser, otherUser, onClose }: TradeModa
               {myAccepted && <div className="ml-auto bg-[#23a559] text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1"><Check size={14}/> Pronto</div>}
             </div>
             
-            <div className="p-4 md:p-6 grid grid-cols-2 gap-3 md:gap-4 flex-shrink-0">
+            <div className="p-6 grid grid-cols-2 gap-4 flex-shrink-0">
               {[0, 1, 2, 3].map(i => renderSlot(myItems[i], true))}
             </div>
 
             {/* My Inventory Selection */}
-            <div className="flex-1 border-t border-[#1e1f22] bg-[#2b2d31] flex flex-col min-h-[200px] md:min-h-0">
-              <div className="px-4 py-2 text-xs font-bold text-[#949ba4] uppercase tracking-wider border-b border-[#1e1f22] flex-shrink-0">
+            <div className="flex-1 border-t border-[#1e1f22] bg-[#2b2d31] flex flex-col min-h-0">
+              <div className="px-4 py-2 text-xs font-bold text-[#949ba4] uppercase tracking-wider border-b border-[#1e1f22]">
                 Il tuo inventario
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar p-2 grid grid-cols-3 gap-2">
@@ -239,8 +239,8 @@ export const TradeModal = ({ trade, currentUser, otherUser, onClose }: TradeModa
           </div>
 
           {/* Right Side: Their Offer */}
-          <div className="flex-1 flex flex-col relative bg-[#2b2d31]/30 min-h-[350px] md:min-h-0">
-            <div className="p-4 flex items-center gap-3 border-b border-[#1e1f22] bg-[#2b2d31]/50 flex-shrink-0">
+          <div className="flex-1 flex flex-col relative bg-[#2b2d31]/30">
+            <div className="p-4 flex items-center gap-3 border-b border-[#1e1f22] bg-[#2b2d31]/50">
               <Avatar src={otherUser.avatar} decoration={otherUser.avatar_decoration} className="w-10 h-10" />
               <div>
                 <div className="text-white font-bold">{otherUser.name}</div>
@@ -249,11 +249,11 @@ export const TradeModal = ({ trade, currentUser, otherUser, onClose }: TradeModa
               {theirAccepted && <div className="ml-auto bg-[#23a559] text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1"><Check size={14}/> Pronto</div>}
             </div>
             
-            <div className="p-4 md:p-6 grid grid-cols-2 gap-3 md:gap-4 flex-shrink-0">
+            <div className="p-6 grid grid-cols-2 gap-4">
               {[0, 1, 2, 3].map(i => renderSlot(theirItems[i], false))}
             </div>
 
-            <div className="mt-auto p-6 text-center flex-shrink-0">
+            <div className="mt-auto p-6 text-center">
               <p className="text-sm text-[#949ba4] mb-4">
                 I doppioni ricevuti verranno automaticamente venduti per metà del loro valore in Digitalcardus.
               </p>
@@ -263,7 +263,7 @@ export const TradeModal = ({ trade, currentUser, otherUser, onClose }: TradeModa
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-[#2b2d31] border-t border-[#1e1f22] flex justify-between items-center flex-shrink-0">
+        <div className="p-4 bg-[#2b2d31] border-t border-[#1e1f22] flex justify-between items-center">
           <button 
             onClick={handleCancel}
             className="px-6 py-2 text-white hover:underline font-medium transition-colors"
