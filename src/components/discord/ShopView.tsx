@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu } from 'lucide-react';
+import { ShoppingCart, Menu, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -25,6 +25,32 @@ const getThemeTextClass = (id: string) => {
 
 export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
+  const canClaimReward = currentUser?.last_reward_date !== today;
+
+  const handleClaimReward = async () => {
+    if (!canClaimReward) return;
+    setIsClaiming(true);
+    try {
+      const { data, error } = await supabase.rpc('claim_daily_reward', { user_id_param: currentUser.id });
+      if (error) throw error;
+      
+      if (data && data.rewarded) {
+        showSuccess(`Hai ricevuto 3 Digitalcardus e 5 XP!`);
+        if (data.leveled_up) {
+          showSuccess(`🎉 Level Up! Sei salito al livello ${data.new_level}!`);
+        }
+      } else {
+        showError("Hai già riscattato il premio oggi.");
+      }
+    } catch (error) {
+      showError("Errore durante il riscatto del premio.");
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   const handlePurchase = async (item: any) => {
     if (currentUser.digitalcardus < item.price) {
@@ -83,6 +109,31 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Cardi E-Shop</h1>
             <p className="text-[#b5bac1]">Acquista personalizzazioni uniche per il tuo profilo.</p>
+          </div>
+
+          {/* Daily Reward Banner */}
+          <div className="mb-10 bg-gradient-to-r from-[#2b2d31] to-[#1e1f22] border border-[#3f4147] rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+            <div className="flex items-center mb-4 sm:mb-0 relative z-10">
+              <div className="w-16 h-16 bg-[#23a559]/20 rounded-full flex items-center justify-center mr-4 border border-[#23a559]/30">
+                <Gift className="text-[#23a559]" size={32} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white mb-1">Premio Giornaliero</h2>
+                <p className="text-[#b5bac1] text-sm">Riscatta ogni giorno per ottenere <span className="text-[#23a559] font-bold">3 DC</span> e <span className="text-brand font-bold">5 XP</span>!</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleClaimReward}
+              disabled={!canClaimReward || isClaiming}
+              className={`relative z-10 px-6 py-3 rounded-lg font-bold transition-all shadow-lg ${
+                canClaimReward 
+                  ? 'bg-[#23a559] hover:bg-[#1a7c43] text-white hover:shadow-[0_0_15px_rgba(35,165,89,0.4)] hover:-translate-y-0.5' 
+                  : 'bg-[#3f4147] text-[#949ba4] cursor-not-allowed'
+              }`}
+            >
+              {isClaiming ? 'Riscatto...' : canClaimReward ? 'Riscatta Ora' : 'Già Riscattato Oggi'}
+            </button>
           </div>
 
           {categories.map(category => (
