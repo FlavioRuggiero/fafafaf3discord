@@ -27,7 +27,6 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: Ava
     <div className={`relative rounded-full flex items-center justify-center dec-wrapper dec-${activeDecoration} ${speakingClass} ${className}`}>
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
-      {/* Le particelle ora sono contenute esattamente nell'avatar e usano solo transform per uscire, senza alterare lo scroll */}
       <div className="absolute inset-0 pointer-events-none z-20">
         {activeDecoration === 'dc-emit' && (
           <>
@@ -51,9 +50,6 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking }: Ava
             <div className="explode-emoji e1">💥</div>
             <div className="explode-emoji e2">🔥</div>
             <div className="explode-emoji e3">💥</div>
-            <div className="explode-emoji e4">🧨</div>
-            <div className="explode-emoji e5">💥</div>
-            <div className="explode-emoji e6">🔥</div>
           </>
         )}
       </div>

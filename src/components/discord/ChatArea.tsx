@@ -433,13 +433,29 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, () => {
         fetchVoiceMembers();
       })
+      // Aggiunto listener per i profili nella chat vocale
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, (payload) => {
+        if (!isMounted) return;
+        setVoiceMembers(prev => prev.map(m =>
+          m.user_id === payload.new.id
+            ? { ...m, profiles: { ...m.profiles, ...payload.new } }
+            : m
+        ));
+        if (currentUser?.id === payload.new.id) {
+          setCurrentUserProfile((prev: any) => ({ ...prev, ...payload.new }));
+        }
+      })
       .subscribe();
 
     return () => {
       isMounted = false;
       supabase.removeChannel(sub);
     };
-  }, [channel?.id, channel?.type, channel?.server_id]);
+  }, [channel?.id, channel?.type, channel?.server_id, currentUser?.id]);
 
   useEffect(() => {
     if (!channel?.id || channel?.type === 'voice') {
