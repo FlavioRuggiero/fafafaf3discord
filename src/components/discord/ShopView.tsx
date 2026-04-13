@@ -106,26 +106,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div className="max-w-5xl mx-auto">
-          
-          {/* Floral Banner */}
-          <div className="relative w-full rounded-2xl mb-8 overflow-hidden shadow-2xl flex items-center p-8 bg-gradient-to-br from-[#134e4a] via-[#166534] to-[#064e3b] border border-[#14532d]">
-            {/* Decorative Elements */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none select-none">
-              <div className="absolute -bottom-8 -left-8 text-[100px] opacity-80 transform -rotate-12 drop-shadow-2xl">🌿</div>
-              <div className="absolute -top-6 right-10 text-[80px] opacity-60 transform rotate-45 drop-shadow-2xl">🍃</div>
-              <div className="absolute -bottom-6 right-0 text-[90px] opacity-90 transform -rotate-12 drop-shadow-2xl">🌱</div>
-              <div className="absolute top-10 left-[30%] text-[50px] opacity-70 transform rotate-12 drop-shadow-xl">🌸</div>
-              <div className="absolute bottom-4 left-[60%] text-[60px] opacity-80 transform -rotate-12 drop-shadow-xl">🌺</div>
-              <div className="absolute top-6 right-[35%] text-[40px] opacity-60 transform rotate-45 drop-shadow-xl">✨</div>
-              <div className="absolute top-1/2 left-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(74,222,128,0.15)_0%,transparent_70%)] -translate-x-1/2 -translate-y-1/2"></div>
-            </div>
-            
-            <div className="relative z-10">
-              <h1 className="text-4xl md:text-5xl font-black text-white mb-3 drop-shadow-lg tracking-tight">Cardi E-Shop</h1>
-              <p className="text-green-100 font-medium drop-shadow-md text-lg max-w-xl">
-                La primavera è arrivata! Acquista personalizzazioni uniche e fai fiorire il tuo profilo.
-              </p>
-            </div>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">Cardi E-Shop</h1>
+            <p className="text-[#b5bac1]">Acquista personalizzazioni uniche per il tuo profilo.</p>
           </div>
 
           {/* Daily Reward Banner */}
