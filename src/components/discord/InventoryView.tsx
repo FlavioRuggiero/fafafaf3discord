@@ -125,15 +125,15 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                         
                         {/* Spunta equipaggiato (spostata a sinistra) */}
                         {isEquipped && (
-                          <div className="absolute top-3 left-3 bg-brand text-white p-1 rounded-full shadow-md z-10">
+                          <div className="absolute top-2 left-2 bg-brand text-white p-1 rounded-full shadow-md z-10">
                             <Check size={14} />
                           </div>
                         )}
 
-                        {/* Pulsante Vendi (in alto a destra) */}
+                        {/* Pulsante Vendi (nell'angolino in alto a destra, z-index basso per non coprire la preview) */}
                         <button 
                           onClick={() => setItemToSell(item)}
-                          className="absolute top-3 right-3 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2 py-1 rounded-md border border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-[60]"
+                          className="absolute top-2 right-2 flex items-center gap-1 bg-[#1e1f22] hover:bg-[#f23f43] text-[#f23f43] hover:text-white px-2 py-1 rounded-md border border-[#3f4147] hover:border-[#f23f43] transition-all shadow-sm z-30"
                           title="Vendi oggetto"
                         >
                           <DollarSign size={14} />
@@ -149,8 +149,8 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                               ))}
                             </div>
                             
-                            {/* Vista Hover (Tutte le emoji animate) */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-[#2b2d31] rounded-xl border-2 border-brand shadow-[0_0_30px_rgba(88,101,242,0.4)] grid grid-cols-4 gap-1.5 p-3 opacity-0 pointer-events-none group-hover/pack:opacity-100 group-hover/pack:pointer-events-auto transition-all duration-300 z-50 scale-50 group-hover/pack:scale-100">
+                            {/* Vista Hover (Tutte le emoji animate, z-index alto per coprire il pulsante vendi) */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-[#2b2d31] rounded-xl border-2 border-brand shadow-[0_0_30px_rgba(88,101,242,0.4)] grid grid-cols-4 gap-1.5 p-3 opacity-0 pointer-events-none group-hover/pack:opacity-100 group-hover/pack:pointer-events-auto transition-all duration-300 z-[60] scale-50 group-hover/pack:scale-100">
                               {item.emojis?.map((e, i) => (
                                 <div key={e} className="flex items-center justify-center opacity-0" style={{ animation: `pop-in-emoji 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards ${i * 30}ms` }}>
                                   <img src={e} className="w-full h-full object-contain drop-shadow-md hover:scale-125 transition-transform cursor-pointer" />
