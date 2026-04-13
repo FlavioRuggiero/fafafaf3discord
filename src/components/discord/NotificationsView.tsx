@@ -49,7 +49,6 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
   useEffect(() => {
     fetchNotifications();
 
-    // Ascolta i broadcast per aggiornare la lista quando arriva una nuova richiesta
     const tradeSub = supabase.channel(`active_trades_global_${currentUser.id}_notif`)
       .on('broadcast', { event: 'trade_request' }, () => {
         fetchNotifications();
@@ -72,23 +71,30 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
   };
 
   const handleAcceptTrade = async (tradeId: string, senderId: string) => {
+    // Rimuovi subito dalla UI per evitare doppi click
+    setTrades(prev => prev.filter(t => t.id !== tradeId));
+
     const { error } = await supabase.from('trades').update({ status: 'active' }).eq('id', tradeId);
     if (error) {
       showError("Errore durante l'accettazione dello scambio.");
+      fetchNotifications(); // Ripristina se fallisce
     } else {
       showSuccess("Scambio accettato!");
       onNavigateToTrade(tradeId);
-      // Notifica il mittente per aprire il modale istantaneamente
       sendBroadcast(senderId, 'trade_accepted', { trade_id: tradeId });
     }
   };
 
   const handleDeclineTrade = async (tradeId: string) => {
+    // Rimuovi subito dalla UI
+    setTrades(prev => prev.filter(t => t.id !== tradeId));
+
     const { error } = await supabase.from('trades').delete().eq('id', tradeId);
-    if (error) showError("Errore durante il rifiuto dello scambio.");
-    else {
+    if (error) {
+      showError("Errore durante il rifiuto dello scambio.");
+      fetchNotifications(); // Ripristina se fallisce
+    } else {
       showSuccess("Scambio rifiutato.");
-      fetchNotifications();
     }
   };
 

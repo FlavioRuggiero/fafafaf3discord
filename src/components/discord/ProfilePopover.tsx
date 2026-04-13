@@ -54,7 +54,6 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
     .filter(Boolean) as typeof SHOP_ITEMS)
     ?.sort((a, b) => b.price - a.price) || [];
 
-  // Helper per inviare il broadcast in tempo reale
   const sendBroadcast = (targetId: string, event: string, payload: any) => {
     const channel = supabase.channel(`active_trades_global_${targetId}`);
     channel.subscribe((status) => {
@@ -83,9 +82,9 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
         showError("Errore nell'accettazione dello scambio.");
       } else {
         showSuccess("Scambio accettato!");
-        // Notifica l'altro utente e te stesso per aprire il modale istantaneamente
         sendBroadcast(user.id, 'trade_accepted', { trade_id: existingTrade.id });
-        sendBroadcast(authUser.id, 'trade_accepted', { trade_id: existingTrade.id });
+        // Apri istantaneamente per te stesso tramite evento locale
+        window.dispatchEvent(new CustomEvent('open_trade', { detail: existingTrade.id }));
       }
     } else {
       const { error } = await supabase.from('trades').insert({
@@ -98,7 +97,6 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
         showError("Errore nell'invio della richiesta di scambio.");
       } else {
         showSuccess("Richiesta di scambio inviata!");
-        // Invia la notifica in tempo reale all'altro utente
         sendBroadcast(user.id, 'trade_request', {});
       }
     }

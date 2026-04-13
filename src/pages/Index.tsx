@@ -152,7 +152,7 @@ const Index = () => {
     };
   }, [currentUser?.id]);
 
-  // Listener per conteggio notifiche e scambi attivi tramite BROADCAST
+  // Listener per conteggio notifiche e scambi attivi
   useEffect(() => {
     if (!currentUser?.id) return;
     
@@ -183,17 +183,19 @@ const Index = () => {
     };
     fetchActiveTrade();
 
-    // Utilizziamo i Broadcast per una reattività istantanea senza dipendere dal realtime del database
     const tradeSub = supabase.channel(`active_trades_global_${userId}`)
-      .on('broadcast', { event: 'trade_request' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
         fetchNotificationCount();
-        playSound('/notifica.mp3');
-        showSuccess("Hai ricevuto una nuova richiesta di scambio!");
+        const { data } = await supabase.from('trades').select('status, sender_id, receiver_id').eq('id', payload.new.id).single();
+        if (data && data.status === 'active' && (data.sender_id === userId || data.receiver_id === userId)) {
+          setActiveTradeId(payload.new.id);
+        }
       })
-      .on('broadcast', { event: 'trade_accepted' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, (payload) => {
         fetchNotificationCount();
-        if (payload.payload?.trade_id) {
-          setActiveTradeId(payload.payload.trade_id);
+        if (payload.new.receiver_id === userId) {
+          playSound('/notifica.mp3');
+          showSuccess("Hai ricevuto una nuova richiesta di scambio!");
         }
       })
       .subscribe();
@@ -202,6 +204,15 @@ const Index = () => {
       supabase.removeChannel(tradeSub);
     };
   }, [currentUser?.id]);
+
+  // Event Listener locale per forzare l'apertura istantanea dello scambio
+  useEffect(() => {
+    const handleOpenTrade = (e: CustomEvent) => {
+      setActiveTradeId(e.detail);
+    };
+    window.addEventListener('open_trade', handleOpenTrade as EventListener);
+    return () => window.removeEventListener('open_trade', handleOpenTrade as EventListener);
+  }, []);
 
   // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
   const serverMembersList: User[] = serverProfiles.map(p => {
