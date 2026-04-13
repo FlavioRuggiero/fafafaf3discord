@@ -58,6 +58,22 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="explode-emoji e3">💥</div>
           </>
         )}
+
+        {activeDecoration === 'hands' && (
+          <>
+            <div className="hand-emoji h1">👋</div>
+            <div className="hand-emoji h2">👋</div>
+            <div className="hand-emoji h3">👋</div>
+          </>
+        )}
+
+        {activeDecoration === 'supernova' && (
+          <>
+            <div className="supernova-star s1"></div>
+            <div className="supernova-star s2"></div>
+            <div className="supernova-star s3"></div>
+          </>
+        )}
       </div>
     </div>
   );

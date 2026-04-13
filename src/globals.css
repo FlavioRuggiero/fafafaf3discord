@@ -173,7 +173,115 @@ body {
   margin-top: -7px;
   margin-left: -7px;
 }
-/* Raggio ridotto per evitare overflow */
 .explode-emoji.e1 { --tx: -20px; --ty: -20px; animation: explode-pop 0.6s infinite ease-out 0s; }
 .explode-emoji.e2 { --tx: 20px; --ty: -10px; animation: explode-pop 0.5s infinite ease-out 0.2s; }
 .explode-emoji.e3 { --tx: -10px; --ty: 20px; animation: explode-pop 0.7s infinite ease-out 0.4s; }
+
+/* NUOVI CONTORNI */
+
+/* 1. Nastro Pericolo */
+.dec-hazard {
+  position: relative;
+}
+.dec-hazard::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(#f0b232 0deg 30deg, #000000 30deg 60deg);
+  animation: spin-slow 5s linear infinite;
+  z-index: 0;
+}
+.dec-hazard img {
+  position: relative;
+  z-index: 1;
+  border: 2px solid #111214;
+}
+
+/* 2. Raggi Elettrici */
+.dec-rays {
+  position: relative;
+}
+.dec-rays::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(transparent 0deg, transparent 130deg, #ffffff 180deg, transparent 230deg, transparent 310deg, #ffffff 360deg);
+  filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 8px #0ff);
+  animation: spin-slow 1s linear infinite;
+  z-index: 0;
+}
+.dec-rays img {
+  position: relative;
+  z-index: 1;
+  border: 2px solid #111214;
+}
+
+/* 3. Mani Salutanti */
+.dec-hands {
+  border: 2px solid #5865F2;
+  position: relative;
+}
+@keyframes wave-animation {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-20deg); }
+  75% { transform: rotate(20deg); }
+}
+.hand-emoji {
+  position: absolute;
+  font-size: 14px;
+  z-index: 20;
+  animation: wave-animation 1s infinite ease-in-out;
+  transform-origin: bottom center;
+}
+.hand-emoji.h1 { top: -10px; left: 50%; margin-left: -7px; }
+.hand-emoji.h2 { bottom: -5px; left: -10px; }
+.hand-emoji.h3 { bottom: -5px; right: -10px; }
+
+/* 4. Supernova Cosmica (Premium) */
+.dec-supernova {
+  position: relative;
+  background: #000;
+}
+.dec-supernova::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(#ff0055, #ffaa00, #aa00ff, #00ffff, #ff0055);
+  filter: blur(5px);
+  animation: spin-slow 2s linear infinite;
+  z-index: 0;
+}
+.dec-supernova::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(transparent, #ffffff, transparent, #ffffff, transparent);
+  animation: spin-slow 1s linear infinite reverse;
+  z-index: 0;
+}
+.dec-supernova img {
+  position: relative;
+  z-index: 1;
+  border: 2px solid #111214;
+}
+@keyframes star-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.5); opacity: 1; box-shadow: 0 0 10px 4px #fff; }
+}
+.supernova-star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px 2px #0ff;
+  z-index: 20;
+  animation: star-pulse 1s infinite;
+}
+.supernova-star.s1 { top: -3px; left: 20%; animation-delay: 0s; }
+.supernova-star.s2 { bottom: 10%; right: -3px; animation-delay: 0.3s; }
+.supernova-star.s3 { top: 40%; left: -4px; animation-delay: 0.6s; }
