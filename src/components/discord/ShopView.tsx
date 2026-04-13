@@ -38,9 +38,23 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const [chestReward, setChestReward] = useState<ShopItem | null>(null);
   const [chestRefund, setChestRefund] = useState<number | null>(null);
   const [openingChestType, setOpeningChestType] = useState<'standard' | 'premium' | null>(null);
+  const [chestSettings, setChestSettings] = useState({ premium_multiplier: 2.0, rare_threshold: 100 });
 
   const today = new Date().toISOString().split('T')[0];
   const canClaimReward = currentUser?.last_reward_date !== today;
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data } = await supabase.from('chest_settings').select('*').eq('id', 1).single();
+      if (data) {
+        setChestSettings({
+          premium_multiplier: Number(data.premium_multiplier),
+          rare_threshold: Number(data.rare_threshold)
+        });
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Logica deterministica per la rotazione oraria sincronizzata
   useEffect(() => {
@@ -51,29 +65,23 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       const msPerHour = 1000 * 60 * 60;
       const hourSeed = Math.floor(now / msPerHour);
       
-      // Se l'ora è cambiata (o è il primo caricamento), ricalcoliamo gli oggetti
       if (hourSeed !== currentHourSeed) {
         currentHourSeed = hourSeed;
-        
-        // Generatore di numeri pseudo-casuali basato sul seed dell'ora
         let seed = hourSeed;
         const random = () => {
           const x = Math.sin(seed++) * 10000;
           return x - Math.floor(x);
         };
 
-        // Fisher-Yates shuffle deterministico
         const items = [...SHOP_ITEMS];
         for (let i = items.length - 1; i > 0; i--) {
           const j = Math.floor(random() * (i + 1));
           [items[i], items[j]] = [items[j], items[i]];
         }
         
-        // Prendiamo i primi 4
         setActiveItems(items.slice(0, 4));
       }
 
-      // Calcolo del countdown
       const nextHourTimestamp = (hourSeed + 1) * msPerHour;
       const diff = nextHourTimestamp - now;
       const minutes = Math.floor(diff / (1000 * 60));
@@ -152,22 +160,19 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     setOpeningChestType(type);
     playSound('/openingsound.mp3');
 
-    // Calcolo delle probabilità con curva esponenziale per rendere gli oggetti costosi molto rari
     let totalWeight = 0;
     const weightedItems = SHOP_ITEMS.map(item => {
-      // Peso base inversamente proporzionale al quadrato del prezzo
       let weight = 50000 / (item.price * item.price); 
       
-      // Il baule premium ha 2x di probabilità in più per gli oggetti rari (prezzo >= 100)
-      if (type === 'premium' && item.price >= 100) {
-        weight *= 2;
+      // Usa i valori dinamici dal database
+      if (type === 'premium' && item.price >= chestSettings.rare_threshold) {
+        weight *= chestSettings.premium_multiplier;
       }
       
       totalWeight += weight;
       return { item, weight };
     });
 
-    // Estrazione casuale
     let random = Math.random() * totalWeight;
     let selectedItem = SHOP_ITEMS[0];
     for (const { item, weight } of weightedItems) {
@@ -178,21 +183,18 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       }
     }
 
-    // Controllo se l'utente possiede già l'oggetto
     const isOwned = currentUser.purchased_decorations?.includes(selectedItem.id);
     let refund = 0;
     let newBalance = currentUser.digitalcardus - cost;
     let newPurchased = currentUser.purchased_decorations || [];
 
     if (isOwned) {
-      // Rimborso di 1/3 del valore dell'oggetto se già posseduto (arrotondato per eccesso)
       refund = Math.ceil(selectedItem.price / 3);
       newBalance += refund;
     } else {
       newPurchased = [...newPurchased, selectedItem.id];
     }
 
-    // Aggiornamento DB
     const { error } = await supabase.from('profiles').update({
       digitalcardus: newBalance,
       purchased_decorations: newPurchased
@@ -204,7 +206,6 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       return;
     }
 
-    // Mostra l'animazione e il premio dopo 1.5 secondi
     setTimeout(() => {
       if (isOwned) {
         playSound('/pullclone.mp3');
@@ -449,7 +450,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 </div>
                 
                 <h3 className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">Baule Premium</h3>
-                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">2x probabilità</strong> di trovare oggetti rari!</p>
+                <p className="text-sm text-[#b5bac1] mb-6">Contiene un oggetto casuale. <strong className="text-yellow-400">{chestSettings.premium_multiplier}x probabilità</strong> di trovare oggetti rari!</p>
                 
                 <button 
                   onClick={() => openChest('premium')}
