@@ -78,7 +78,11 @@ const Index = () => {
   const [unreadServers, setUnreadServers] = useState<Set<string>>(new Set());
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
   const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
-  const [notificationCount, setNotificationCount] = useState(0);
+  
+  // Calcolo dinamico delle notifiche
+  const [pendingTradeCount, setPendingTradeCount] = useState(0);
+  const today = new Date().toISOString().split('T')[0];
+  const notificationCount = (currentUser?.last_reward_date !== today ? 1 : 0) + pendingTradeCount;
 
   // Carica impostazioni notifiche
   useEffect(() => {
@@ -158,20 +162,12 @@ const Index = () => {
     
     const userId = currentUser.id;
 
-    const fetchNotificationCount = async () => {
-      const userRef = currentUserRef.current;
-      if (!userRef) return;
-
-      const today = new Date().toISOString().split('T')[0];
-      let count = userRef.last_reward_date !== today ? 1 : 0;
-
-      const { count: tradeCount } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('status', 'pending');
-      if (tradeCount) count += tradeCount;
-
-      setNotificationCount(count);
+    const fetchTradeCount = async () => {
+      const { count } = await supabase.from('trades').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('status', 'pending');
+      setPendingTradeCount(count || 0);
     };
 
-    fetchNotificationCount();
+    fetchTradeCount();
 
     const fetchActiveTrade = async () => {
       const { data } = await supabase.from('trades')
@@ -185,25 +181,28 @@ const Index = () => {
 
     const tradeSub = supabase.channel(`active_trades_global_${userId}`)
       .on('broadcast', { event: 'trade_request' }, () => {
-        fetchNotificationCount();
+        fetchTradeCount();
         playSound('/notifica.mp3');
         showSuccess("Hai ricevuto una nuova richiesta di scambio!");
       })
       .on('broadcast', { event: 'trade_accepted' }, (payload) => {
-        fetchNotificationCount();
+        fetchTradeCount();
         if (payload.payload?.trade_id) {
           setActiveTradeId(payload.payload.trade_id);
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
-        fetchNotificationCount();
+        fetchTradeCount();
         const { data } = await supabase.from('trades').select('status, sender_id, receiver_id').eq('id', payload.new.id).single();
         if (data && data.status === 'active' && (data.sender_id === userId || data.receiver_id === userId)) {
           setActiveTradeId(payload.new.id);
         }
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, (payload) => {
-        fetchNotificationCount();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, () => {
+        fetchTradeCount();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'trades' }, () => {
+        fetchTradeCount();
       })
       .subscribe();
 
