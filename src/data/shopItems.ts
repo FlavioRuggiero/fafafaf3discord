@@ -43,7 +43,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   { 
     id: 'privilege-upload', 
     name: 'Upload Esteso', 
-    price: 800, 
+    price: 500, 
     type: 'privilege', 
     category: 'Privilegi',
     description: 'Ti permette di inviare audio fino a 45 secondi e caricare immagini fino a 6MB in chat.'
@@ -51,7 +51,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   { 
     id: 'privilege-daily-bonus', 
     name: 'Bonus Giornaliero', 
-    price: 1000, 
+    price: 500, 
     type: 'privilege', 
     category: 'Privilegi',
     description: 'Ottieni un bonus del 20% sui guadagni in XP e Digitalcardus del premio giornaliero.'
