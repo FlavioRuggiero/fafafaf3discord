@@ -31,9 +31,60 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   const [theirProfile, setTheirProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Stato per la schermata di riepilogo
+  const [tradeResult, setTradeResult] = useState<{ received: string[], duplicates: string[], refund: number } | null>(null);
+  
   const syncChannelRef = useRef<any>(null);
+  const myProfileRef = useRef<any>(null);
 
-  const fetchTradeData = async () => {
+  useEffect(() => {
+    myProfileRef.current = myProfile;
+  }, [myProfile]);
+
+  const fetchAndUpdateTrade = async () => {
+    const { data } = await supabase.from('trades').select('*').eq('id', tradeId).single();
+    if (data) {
+      setTrade(data);
+      if (data.status === 'completed') {
+        setTradeResult(prev => {
+          if (prev) return prev; // Evita di ricalcolare se già fatto
+          
+          const profile = myProfileRef.current;
+          const isSender = data.sender_id === currentUser.id;
+          const myItems = isSender ? data.sender_items : data.receiver_items;
+          const theirItems = isSender ? data.receiver_items : data.sender_items;
+          
+          // Calcola l'inventario che avrò dopo aver dato via i miei oggetti
+          const inventoryAfterGiving = (profile?.purchased_decorations || []).filter((id: string) => !myItems.includes(id));
+
+          // Trova i doppioni e gli oggetti nuovi
+          const duplicates = theirItems.filter((id: string) => inventoryAfterGiving.includes(id));
+          const received = theirItems.filter((id: string) => !inventoryAfterGiving.includes(id));
+          
+          // Calcola il rimborso (metà del valore)
+          const refund = duplicates.reduce((acc: number, id: string) => {
+            const item = SHOP_ITEMS.find(i => i.id === id);
+            return acc + Math.floor((item?.price || 0) / 2);
+          }, 0);
+
+          showSuccess("Scambio completato con successo!");
+          return { received, duplicates, refund };
+        });
+      } else if (data.status === 'cancelled') {
+        showError("Lo scambio è stato annullato.");
+        onClose();
+      }
+    }
+  };
+
+  const notifyUpdate = async () => {
+    await fetchAndUpdateTrade();
+    if (syncChannelRef.current) {
+      syncChannelRef.current.send({ type: 'broadcast', event: 'trade_updated', payload: {} });
+    }
+  };
+
+  const fetchInitialData = async () => {
     const { data: tradeData } = await supabase.from('trades').select('*').eq('id', tradeId).single();
     if (!tradeData) {
       onClose();
@@ -53,22 +104,11 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   };
 
   useEffect(() => {
-    fetchTradeData();
+    fetchInitialData();
 
-    // Utilizziamo i Broadcast per una sincronizzazione istantanea all'interno del modale
     const channel = supabase.channel(`trade_sync_${tradeId}`);
-    channel.on('broadcast', { event: 'trade_updated' }, async () => {
-      const { data } = await supabase.from('trades').select('*').eq('id', tradeId).single();
-      if (data) {
-        setTrade(data);
-        if (data.status === 'completed') {
-          showSuccess("Scambio completato con successo!");
-          setTimeout(onClose, 2000);
-        } else if (data.status === 'cancelled') {
-          showError("Lo scambio è stato annullato.");
-          onClose();
-        }
-      }
+    channel.on('broadcast', { event: 'trade_updated' }, () => {
+      fetchAndUpdateTrade();
     }).subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         syncChannelRef.current = channel;
@@ -79,12 +119,6 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
       supabase.removeChannel(channel);
     };
   }, [tradeId, currentUser.id, onClose]);
-
-  const notifyUpdate = () => {
-    if (syncChannelRef.current) {
-      syncChannelRef.current.send({ type: 'broadcast', event: 'trade_updated', payload: {} });
-    }
-  };
 
   if (isLoading || !trade || !myProfile || !theirProfile) return null;
 
@@ -225,6 +259,62 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
     );
   };
 
+  // Se lo scambio è completato, mostra la schermata di riepilogo
+  if (tradeResult) {
+    return (
+      <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="bg-[#313338] rounded-xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-6 border-b border-[#1e1f22] bg-[#2b2d31] text-center">
+            <div className="w-16 h-16 bg-[#23a559]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-[#23a559]" />
+            </div>
+            <h2 className="text-2xl font-black text-white">Scambio Completato!</h2>
+            <p className="text-[#b5bac1] mt-2">La transazione è andata a buon fine.</p>
+          </div>
+
+          <div className="p-6 flex flex-col gap-6 bg-[#1e1f22] max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {tradeResult.received.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Oggetti Ricevuti</h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {tradeResult.received.map(id => renderItemCard(id, 'none', theirProfile))}
+                </div>
+              </div>
+            )}
+
+            {tradeResult.duplicates.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-[#f0b232] uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  Doppioni Venduti (+{tradeResult.refund} DC)
+                </h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 opacity-80">
+                  {tradeResult.duplicates.map(id => renderItemCard(id, 'none', theirProfile))}
+                </div>
+              </div>
+            )}
+
+            {tradeResult.received.length === 0 && tradeResult.duplicates.length === 0 && (
+              <div className="text-center text-[#949ba4] py-4">
+                Non hai ricevuto nessun oggetto in questo scambio.
+              </div>
+            )}
+          </div>
+
+          <div className="p-5 bg-[#2b2d31] border-t border-[#1e1f22] flex justify-center">
+            <button
+              onClick={onClose}
+              className="px-8 py-3 rounded-lg font-bold bg-[#5865F2] hover:bg-[#4752C4] text-white transition-all shadow-lg"
+            >
+              Chiudi
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Altrimenti mostra il tavolo di scambio
   return (
     <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-[#313338] rounded-xl w-full max-w-5xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
@@ -337,23 +427,15 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
         <div className="p-5 bg-[#2b2d31] border-t border-[#1e1f22] flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-2 text-[#949ba4] text-sm">
             <AlertCircle size={16} />
-            {trade.status === 'completed' ? (
-              <span className="text-[#23a559] font-bold">Scambio completato!</span>
-            ) : (
-              <span>Controlla bene gli oggetti prima di confermare.</span>
-            )}
+            <span>Controlla bene gli oggetti prima di confermare.</span>
           </div>
           <button 
             onClick={handleToggleAccept}
-            disabled={trade.status === 'completed'}
             className={`px-8 py-3 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 ${
-              trade.status === 'completed' ? 'bg-[#23a559] text-white opacity-50 cursor-not-allowed' :
               myAccepted ? 'bg-[#f23f43] hover:bg-[#da373c] text-white' : 'bg-[#5865F2] hover:bg-[#4752C4] text-white hover:-translate-y-0.5'
             }`}
           >
-            {trade.status === 'completed' ? (
-              <>Completato <Check size={18}/></>
-            ) : myAccepted ? (
+            {myAccepted ? (
               <>Annulla Conferma <X size={18}/></>
             ) : (
               <>Conferma Scambio <Check size={18}/></>
