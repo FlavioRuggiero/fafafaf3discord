@@ -263,6 +263,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const customEmojis = ownedEmojiPacks.flatMap((packId: string) => SHOP_ITEMS.find(i => i.id === packId)?.emojis || []);
   const allReactionEmojis = [...EMOJIS, ...customEmojis];
 
+  // Limiti di upload basati sui privilegi
+  const hasUploadPrivilege = currentUserProfile?.purchased_decorations?.includes('privilege-upload');
+  const maxImageSize = hasUploadPrivilege ? 6 * 1024 * 1024 : 2 * 1024 * 1024; // 6MB o 2MB
+  const maxAudioDuration = hasUploadPrivilege ? 45 : 15; // 45s o 15s
+
   // Funzioni per gestire il contentEditable
   const parseContentEditable = (element: HTMLElement): string => {
     let text = '';
@@ -935,8 +940,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const validateAndSetFile = (file: File) => {
     if (file.type.startsWith('image/')) {
-      if (file.size > 2 * 1024 * 1024) {
-        showError("L'immagine non può superare i 2MB.");
+      if (file.size > maxImageSize) {
+        showError(`L'immagine non può superare i ${hasUploadPrivilege ? '6MB' : '2MB'}.`);
         return;
       }
       setSelectedFile(file);
@@ -947,8 +952,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       const url = URL.createObjectURL(file);
       const audio = new Audio(url);
       audio.onloadedmetadata = () => {
-        if (audio.duration > 15) {
-          showError("L'audio non può superare i 15 secondi.");
+        if (audio.duration > maxAudioDuration + 0.5) { // Piccolo margine
+          showError(`L'audio non può superare i ${maxAudioDuration} secondi.`);
         } else {
           setSelectedFile(file);
           setFileType('audio');
@@ -1045,9 +1050,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prev => {
-          if (prev >= 14) {
+          if (prev >= maxAudioDuration - 1) {
             stopRecording();
-            return 15;
+            return maxAudioDuration;
           }
           return prev + 1;
         });
@@ -1874,7 +1879,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <div className="bg-[#2b2d31] p-6 rounded-xl flex flex-col items-center shadow-2xl pointer-events-none">
             <UploadCloud size={48} className="text-brand mb-4" />
             <h3 className="text-xl font-bold text-white">Trascina il file qui</h3>
-            <p className="text-[#b5bac1] mt-2">Rilascia per caricare un'immagine (max 2MB) o un audio (max 15s)</p>
+            <p className="text-[#b5bac1] mt-2">Rilascia per caricare un'immagine (max {hasUploadPrivilege ? '6MB' : '2MB'}) o un audio (max {hasUploadPrivilege ? '45s' : '15s'})</p>
           </div>
         </div>
       )}
@@ -2369,7 +2374,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             <div className="flex-1 flex items-center justify-between text-[#dbdee1] mb-1">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-[#f23f43] animate-pulse" />
-                <span className="font-medium">Registrazione in corso... {recordingTime}s / 15s</span>
+                <span className="font-medium">Registrazione in corso... {recordingTime}s / {maxAudioDuration}s</span>
               </div>
               <button onClick={stopRecording} className="p-1.5 bg-[#f23f43] hover:bg-[#da373c] text-white rounded-full transition-colors">
                 <Square size={16} fill="currentColor" />

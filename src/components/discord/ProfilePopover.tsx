@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
-import { Shield, Archive, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, Archive, ChevronDown, ChevronUp, Crown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
@@ -183,7 +183,18 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
                     <div className="grid grid-cols-2 gap-2">
                       {ownedItems.map(item => (
                         <div key={item.id} className="flex flex-col items-center bg-[#2b2d31] border border-[#1e1f22] rounded p-2 text-center">
-                          {item.type === 'emoji_pack' ? (
+                          {item.type === 'privilege' ? (
+                            <Tooltip delayDuration={0}>
+                              <TooltipTrigger asChild>
+                                <div className="w-10 h-10 flex items-center justify-center bg-[#1e1f22] rounded-full border border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)] mb-1.5 cursor-help">
+                                  <Crown size={20} className="text-yellow-500" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-xs max-w-[200px] text-center z-[99999]">
+                                {item.description}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : item.type === 'emoji_pack' ? (
                             <div className="w-10 h-10 grid grid-cols-2 gap-0.5 bg-[#1e1f22] p-1 rounded mb-1.5">
                               {item.emojis?.slice(0, 4).map(e => (
                                 <img key={e} src={e} className="w-full h-full object-contain" />

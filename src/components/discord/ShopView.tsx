@@ -94,7 +94,11 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       if (error) throw error;
       
       if (data && data.rewarded) {
-        showSuccess(`Hai ricevuto 3 Digitalcardus e 5 XP!`);
+        const earnedDc = data.earned_dc || 3;
+        const earnedXp = data.earned_xp || 5;
+        const bonusText = data.bonus_applied ? " (incluso bonus VIP del 20%!)" : "";
+        
+        showSuccess(`Hai ricevuto ${earnedDc} Digitalcardus e ${earnedXp} XP!${bonusText}`);
         if (data.leveled_up) {
           showSuccess(`🎉 Level Up! Sei salito al livello ${data.new_level}!`);
         }

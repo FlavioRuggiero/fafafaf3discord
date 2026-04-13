@@ -40,6 +40,22 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'Privilegi',
     description: 'Ti permette di caricare un\'immagine o una GIF personalizzata come banner del tuo profilo, anche se non sei Admin.'
   },
+  { 
+    id: 'privilege-upload', 
+    name: 'Upload Esteso', 
+    price: 800, 
+    type: 'privilege', 
+    category: 'Privilegi',
+    description: 'Ti permette di inviare audio fino a 45 secondi e caricare immagini fino a 6MB in chat.'
+  },
+  { 
+    id: 'privilege-daily-bonus', 
+    name: 'Bonus Giornaliero', 
+    price: 1000, 
+    type: 'privilege', 
+    category: 'Privilegi',
+    description: 'Ottieni un bonus del 20% sui guadagni in XP e Digitalcardus del premio giornaliero.'
+  },
 
   // Pacchetti Emoji
   { 
