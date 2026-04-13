@@ -663,23 +663,15 @@ body {
 .gustavo-trail.t1 { animation: gustavo-snap 3.5s infinite; animation-delay: 0.04s; opacity: 0.5; filter: blur(1px); }
 .gustavo-trail.t2 { animation: gustavo-snap 3.5s infinite; animation-delay: 0.08s; opacity: 0.2; filter: blur(3px); }
 
-/* Nuove icone orbitanti per Gustavo */
+/* Nuove icone orbitanti per Gustavo (8 icone) */
 @keyframes gustavo-orbit-z {
-  0% { transform: rotate(0deg); z-index: 25; }
-  24% { z-index: 25; }
-  25% { transform: rotate(90deg); z-index: 5; }
-  50% { transform: rotate(180deg); z-index: 5; }
-  74% { z-index: 5; }
-  75% { transform: rotate(270deg); z-index: 25; }
-  100% { transform: rotate(360deg); z-index: 25; }
-}
-
-@keyframes gustavo-counter-rotate {
-  0% { transform: rotate(0deg) scale(1.2); }
-  25% { transform: rotate(-90deg) scale(0.8); }
-  50% { transform: rotate(-180deg) scale(0.5); }
-  75% { transform: rotate(-270deg) scale(0.8); }
-  100% { transform: rotate(-360deg) scale(1.2); }
+  0% { transform: rotate(0deg); z-index: 5; }
+  24% { z-index: 5; }
+  25% { transform: rotate(90deg); z-index: 25; }
+  50% { transform: rotate(180deg); z-index: 25; }
+  74% { z-index: 25; }
+  75% { transform: rotate(270deg); z-index: 5; }
+  100% { transform: rotate(360deg); z-index: 5; }
 }
 
 .gustavo-orbit-wrapper {
@@ -693,22 +685,22 @@ body {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 25cqw;
-  height: 25cqw;
-  margin-left: -12.5cqw;
+  width: 35cqw;
+  height: 35cqw;
+  margin-left: -17.5cqw;
   background-image: url('/adrotto.png');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  opacity: 0.35;
+  opacity: 0.25;
   filter: drop-shadow(0 0 5px rgba(168, 85, 247, 0.5));
 }
 
-.gustavo-orbit-wrapper.o1 { animation: gustavo-orbit-z 3.5s infinite linear; }
-.gustavo-orbit-wrapper.o1 .gustavo-orbit-inner { animation: gustavo-counter-rotate 3.5s infinite linear; }
-
-.gustavo-orbit-wrapper.o2 { animation: gustavo-orbit-z 3.5s infinite linear -1.16s; }
-.gustavo-orbit-wrapper.o2 .gustavo-orbit-inner { animation: gustavo-counter-rotate 3.5s infinite linear -1.16s; }
-
-.gustavo-orbit-wrapper.o3 { animation: gustavo-orbit-z 3.5s infinite linear -2.33s; }
-.gustavo-orbit-wrapper.o3 .gustavo-orbit-inner { animation: gustavo-counter-rotate 3.5s infinite linear -2.33s; }
+.gustavo-orbit-wrapper.o1 { animation: gustavo-orbit-z 4s infinite linear; }
+.gustavo-orbit-wrapper.o2 { animation: gustavo-orbit-z 4s infinite linear -0.5s; }
+.gustavo-orbit-wrapper.o3 { animation: gustavo-orbit-z 4s infinite linear -1s; }
+.gustavo-orbit-wrapper.o4 { animation: gustavo-orbit-z 4s infinite linear -1.5s; }
+.gustavo-orbit-wrapper.o5 { animation: gustavo-orbit-z 4s infinite linear -2s; }
+.gustavo-orbit-wrapper.o6 { animation: gustavo-orbit-z 4s infinite linear -2.5s; }
+.gustavo-orbit-wrapper.o7 { animation: gustavo-orbit-z 4s infinite linear -3s; }
+.gustavo-orbit-wrapper.o8 { animation: gustavo-orbit-z 4s infinite linear -3.5s; }

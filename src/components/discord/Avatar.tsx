@@ -55,6 +55,11 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner"></div></div>
           <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner"></div></div>
           <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner"></div></div>
+          <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner"></div></div>
         </>
       )}
 
@@ -150,6 +155,11 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner"></div></div>
             <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner"></div></div>
             <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner"></div></div>
+            <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner"></div></div>
           </>
         )}
       </div>
