@@ -3,13 +3,11 @@
 import React, { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { User } from "@/types/discord";
-import { Shield, Archive, ChevronDown, ChevronUp, Crown, ArrowRightLeft } from "lucide-react";
+import { Shield, Archive, ChevronDown, ChevronUp, Crown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
 import { SHOP_ITEMS } from "@/data/shopItems";
-import { supabase } from "@/integrations/supabase/client";
-import { showError, showSuccess } from "@/utils/toast";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -37,9 +35,8 @@ const getThemeTextClass = (id: string) => {
 };
 
 export const ProfilePopover = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
-  const { user: authUser, adminId, moderatorIds } = useAuth();
+  const { adminId, moderatorIds } = useAuth();
   const [showInventory, setShowInventory] = useState(false);
-  const [isStartingTrade, setIsStartingTrade] = useState(false);
 
   if (!user) return <>{children}</>;
 
@@ -54,46 +51,6 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
     ?.map(id => SHOP_ITEMS.find(i => i.id === id))
     .filter(Boolean) as typeof SHOP_ITEMS)
     ?.sort((a, b) => b.price - a.price) || [];
-
-  const isMe = authUser?.id === user.id;
-
-  const handleStartTrade = async () => {
-    if (!authUser || isMe) return;
-    setIsStartingTrade(true);
-
-    try {
-      // Controlla se c'è già uno scambio in corso tra questi due utenti
-      const { data: existingTrade } = await supabase
-        .from('trades')
-        .select('id')
-        .eq('status', 'pending')
-        .or(`and(sender_id.eq.${authUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${authUser.id})`)
-        .maybeSingle();
-
-      if (existingTrade) {
-        showError("C'è già uno scambio in corso con questo utente!");
-        setIsStartingTrade(false);
-        return;
-      }
-
-      const { error } = await supabase.from('trades').insert({
-        sender_id: authUser.id,
-        receiver_id: user.id,
-        status: 'pending'
-      });
-
-      if (error) {
-        showError("Errore durante l'avvio dello scambio.");
-      } else {
-        showSuccess("Richiesta di scambio inviata!");
-      }
-    } catch (err) {
-      console.error(err);
-      showError("Si è verificato un errore imprevisto.");
-    } finally {
-      setIsStartingTrade(false);
-    }
-  };
   
   return (
     <Popover.Root>
@@ -202,20 +159,6 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Pulsante Scambio (Visibile solo se non è il proprio profilo) */}
-            {!isMe && (
-              <div className="mt-4 pt-4 border-t border-[#2b2d31]">
-                <button
-                  onClick={handleStartTrade}
-                  disabled={isStartingTrade}
-                  className="w-full flex items-center justify-center gap-2 bg-[#2b2d31] hover:bg-[#5865F2] text-white py-2 rounded transition-colors font-medium text-sm disabled:opacity-50"
-                >
-                  <ArrowRightLeft size={16} />
-                  {isStartingTrade ? 'Avvio in corso...' : 'Proponi Scambio'}
-                </button>
               </div>
             )}
 
