@@ -105,7 +105,8 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
     // Rimuovi subito dalla UI
     setTrades(prev => prev.filter(t => t.id !== tradeId));
 
-    const { error } = await supabase.from('trades').delete().eq('id', tradeId);
+    // Usa UPDATE status = 'cancelled' invece di DELETE per via dei permessi RLS
+    const { error } = await supabase.from('trades').update({ status: 'cancelled' }).eq('id', tradeId);
     if (error) {
       showError("Errore durante il rifiuto dello scambio.");
       fetchNotifications(); // Ripristina se fallisce
