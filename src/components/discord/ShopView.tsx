@@ -97,11 +97,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                       <div className="mb-6 mt-2 h-24 flex items-center justify-center">
                         <Avatar src={currentUser.avatar} decoration={item.id} className="w-20 h-20" />
                       </div>
-                      <h3 className={`font-bold mb-2 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
-                      <div className="flex items-center justify-center mb-4 bg-[#1e1f22] px-3 py-1 rounded-full">
-                        <img src="/digitalcardus.png" alt="Digitalcardus" className="w-3.5 h-3.5 mr-1.5 object-contain" />
-                        <span className="text-white font-medium text-sm">{item.price}</span>
-                      </div>
+                      <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
 
                       <div className="mt-auto w-full">
                         {isOwned ? (
@@ -112,13 +108,14 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                           <button 
                             onClick={() => handlePurchase(item)} 
                             disabled={isPurchasing || currentUser.digitalcardus < item.price}
-                            className={`w-full py-2 rounded font-medium transition-colors text-sm ${
+                            className={`w-full py-2 rounded font-medium transition-colors text-sm flex items-center justify-center ${
                               currentUser.digitalcardus < item.price 
                                 ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
                                 : 'bg-[#23a559] text-white hover:bg-[#1a7c43]'
                             }`}
                           >
-                            Acquista
+                            Acquista - {item.price}
+                            <img src="/digitalcardus.png" alt="Digitalcardus" className="w-3.5 h-3.5 ml-1.5 object-contain" />
                           </button>
                         )}
                       </div>
