@@ -71,6 +71,10 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           <div className="serpixel-snake s2"></div>
           <div className="serpixel-snake s3"></div>
           <div className="serpixel-snake s4"></div>
+          <div className="serpixel-snake s5"></div>
+          <div className="serpixel-snake s6"></div>
+          <div className="serpixel-snake s7"></div>
+          <div className="serpixel-snake s8"></div>
         </>
       )}
 
@@ -182,6 +186,10 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="serpixel-snake s2"></div>
             <div className="serpixel-snake s3"></div>
             <div className="serpixel-snake s4"></div>
+            <div className="serpixel-snake s5"></div>
+            <div className="serpixel-snake s6"></div>
+            <div className="serpixel-snake s7"></div>
+            <div className="serpixel-snake s8"></div>
           </>
         )}
       </div>

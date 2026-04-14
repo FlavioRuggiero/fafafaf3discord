@@ -743,20 +743,16 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(-360deg); }
 }
-@keyframes diamond-counter-cw {
-  0% { transform: translateX(-50%) rotate(45deg); }
-  100% { transform: translateX(-50%) rotate(-315deg); }
-}
-@keyframes diamond-counter-ccw {
-  0% { transform: translateX(-50%) rotate(45deg); }
-  100% { transform: translateX(-50%) rotate(405deg); }
+@keyframes diamond-spin {
+  0% { transform: translateX(-50%) rotate(0deg); }
+  100% { transform: translateX(-50%) rotate(360deg); }
 }
 
 .serpixel-diamond-wrapper.dw1 { animation: diamond-orbit-cw 3s infinite linear; }
-.serpixel-diamond-wrapper.dw1 .serpixel-diamond { animation: diamond-counter-cw 3s infinite linear; }
+.serpixel-diamond-wrapper.dw1 .serpixel-diamond { animation: diamond-spin 1s infinite linear; }
 
 .serpixel-diamond-wrapper.dw2 { animation: diamond-orbit-ccw 4s infinite linear; }
-.serpixel-diamond-wrapper.dw2 .serpixel-diamond { animation: diamond-counter-ccw 4s infinite linear; }
+.serpixel-diamond-wrapper.dw2 .serpixel-diamond { animation: diamond-spin 1.5s infinite linear reverse; }
 
 @keyframes snake-slither {
   0%, 100% { background-image: url('/serpe1.png'); }
@@ -775,25 +771,37 @@ body {
   animation: snake-slither 0.4s infinite step-end;
 }
 
-@keyframes snake-go-right {
-  0% { transform: translateX(-50%) scale(1) scaleX(1); z-index: 25; opacity: 0; bottom: -5cqw; }
-  10% { opacity: 1; }
-  45% { transform: translateX(calc(-50% + 40cqw)) scale(0.8) scaleX(1); z-index: 25; bottom: 10cqw; }
-  50% { transform: translateX(calc(-50% + 45cqw)) scale(0.7) scaleX(-1); z-index: 5; bottom: 15cqw; }
-  90% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 1; }
-  100% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 0; }
-}
+/* L'immagine base guarda a SINISTRA.
+   Quindi scaleX(1) = guarda a sinistra.
+   scaleX(-1) = guarda a destra. */
 
-@keyframes snake-go-left {
+@keyframes snake-go-right {
+  /* Davanti, va a destra -> guarda a destra (scaleX(-1)) */
   0% { transform: translateX(-50%) scale(1) scaleX(-1); z-index: 25; opacity: 0; bottom: -5cqw; }
   10% { opacity: 1; }
-  45% { transform: translateX(calc(-50% - 40cqw)) scale(0.8) scaleX(-1); z-index: 25; bottom: 10cqw; }
-  50% { transform: translateX(calc(-50% - 45cqw)) scale(0.7) scaleX(1); z-index: 5; bottom: 15cqw; }
+  45% { transform: translateX(calc(-50% + 40cqw)) scale(0.8) scaleX(-1); z-index: 25; bottom: 10cqw; }
+  /* Dietro, va a sinistra -> guarda a sinistra (scaleX(1)) */
+  50% { transform: translateX(calc(-50% + 45cqw)) scale(0.7) scaleX(1); z-index: 5; bottom: 15cqw; }
   90% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 20cqw; opacity: 1; }
   100% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 20cqw; opacity: 0; }
 }
 
+@keyframes snake-go-left {
+  /* Davanti, va a sinistra -> guarda a sinistra (scaleX(1)) */
+  0% { transform: translateX(-50%) scale(1) scaleX(1); z-index: 25; opacity: 0; bottom: -5cqw; }
+  10% { opacity: 1; }
+  45% { transform: translateX(calc(-50% - 40cqw)) scale(0.8) scaleX(1); z-index: 25; bottom: 10cqw; }
+  /* Dietro, va a destra -> guarda a destra (scaleX(-1)) */
+  50% { transform: translateX(calc(-50% - 45cqw)) scale(0.7) scaleX(-1); z-index: 5; bottom: 15cqw; }
+  90% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 0; }
+}
+
 .serpixel-snake.s1 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 0s; }
-.serpixel-snake.s2 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 2s; }
-.serpixel-snake.s3 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 4s; }
-.serpixel-snake.s4 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 6s; }
+.serpixel-snake.s2 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 1s; }
+.serpixel-snake.s3 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 2s; }
+.serpixel-snake.s4 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 3s; }
+.serpixel-snake.s5 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 4s; }
+.serpixel-snake.s6 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 5s; }
+.serpixel-snake.s7 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 6s; }
+.serpixel-snake.s8 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 7s; }
