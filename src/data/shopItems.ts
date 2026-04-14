@@ -56,6 +56,14 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'Privilegi',
     description: 'Ottieni un bonus del 20% sui guadagni in XP e Digitalcardus del premio giornaliero.'
   },
+  { 
+    id: 'privilege-entrance-audio', 
+    name: 'Entrata in scena', 
+    price: 500, 
+    type: 'privilege', 
+    category: 'Privilegi',
+    description: 'Permette di registrare o caricare un audio (max 2s) che verrà riprodotto quando entri in un canale vocale.'
+  },
 
   // Pacchetti Emoji
   { 

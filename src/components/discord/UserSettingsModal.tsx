@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, User as UserIcon, Upload, Headphones, Mic } from "lucide-react";
+import { X, User as UserIcon, Upload, Headphones, Mic, Sparkles, Square, Crown } from "lucide-react";
 import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
+import { CustomAudioPlayer } from "./CustomAudioPlayer";
+import { showError } from "@/utils/toast";
 
 interface UserSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: User | null;
-  onUpdate: (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined) => Promise<void>;
+  onUpdate: (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined, entranceAudioFile: File | Blob | null | undefined) => Promise<void>;
 }
 
 export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSettingsModalProps) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'audio'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'customization' | 'audio'>('profile');
   
   const [nickname, setNickname] = useState("");
   const [bio, setBio] = useState("");
@@ -22,6 +24,14 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
   
   const [bannerFile, setBannerFile] = useState<File | null | undefined>(undefined);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+
+  // Entrance Audio States
+  const [entranceAudioFile, setEntranceAudioFile] = useState<File | Blob | null | undefined>(undefined);
+  const [entranceAudioPreview, setEntranceAudioPreview] = useState<string | null>(null);
+  const [isRecordingEntrance, setIsRecordingEntrance] = useState(false);
+  const entranceMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const entranceRecordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const entranceAudioInputRef = useRef<HTMLInputElement>(null);
   
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -52,6 +62,10 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
       setAvatarFile(null);
       setBannerPreview(user.banner_url || null);
       setBannerFile(undefined);
+      setEntranceAudioPreview(user.entrance_audio_url || null);
+      setEntranceAudioFile(undefined);
+      setIsRecordingEntrance(false);
+      if (entranceRecordingTimeoutRef.current) clearTimeout(entranceRecordingTimeoutRef.current);
       setActiveTab('profile');
     }
   }, [user, isOpen]);
@@ -61,6 +75,7 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
   const isAdmin = user.global_role === 'ADMIN' || user.global_role === 'CREATOR';
   const hasBannerPrivilege = user.purchased_decorations?.includes('privilege-banner');
   const canEditBanner = isAdmin || hasBannerPrivilege;
+  const hasEntrancePrivilege = user.purchased_decorations?.includes('privilege-entrance-audio');
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -78,12 +93,66 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEntranceAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const tempUrl = URL.createObjectURL(file);
+      
+      const audio = new Audio(tempUrl);
+      audio.onloadedmetadata = () => {
+        if (audio.duration > 2.5) { // 2.5s limite per dare un leggero margine
+          showError("L'audio di entrata può durare massimo 2 secondi.");
+          if (entranceAudioInputRef.current) entranceAudioInputRef.current.value = '';
+        } else {
+          setEntranceAudioFile(file);
+          setEntranceAudioPreview(tempUrl);
+        }
+      };
+    }
+  };
+
+  const startRecordingEntrance = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      entranceMediaRecorderRef.current = mediaRecorder;
+      const chunks: BlobPart[] = [];
+      
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setEntranceAudioFile(blob);
+        setEntranceAudioPreview(URL.createObjectURL(blob));
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecordingEntrance(true);
+
+      entranceRecordingTimeoutRef.current = setTimeout(() => {
+        stopRecordingEntrance();
+      }, 2000); // 2 secondi max
+      
+    } catch (err) {
+      console.error("Accesso al microfono negato", err);
+      showError("Impossibile accedere al microfono.");
+    }
+  };
+
+  const stopRecordingEntrance = () => {
+    if (entranceRecordingTimeoutRef.current) {
+      clearTimeout(entranceRecordingTimeoutRef.current);
+    }
+    entranceMediaRecorderRef.current?.stop();
+    setIsRecordingEntrance(false);
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!nickname.trim()) return;
     
     setIsUpdating(true);
-    await onUpdate(nickname.trim(), bio.trim(), avatarFile, bannerColor, bannerFile);
+    await onUpdate(nickname.trim(), bio.trim(), avatarFile, bannerColor, bannerFile, entranceAudioFile);
     setIsUpdating(false);
   };
 
@@ -103,6 +172,12 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
               className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'profile' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
             >
               Profilo
+            </button>
+            <button 
+              onClick={() => setActiveTab('customization')} 
+              className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'customization' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+            >
+              Personalizzazione
             </button>
             <button 
               onClick={() => setActiveTab('audio')} 
@@ -233,6 +308,93 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
                   <button 
                     type="submit" 
                     form="user-settings-form" 
+                    disabled={isUpdating} 
+                    className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdating ? 'Salvataggio...' : 'Salva modifiche'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'customization' && (
+              <div className="animate-in fade-in duration-200">
+                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <Sparkles size={24} />
+                  Personalizzazione
+                </h2>
+                
+                <div className="bg-[#2b2d31] rounded-lg p-6 border border-[#1e1f22] mb-6">
+                  <h3 className="text-white font-bold mb-2">Audio di Entrata in Scena</h3>
+                  <p className="text-[#b5bac1] text-sm mb-4">
+                    Imposta un audio personalizzato che verrà riprodotto per tutti quando entri in un canale vocale. (Max 2 secondi)
+                  </p>
+                  
+                  {hasEntrancePrivilege ? (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button 
+                          type="button" 
+                          disabled={isUpdating || isRecordingEntrance}
+                          onClick={() => entranceAudioInputRef.current?.click()}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-[#1e1f22] hover:bg-[#35373c] text-[#dbdee1] transition-colors disabled:opacity-50"
+                        >
+                          <Upload size={16} /> Carica Audio
+                        </button>
+                        <button 
+                          type="button" 
+                          disabled={isUpdating}
+                          onClick={isRecordingEntrance ? stopRecordingEntrance : startRecordingEntrance}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 ${
+                            isRecordingEntrance 
+                              ? 'bg-[#f23f43] hover:bg-[#da373c] text-white animate-pulse' 
+                              : 'bg-[#1e1f22] hover:bg-[#35373c] text-[#dbdee1]'
+                          }`}
+                        >
+                          {isRecordingEntrance ? <Square size={16} /> : <Mic size={16} />}
+                          {isRecordingEntrance ? 'Ferma (Auto tra 2s)' : 'Registra Audio'}
+                        </button>
+                        <input 
+                          type="file" 
+                          ref={entranceAudioInputRef} 
+                          className="hidden" 
+                          accept="audio/*" 
+                          onChange={handleEntranceAudioFileChange} 
+                        />
+                      </div>
+
+                      {entranceAudioPreview && (
+                        <div className="flex items-center gap-2 mt-3 bg-[#1e1f22] p-2 rounded-md border border-[#3f4147]">
+                          <div className="flex-1 min-w-0">
+                            <CustomAudioPlayer src={entranceAudioPreview} />
+                          </div>
+                          <button 
+                            type="button" 
+                            disabled={isUpdating}
+                            onClick={() => { setEntranceAudioFile(null); setEntranceAudioPreview(null); }} 
+                            className="p-2 text-[#f23f43] hover:bg-[#f23f43]/10 rounded transition-colors disabled:opacity-50 flex-shrink-0"
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-[#1e1f22] p-4 rounded-md border border-[#3f4147] flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                        <Crown className="text-yellow-500" size={24} />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-bold text-sm">Privilegio Richiesto</h4>
+                        <p className="text-[#949ba4] text-xs mt-1">Devi acquistare il privilegio "Entrata in scena" nel Cardi E-Shop per sbloccare questa funzione.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <button 
+                    onClick={() => handleSubmit()}
                     disabled={isUpdating} 
                     className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium px-6 py-2 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >

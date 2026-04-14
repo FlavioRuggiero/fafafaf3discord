@@ -82,8 +82,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
   // --- GLOBAL VOICE CHANNEL STATE ---
   const [activeVoiceChannelName, setActiveVoiceChannelName] = useState<string>("");
-  const [vcMembers, setVcMembers] = useState<string[]>([]);
-  const prevVcMembersRef = useRef<string[]>([]);
+  const [vcMembers, setVcMembers] = useState<{id: string, audio: string | null}[]>([]);
+  const prevVcMembersRef = useRef<{id: string, audio: string | null}[]>([]);
   const isInitialVcLoad = useRef(true);
 
   useEffect(() => {
@@ -110,7 +110,21 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         .eq('voice_channel_id', activeVoiceChannelId);
       
       if (isMounted && data) {
-        setVcMembers(data.map(d => d.user_id));
+        const userIds = data.map(d => d.user_id);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, entrance_audio_url')
+            .in('id', userIds);
+            
+          const membersWithAudio = data.map(d => ({
+            id: d.user_id,
+            audio: profiles?.find(p => p.id === d.user_id)?.entrance_audio_url || null
+          }));
+          setVcMembers(membersWithAudio);
+        } else {
+          setVcMembers([]);
+        }
       }
     };
 
@@ -149,16 +163,17 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       return;
     }
 
-    const currentIds = new Set(vcMembers);
-    const prevIds = new Set(prevVcMembersRef.current);
+    const currentIds = new Map(vcMembers.map(m => [m.id, m.audio]));
+    const prevIds = new Map(prevVcMembersRef.current.map(m => [m.id, m.audio]));
 
-    currentIds.forEach(id => {
+    currentIds.forEach((audio, id) => {
       if (!prevIds.has(id) && id !== currentUser.id) {
-        playSound('/enter.mp3');
+        if (audio) playSound(audio);
+        else playSound('/enter.mp3');
       }
     });
 
-    prevIds.forEach(id => {
+    prevIds.forEach((audio, id) => {
       if (!currentIds.has(id) && id !== currentUser.id) {
         playSound('/exit.mp3');
       }
@@ -734,7 +749,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             <div 
               className={`absolute inset-0 transition-opacity duration-300 ${activeChannelId === 'shop' ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}`}
               style={{
-                backgroundImage: `linear-gradient(to left, rgba(35, 165, 89, 0.3), transparent), url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23166534' fill-opacity='0.15'%3E%3Cpath d='M40,20 C60,20 70,40 70,60 C50,60 40,40 40,20 Z' transform='rotate(15 55 40)'/%3E%3Cpath d='M140,30 Q160,10 170,40 Q150,60 140,30 Z' transform='rotate(-25 155 35)'/%3E%3Cpath d='M30,130 C40,110 60,120 70,140 C80,160 50,170 30,130 Z' transform='rotate(45 50 140)'/%3E%3Cpath d='M150,140 C170,140 180,160 180,180 C160,180 150,160 150,140 Z' transform='rotate(-60 165 160)'/%3E%3Cpath d='M90,90 Q100,80 110,95 Q95,105 90,90 Z' transform='rotate(10 100 92)'/%3E%3C/g%3E%3C/svg%3E")`,
+                backgroundImage: `linear-gradient(to left, rgba(35, 165, 89, 0.3), transparent), url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23166534' fill-opacity='0.15'%3E%3Cpath d='M40,20 C60,20 70,40 70,60 C50,60 40,40 40,20 Z' transform='rotate(15 55 40)'/%3E%3Cpath d='M140,30 Q160,10 170,40 Q150,60 140,30 Z' transform='rotate(-25 155 35)'/%3E%3Cpath d='M30,130 C40,110 60,120 70,140 C80,160 50,170 30,130 Z' transform='rotate(45 50 140)'/%3E%3Cpath d='M150,140 C170,140 180,160 180,180 C160,180 150,140 Z' transform='rotate(-60 165 160)'/%3E%3Cpath d='M90,90 Q100,80 110,95 Q95,105 90,90 Z' transform='rotate(10 100 92)'/%3E%3C/g%3E%3C/svg%3E")`,
                 backgroundSize: 'auto, 100px 100px'
               }}
             ></div>

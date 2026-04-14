@@ -404,7 +404,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       setSpeakingStates(prev => {
         if (!!prev[currentUserId] === isSpeaking) return prev;
-        return { ...prev, [currentUserId]: isSpeaking };
+        return { ...prev, [currentUserId] };
       });
 
       animationFrameId = requestAnimationFrame(checkVolume);
@@ -772,7 +772,11 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
         }
       }
       
-      playSound('/enter.mp3');
+      if (currentUser.entrance_audio_url) {
+        playSound(currentUser.entrance_audio_url);
+      } else {
+        playSound('/enter.mp3');
+      }
 
       setActiveVoiceChannelId(channelId);
       setActiveServerId(serverId);

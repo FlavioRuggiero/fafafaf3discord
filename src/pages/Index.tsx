@@ -290,7 +290,8 @@ const Index = () => {
       xp: p.xp || 0,
       server_roles: userRoles,
       avatar_decoration: p.avatar_decoration || null,
-      purchased_decorations: p.purchased_decorations || []
+      purchased_decorations: p.purchased_decorations || [],
+      entrance_audio_url: p.entrance_audio_url || null
     };
   });
 
@@ -382,7 +383,8 @@ const Index = () => {
             global_role: role,
             last_reward_date: updatedProfile.last_reward_date, // Accetta null
             avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
-            purchased_decorations: updatedProfile.purchased_decorations || []
+            purchased_decorations: updatedProfile.purchased_decorations || [],
+            entrance_audio_url: updatedProfile.entrance_audio_url || null
           };
         });
       })
@@ -448,7 +450,8 @@ const Index = () => {
         xp: profile?.xp || 0,
         last_reward_date: profile?.last_reward_date || null,
         avatar_decoration: profile?.avatar_decoration || null,
-        purchased_decorations: profile?.purchased_decorations || []
+        purchased_decorations: profile?.purchased_decorations || [],
+        entrance_audio_url: profile?.entrance_audio_url || null
       };
       
       setCurrentUser(loadedUser);
@@ -820,24 +823,12 @@ const Index = () => {
     setIsUpdatingServer(false);
   };
 
-  const handleDeleteServer = async (id: string) => {
-    const { data, error } = await supabase.from('servers').delete().eq('id', id).select();
-    if (error || !data || data.length === 0) {
-      showError("Impossibile eliminare il server");
-      return;
-    }
-    setServers(servers.filter(s => s.id !== id));
-    setAllChannels(allChannels.filter(c => c.server_id !== id));
-    setActiveServerId('home');
-    setShowSettingsModal(false);
-    showSuccess("Server eliminato!");
-  };
-
-  const handleUpdateProfile = async (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined) => {
+  const handleUpdateProfile = async (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined, entranceAudioFile: File | Blob | null | undefined) => {
     if (!currentUser) return;
 
     let avatar_url = currentUser.avatar;
     let banner_url = currentUser.banner_url;
+    let entrance_audio_url = currentUser.entrance_audio_url;
 
     if (avatarFile) {
       const fileExt = avatarFile.name.split('.').pop();
@@ -863,6 +854,20 @@ const Index = () => {
       }
     }
 
+    if (entranceAudioFile !== undefined) {
+      if (entranceAudioFile === null) {
+        entrance_audio_url = null;
+      } else {
+        const fileExt = entranceAudioFile instanceof File ? entranceAudioFile.name.split('.').pop() : 'webm';
+        const filePath = `entrance_audios/${currentUser.id}_${Math.random()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, entranceAudioFile);
+        if (!uploadError) {
+          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+          entrance_audio_url = data.publicUrl;
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update({ 
@@ -870,7 +875,8 @@ const Index = () => {
         bio: bio,
         avatar_url: avatar_url,
         banner_color: bannerColor,
-        banner_url: banner_url || null
+        banner_url: banner_url || null,
+        entrance_audio_url: entrance_audio_url || null
       })
       .eq('id', currentUser.id);
 
@@ -885,7 +891,8 @@ const Index = () => {
       bio: bio,
       avatar: avatar_url,
       banner_color: bannerColor,
-      banner_url: banner_url
+      banner_url: banner_url,
+      entrance_audio_url: entrance_audio_url
     });
     showSuccess("Profilo aggiornato con successo!");
     setShowUserSettingsModal(false);

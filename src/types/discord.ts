@@ -38,6 +38,7 @@ export type User = {
   last_reward_date?: string | null;
   avatar_decoration?: string | null;
   purchased_decorations?: string[];
+  entrance_audio_url?: string | null;
 };
 
 export type Server = {
@@ -87,6 +88,7 @@ export type Profile = {
   last_reward_date?: string | null;
   avatar_decoration?: string | null;
   purchased_decorations?: string[];
+  entrance_audio_url?: string | null;
 };
 
 export type ServerMember = {
