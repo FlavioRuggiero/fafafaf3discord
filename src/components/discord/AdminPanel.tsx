@@ -224,7 +224,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         <div className="p-4 flex-1 overflow-hidden flex flex-col">
           
           {activeTab === 'chests' && (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col flex-1 min-h-0">
               <div className="flex-shrink-0 bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22] mb-4">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Settings2 size={18} className="text-brand"/> Parametri Bauli</h3>
                 
