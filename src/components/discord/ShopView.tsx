@@ -234,7 +234,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           25% { transform: rotate(-5deg) scale(1.05); }
           50% { transform: rotate(5deg) scale(1.05); }
           75% { transform: rotate(-5deg) scale(1.05); }
-          100% { transform: rotate(0deg) scale(1); }
+          100% { rotate(0deg) scale(1); }
         }
         .animate-chest-shake {
           animation: chest-shake 0.5s ease-in-out infinite;
@@ -329,7 +329,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 const isOwned = currentUser.purchased_decorations?.includes(item.id);
 
                 return (
-                  <div key={item.id} className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147] group">
+                  <div key={item.id} className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147] group hover:z-50">
                     
                     {/* Badge Categoria */}
                     <div className="absolute top-3 left-3 bg-[#1e1f22] text-[#949ba4] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border border-[#3f4147]/50 shadow-sm">
