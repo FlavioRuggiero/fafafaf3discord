@@ -404,7 +404,7 @@ export const VoiceChannelProvider: React.FC<VoiceChannelProviderProps> = ({ chil
 
       setSpeakingStates(prev => {
         if (!!prev[currentUserId] === isSpeaking) return prev;
-        return { ...prev, [currentUserId] };
+        return { ...prev, [currentUserId]: isSpeaking };
       });
 
       animationFrameId = requestAnimationFrame(checkVolume);
