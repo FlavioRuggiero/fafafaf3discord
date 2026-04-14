@@ -19,7 +19,13 @@ import { SHOP_ITEMS } from "@/data/shopItems";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "🎉"];
 
-type LocalMessage = Message & { rawCreatedAt?: string; updatedAt?: string };
+type LocalUser = User & {
+  welcome_text?: string;
+  welcome_bg_color?: string;
+  welcome_border_color?: string;
+};
+
+type LocalMessage = Omit<Message, 'user'> & { rawCreatedAt?: string; updatedAt?: string; user: LocalUser };
 
 const StreamPlayer = ({ stream, isLocal, className, volume = 1, isDeafened = false }: { stream: MediaStream; isLocal?: boolean; className?: string; volume?: number; isDeafened?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -386,7 +392,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setCurrentUser(session.user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations')
+          .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color')
           .eq('id', session.user.id)
           .single();
         setCurrentUserProfile(profile);
@@ -529,7 +535,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           created_at,
           updated_at,
           user_id,
-          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations)
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
         `)
         .eq('channel_id', channel.id)
         .order('created_at', { ascending: true });
@@ -542,7 +548,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             content,
             created_at,
             user_id,
-            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations)
+            profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
           `)
           .eq('channel_id', channel.id)
           .order('created_at', { ascending: true });
@@ -588,7 +594,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               global_role: role,
               status: "online" as const,
               avatar_decoration: m.profiles?.avatar_decoration || null,
-              purchased_decorations: m.profiles?.purchased_decorations || []
+              purchased_decorations: m.profiles?.purchased_decorations || [],
+              welcome_text: m.profiles?.welcome_text,
+              welcome_bg_color: m.profiles?.welcome_bg_color,
+              welcome_border_color: m.profiles?.welcome_border_color
             }
           };
         });
@@ -634,7 +643,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations')
+          .select('id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color')
           .eq('id', payload.new.user_id)
           .single();
           
@@ -666,7 +675,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             global_role: role,
             status: "online",
             avatar_decoration: profileData?.avatar_decoration || null,
-            purchased_decorations: profileData?.purchased_decorations || []
+            purchased_decorations: profileData?.purchased_decorations || [],
+            welcome_text: profileData?.welcome_text,
+            welcome_bg_color: profileData?.welcome_bg_color,
+            welcome_border_color: profileData?.welcome_border_color
           }
         };
         
@@ -740,7 +752,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 xp: updatedProfile.xp || 0,
                 global_role: role,
                 avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
-                purchased_decorations: updatedProfile.purchased_decorations || []
+                purchased_decorations: updatedProfile.purchased_decorations || [],
+                welcome_text: updatedProfile.welcome_text !== undefined ? updatedProfile.welcome_text : m.user.welcome_text,
+                welcome_bg_color: updatedProfile.welcome_bg_color !== undefined ? updatedProfile.welcome_bg_color : m.user.welcome_bg_color,
+                welcome_border_color: updatedProfile.welcome_border_color !== undefined ? updatedProfile.welcome_border_color : m.user.welcome_border_color
               }
             };
           }
@@ -1236,7 +1251,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             global_role: role,
             status: "online",
             avatar_decoration: currentUserProfile?.avatar_decoration || null,
-            purchased_decorations: currentUserProfile?.purchased_decorations || []
+            purchased_decorations: currentUserProfile?.purchased_decorations || [],
+            welcome_text: currentUserProfile?.welcome_text,
+            welcome_bg_color: currentUserProfile?.welcome_bg_color,
+            welcome_border_color: currentUserProfile?.welcome_border_color
           }
         };
         
@@ -1993,10 +2011,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                     </button>
                   </div>
                 )}
-                <div className="flex items-center gap-2 text-[#949ba4] bg-[#2b2d31] px-4 py-2 rounded-full border border-[#1e1f22] shadow-sm">
+                <div 
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm"
+                  style={{
+                    backgroundColor: msg.user.welcome_bg_color || '#2b2d31',
+                    borderColor: msg.user.welcome_border_color || '#1e1f22',
+                    color: '#949ba4'
+                  }}
+                >
                   <span className="text-xl">👋</span>
                   <span className="flex items-center">
-                    <ProfilePopover user={getUserWithRoles(msg.user)}>
+                    <ProfilePopover user={getUserWithRoles(msg.user as User)}>
                       <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline mr-1.5">{msg.user.name}</span>
                     </ProfilePopover>
                     {msg.user.id === adminId && (
@@ -2019,7 +2044,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                         </TooltipContent>
                       </Tooltip>
                     )}
-                    <span>è appena entrato nel server!</span>
+                    <span className="text-[#dbdee1]">{msg.user.welcome_text || 'è appena entrato nel server!'}</span>
                   </span>
                   <span className="text-[10px] ml-2 opacity-50">{msg.timestamp}</span>
                 </div>
@@ -2146,7 +2171,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
               <div className="flex items-start">
                 {!isSameUserAsPrevious || isEditing ? (
-                  <ProfilePopover user={getUserWithRoles(msg.user)}>
+                  <ProfilePopover user={getUserWithRoles(msg.user as User)}>
                     <Avatar src={msg.user.avatar} decoration={msg.user.avatar_decoration} alt={msg.user.name} className="w-10 h-10 mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
                   </ProfilePopover>
                 ) : (
@@ -2158,7 +2183,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                 <div className="flex-1 min-w-0">
                   {(!isSameUserAsPrevious || isEditing) && (
                     <div className="flex items-center min-w-0 mb-0.5">
-                      <ProfilePopover user={getUserWithRoles(msg.user)}>
+                      <ProfilePopover user={getUserWithRoles(msg.user as User)}>
                         <span className="font-medium text-[#dbdee1] mr-1.5 cursor-pointer hover:underline truncate">{msg.user.name}</span>
                       </ProfilePopover>
                       {msg.user.id === adminId && (
