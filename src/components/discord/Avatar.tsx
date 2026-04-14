@@ -63,6 +63,17 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         </>
       )}
 
+      {activeDecoration === 'serpixel-agitato' && !clipEffects && (
+        <>
+          <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond d1"></div></div>
+          <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond d2"></div></div>
+          <div className="serpixel-snake s1"></div>
+          <div className="serpixel-snake s2"></div>
+          <div className="serpixel-snake s3"></div>
+          <div className="serpixel-snake s4"></div>
+        </>
+      )}
+
       <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
       
       {/* Se clipEffects è true (es. nel UserPanel in basso), intrappoliamo le particelle nel cerchio per non sballare il layout */}
@@ -160,6 +171,17 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner"></div></div>
             <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner"></div></div>
             <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner"></div></div>
+          </>
+        )}
+
+        {activeDecoration === 'serpixel-agitato' && clipEffects && (
+          <>
+            <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond d1"></div></div>
+            <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond d2"></div></div>
+            <div className="serpixel-snake s1"></div>
+            <div className="serpixel-snake s2"></div>
+            <div className="serpixel-snake s3"></div>
+            <div className="serpixel-snake s4"></div>
           </>
         )}
       </div>

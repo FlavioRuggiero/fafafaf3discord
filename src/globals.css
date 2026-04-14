@@ -90,6 +90,12 @@ body {
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
 }
+.theme-text-serpixel-agitato {
+  background: linear-gradient(90deg, #22c55e, #10b981);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+}
 
 /* =========================================
    AVATAR DECORATIONS (SCALABILI CON CQW)
@@ -704,3 +710,90 @@ body {
 .gustavo-orbit-wrapper.o6 { animation: gustavo-orbit-z 4s infinite linear -2.5s; }
 .gustavo-orbit-wrapper.o7 { animation: gustavo-orbit-z 4s infinite linear -3s; }
 .gustavo-orbit-wrapper.o8 { animation: gustavo-orbit-z 4s infinite linear -3.5s; }
+
+/* 9. Serpixel Agitato (Premium) */
+.dec-serpixel-agitato {
+  border: 2px solid #22c55e;
+  box-shadow: 0 0 10px #22c55e, inset 0 0 10px #22c55e;
+  position: relative;
+}
+
+.serpixel-diamond-wrapper {
+  position: absolute;
+  inset: -15%;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.serpixel-diamond {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 10cqw;
+  height: 10cqw;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+@keyframes diamond-orbit-cw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes diamond-orbit-ccw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+@keyframes diamond-counter-cw {
+  0% { transform: translateX(-50%) rotate(45deg); }
+  100% { transform: translateX(-50%) rotate(-315deg); }
+}
+@keyframes diamond-counter-ccw {
+  0% { transform: translateX(-50%) rotate(45deg); }
+  100% { transform: translateX(-50%) rotate(405deg); }
+}
+
+.serpixel-diamond-wrapper.dw1 { animation: diamond-orbit-cw 3s infinite linear; }
+.serpixel-diamond-wrapper.dw1 .serpixel-diamond { animation: diamond-counter-cw 3s infinite linear; }
+
+.serpixel-diamond-wrapper.dw2 { animation: diamond-orbit-ccw 4s infinite linear; }
+.serpixel-diamond-wrapper.dw2 .serpixel-diamond { animation: diamond-counter-ccw 4s infinite linear; }
+
+@keyframes snake-slither {
+  0%, 100% { background-image: url('/serpe1.png'); }
+  33% { background-image: url('/serpe2.png'); }
+  66% { background-image: url('/serpe3.png'); }
+}
+
+.serpixel-snake {
+  position: absolute;
+  width: 30cqw;
+  height: 30cqw;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  pointer-events: none;
+  animation: snake-slither 0.4s infinite step-end;
+}
+
+@keyframes snake-go-right {
+  0% { transform: translateX(-50%) scale(1) scaleX(1); z-index: 25; opacity: 0; bottom: -5cqw; }
+  10% { opacity: 1; }
+  45% { transform: translateX(calc(-50% + 40cqw)) scale(0.8) scaleX(1); z-index: 25; bottom: 10cqw; }
+  50% { transform: translateX(calc(-50% + 45cqw)) scale(0.7) scaleX(-1); z-index: 5; bottom: 15cqw; }
+  90% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 0; }
+}
+
+@keyframes snake-go-left {
+  0% { transform: translateX(-50%) scale(1) scaleX(-1); z-index: 25; opacity: 0; bottom: -5cqw; }
+  10% { opacity: 1; }
+  45% { transform: translateX(calc(-50% - 40cqw)) scale(0.8) scaleX(-1); z-index: 25; bottom: 10cqw; }
+  50% { transform: translateX(calc(-50% - 45cqw)) scale(0.7) scaleX(1); z-index: 5; bottom: 15cqw; }
+  90% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 20cqw; opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 20cqw; opacity: 0; }
+}
+
+.serpixel-snake.s1 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 0s; }
+.serpixel-snake.s2 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 2s; }
+.serpixel-snake.s3 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 4s; }
+.serpixel-snake.s4 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 6s; }

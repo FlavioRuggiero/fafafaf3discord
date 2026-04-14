@@ -21,6 +21,7 @@ const getThemeTextClass = (id: string) => {
     case 'oceanic': return 'theme-text-oceanic';
     case 'saturn-fire': return 'theme-text-saturn-fire';
     case 'gustavo-armando': return 'theme-text-gustavo';
+    case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
     default: return 'text-white';
   }
 };

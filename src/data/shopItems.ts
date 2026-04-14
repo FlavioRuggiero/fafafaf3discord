@@ -30,6 +30,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'oceanic', name: 'Vortice Oceanico', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'saturn-fire', name: 'Saturno a Fuoco', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'gustavo-armando', name: 'Gustavo armando', price: 300, type: 'decoration', category: 'Contorni Premium' },
+  { id: 'serpixel-agitato', name: 'Serpixel Agitato', price: 300, type: 'decoration', category: 'Contorni Premium' },
   
   // Privilegi
   { 
