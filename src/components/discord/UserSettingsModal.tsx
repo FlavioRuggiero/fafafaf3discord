@@ -298,10 +298,11 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
                         onChange={(e) => setBio(e.target.value)}
                         placeholder="Racconta qualcosa di te..."
                         disabled={isUpdating}
-                        rows={4}
+                        rows={3}
+                        maxLength={90}
                         className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] p-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50 resize-none custom-scrollbar"
                       />
-                      <p className="text-[#949ba4] text-[11px] mt-1 text-right">{bio.length}/190</p>
+                      <p className="text-[#949ba4] text-[11px] mt-1 text-right">{bio.length}/90</p>
                     </div>
                   </form>
                 </div>
