@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '@/types/discord';
 import { Gamepad2, Menu, Fish, Trophy, Sparkles } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { showSuccess } from '@/utils/toast';
 
 interface DailyMinigameViewProps {
   currentUser: User;
   onToggleSidebar?: () => void;
 }
 
-type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
 interface FishType {
   id: string;
@@ -23,11 +25,12 @@ interface FishType {
 }
 
 const FISH_TYPES = [
-  { type: 'common', chance: 60, emoji: '🐟', name: 'Pesce Comune', color: 'text-gray-400', bg: 'bg-gray-400/20', border: 'border-gray-400' },
+  { type: 'common', chance: 59.8, emoji: '🐟', name: 'Pesce Comune', color: 'text-gray-400', bg: 'bg-gray-400/20', border: 'border-gray-400' },
   { type: 'uncommon', chance: 25, emoji: '🐠', name: 'Pesce Tropicale', color: 'text-green-400', bg: 'bg-green-400/20', border: 'border-green-400' },
   { type: 'rare', chance: 10, emoji: '🐡', name: 'Pesce Palla', color: 'text-blue-400', bg: 'bg-blue-400/20', border: 'border-blue-400' },
   { type: 'epic', chance: 4, emoji: '🦈', name: 'Squalo', color: 'text-purple-400', bg: 'bg-purple-400/20', border: 'border-purple-400' },
   { type: 'legendary', chance: 1, emoji: '🐋', name: 'Balena', color: 'text-yellow-400', bg: 'bg-yellow-400/20', border: 'border-yellow-400' },
+  { type: 'mythic', chance: 0.2, emoji: '🐉', name: 'Pesce Cardo', color: 'text-[#23a559]', bg: 'bg-[#23a559]/20', border: 'border-[#23a559]' },
 ];
 
 export const DailyMinigameView = ({ currentUser, onToggleSidebar }: DailyMinigameViewProps) => {
@@ -77,7 +80,7 @@ export const DailyMinigameView = ({ currentUser, onToggleSidebar }: DailyMinigam
     return () => clearInterval(interval);
   }, []);
 
-  const handleCatch = (e: React.MouseEvent, fish: FishType) => {
+  const handleCatch = async (e: React.MouseEvent, fish: FishType) => {
     e.stopPropagation();
     
     // Aggiungi all'inventario
@@ -90,19 +93,30 @@ export const DailyMinigameView = ({ currentUser, onToggleSidebar }: DailyMinigam
     setFishes(prev => prev.filter(f => f.id !== fish.id));
 
     // Effetto visivo
-    const rect = e.currentTarget.getBoundingClientRect();
     const effectId = Math.random().toString();
     setCatchEffects(prev => [...prev, {
       id: effectId,
       x: e.clientX,
       y: e.clientY,
-      text: `+1 ${fish.name}`,
+      text: fish.name === 'Pesce Cardo' ? '+1 DC! 🌟' : `+1 ${fish.name}`,
       color: fish.color
     }]);
 
     setTimeout(() => {
       setCatchEffects(prev => prev.filter(eff => eff.id !== effectId));
     }, 1000);
+
+    // Logica speciale per il Pesce Cardo
+    if (fish.name === 'Pesce Cardo') {
+      const { data: profile } = await supabase.from('profiles').select('digitalcardus').eq('id', currentUser.id).single();
+      if (profile) {
+        const newBalance = (profile.digitalcardus || 0) + 1;
+        const { error } = await supabase.from('profiles').update({ digitalcardus: newBalance }).eq('id', currentUser.id);
+        if (!error) {
+          showSuccess("Hai trovato il rarissimo Pesce Cardo! +1 Digitalcardus 🌟");
+        }
+      }
+    }
   };
 
   return (
@@ -215,8 +229,8 @@ export const DailyMinigameView = ({ currentUser, onToggleSidebar }: DailyMinigam
                       </div>
                       <span className="text-5xl mb-2 drop-shadow-md group-hover:scale-110 transition-transform">{fishType.emoji}</span>
                       <span className={`text-sm font-bold text-center ${fishType.color}`}>{fishType.name}</span>
-                      {fishType.type === 'legendary' && (
-                        <Sparkles className="absolute top-2 left-2 text-yellow-400 animate-pulse" size={16} />
+                      {(fishType.type === 'legendary' || fishType.type === 'mythic') && (
+                        <Sparkles className={`absolute top-2 left-2 animate-pulse ${fishType.type === 'mythic' ? 'text-[#23a559]' : 'text-yellow-400'}`} size={16} />
                       )}
                     </div>
                   );
