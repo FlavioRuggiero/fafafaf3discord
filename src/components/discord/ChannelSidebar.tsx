@@ -738,6 +738,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             )}
           </button>
           
+          <div className="h-[1px] bg-[#1e1f22] mx-2 my-2"></div>
+          
           <button
             onClick={() => onChannelSelect({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
             className={`relative w-full flex items-center justify-between px-3 py-2 rounded cursor-pointer mb-2 transition-colors overflow-hidden group ${activeChannelId === 'shop' ? 'text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
