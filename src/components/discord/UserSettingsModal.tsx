@@ -4,6 +4,7 @@ import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { showError } from "@/utils/toast";
+import { WelcomeMessageEditor } from "./settings/WelcomeMessageEditor";
 
 interface UserSettingsModalProps {
   isOpen: boolean;
@@ -392,7 +393,9 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
                   )}
                 </div>
 
-                <div className="flex justify-end">
+                <WelcomeMessageEditor />
+
+                <div className="flex justify-end mt-6">
                   <button 
                     onClick={() => handleSubmit()}
                     disabled={isUpdating} 
