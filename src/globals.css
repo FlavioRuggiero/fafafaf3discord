@@ -714,13 +714,46 @@ body {
 /* 9. Serpixel Agitato (Premium) */
 .dec-serpixel-agitato {
   border: 2px solid #22c55e;
-  box-shadow: 0 0 10px #22c55e, inset 0 0 10px #22c55e;
   position: relative;
+  animation: serpixel-pulse 1.5s infinite alternate;
+}
+
+@keyframes serpixel-pulse {
+  0% { box-shadow: 0 0 10px #22c55e, inset 0 0 10px #22c55e; border-color: #22c55e; }
+  100% { box-shadow: 0 0 25px #4ade80, inset 0 0 20px #4ade80; border-color: #4ade80; }
+}
+
+.dec-serpixel-agitato::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(transparent, rgba(34, 197, 94, 0.5), transparent, rgba(16, 185, 129, 0.5), transparent);
+  animation: spin-slow 2s linear infinite;
+  z-index: 0;
+}
+
+.serpixel-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2cqw;
+  background: #4ade80;
+  box-shadow: 0 0 15px #4ade80, 0 0 30px #22c55e;
+  z-index: 30;
+  opacity: 0.7;
+  animation: pixel-scan 2.5s infinite ease-in-out alternate;
+  mix-blend-mode: overlay;
+}
+
+@keyframes pixel-scan {
+  0% { top: 0%; }
+  100% { top: 100%; }
 }
 
 .serpixel-diamond-wrapper {
   position: absolute;
-  inset: -15%;
+  inset: -20%;
   pointer-events: none;
   z-index: 25;
 }
@@ -729,30 +762,52 @@ body {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 10cqw;
-  height: 10cqw;
-  background: #22c55e;
-  box-shadow: 0 0 8px #22c55e;
+  width: 12cqw;
+  height: 12cqw;
+  background: #4ade80;
+  box-shadow: 0 0 15px #22c55e, 0 0 30px #4ade80;
+  border-radius: 2px;
 }
 
 @keyframes diamond-orbit-cw {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-@keyframes diamond-orbit-ccw {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(-360deg); }
-}
-@keyframes diamond-spin {
-  0% { transform: translateX(-50%) rotate(0deg); }
-  100% { transform: translateX(-50%) rotate(360deg); }
+
+@keyframes diamond-counter-cw {
+  0% { transform: translateX(-50%) rotate(45deg); }
+  100% { transform: translateX(-50%) rotate(-315deg); }
 }
 
-.serpixel-diamond-wrapper.dw1 { animation: diamond-orbit-cw 3s infinite linear; }
-.serpixel-diamond-wrapper.dw1 .serpixel-diamond { animation: diamond-spin 1s infinite linear; }
+.serpixel-diamond-wrapper.dw1 { animation: diamond-orbit-cw 4s infinite linear; }
+.serpixel-diamond-wrapper.dw2 { animation: diamond-orbit-cw 4s infinite linear -1s; }
+.serpixel-diamond-wrapper.dw3 { animation: diamond-orbit-cw 4s infinite linear -2s; }
+.serpixel-diamond-wrapper.dw4 { animation: diamond-orbit-cw 4s infinite linear -3s; }
 
-.serpixel-diamond-wrapper.dw2 { animation: diamond-orbit-ccw 4s infinite linear; }
-.serpixel-diamond-wrapper.dw2 .serpixel-diamond { animation: diamond-spin 1.5s infinite linear reverse; }
+.serpixel-diamond-wrapper .serpixel-diamond { animation: diamond-counter-cw 4s infinite linear; }
+
+@keyframes venom-rise {
+  0% { transform: translateY(10cqw) scale(0.5); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-60cqw) scale(1.5); opacity: 0; }
+}
+
+.serpixel-venom {
+  position: absolute;
+  width: 6cqw;
+  height: 6cqw;
+  background: #22c55e;
+  box-shadow: 0 0 8px #4ade80;
+  border-radius: 1px;
+  z-index: 20;
+  animation: venom-rise 2s infinite ease-in;
+}
+
+.serpixel-venom.v1 { bottom: 0; left: 20%; animation-delay: 0s; }
+.serpixel-venom.v2 { bottom: -10cqw; right: 25%; animation-delay: 0.4s; }
+.serpixel-venom.v3 { bottom: 10cqw; left: 50%; animation-delay: 0.8s; }
+.serpixel-venom.v4 { bottom: 5cqw; right: 10%; animation-delay: 1.2s; }
+.serpixel-venom.v5 { bottom: -5cqw; left: 35%; animation-delay: 1.6s; }
 
 @keyframes snake-slither {
   0%, 100% { background-image: url('/serpe1.png'); }
@@ -762,46 +817,38 @@ body {
 
 .serpixel-snake {
   position: absolute;
-  width: 30cqw;
-  height: 30cqw;
+  width: 35cqw;
+  height: 35cqw;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
   pointer-events: none;
-  animation: snake-slither 0.4s infinite step-end;
+  animation: snake-slither 0.3s infinite step-end;
 }
 
-/* L'immagine base guarda a SINISTRA.
-   Quindi scaleX(1) = guarda a sinistra.
-   scaleX(-1) = guarda a destra. */
-
 @keyframes snake-go-right {
-  /* Davanti, va a destra -> guarda a destra (scaleX(-1)) */
-  0% { transform: translateX(-50%) scale(1) scaleX(-1); z-index: 25; opacity: 0; bottom: -5cqw; }
+  0% { transform: translateX(-50%) scale(1.2) scaleX(-1); z-index: 25; opacity: 0; bottom: -10cqw; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); }
   10% { opacity: 1; }
-  45% { transform: translateX(calc(-50% + 40cqw)) scale(0.8) scaleX(-1); z-index: 25; bottom: 10cqw; }
-  /* Dietro, va a sinistra -> guarda a sinistra (scaleX(1)) */
-  50% { transform: translateX(calc(-50% + 45cqw)) scale(0.7) scaleX(1); z-index: 5; bottom: 15cqw; }
-  90% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 20cqw; opacity: 1; }
-  100% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 20cqw; opacity: 0; }
+  45% { transform: translateX(calc(-50% + 50cqw)) scale(1) scaleX(-1); z-index: 25; bottom: 10cqw; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5)); }
+  50% { transform: translateX(calc(-50% + 55cqw)) scale(0.8) scaleX(1); z-index: 5; bottom: 15cqw; filter: drop-shadow(0 0 0 transparent); }
+  90% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 25cqw; opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.5) scaleX(1); z-index: 5; bottom: 25cqw; opacity: 0; }
 }
 
 @keyframes snake-go-left {
-  /* Davanti, va a sinistra -> guarda a sinistra (scaleX(1)) */
-  0% { transform: translateX(-50%) scale(1) scaleX(1); z-index: 25; opacity: 0; bottom: -5cqw; }
+  0% { transform: translateX(-50%) scale(1.2) scaleX(1); z-index: 25; opacity: 0; bottom: -10cqw; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); }
   10% { opacity: 1; }
-  45% { transform: translateX(calc(-50% - 40cqw)) scale(0.8) scaleX(1); z-index: 25; bottom: 10cqw; }
-  /* Dietro, va a destra -> guarda a destra (scaleX(-1)) */
-  50% { transform: translateX(calc(-50% - 45cqw)) scale(0.7) scaleX(-1); z-index: 5; bottom: 15cqw; }
-  90% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 1; }
-  100% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 20cqw; opacity: 0; }
+  45% { transform: translateX(calc(-50% - 50cqw)) scale(1) scaleX(1); z-index: 25; bottom: 10cqw; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5)); }
+  50% { transform: translateX(calc(-50% - 55cqw)) scale(0.8) scaleX(-1); z-index: 5; bottom: 15cqw; filter: drop-shadow(0 0 0 transparent); }
+  90% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 25cqw; opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.5) scaleX(-1); z-index: 5; bottom: 25cqw; opacity: 0; }
 }
 
-.serpixel-snake.s1 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 0s; }
-.serpixel-snake.s2 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 1s; }
-.serpixel-snake.s3 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 2s; }
-.serpixel-snake.s4 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 3s; }
-.serpixel-snake.s5 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 4s; }
-.serpixel-snake.s6 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 5s; }
-.serpixel-snake.s7 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 6s; }
-.serpixel-snake.s8 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 7s; }
+.serpixel-snake.s1 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-right 6s infinite linear 0s; }
+.serpixel-snake.s2 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-left 6s infinite linear 0.75s; }
+.serpixel-snake.s3 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-right 6s infinite linear 1.5s; }
+.serpixel-snake.s4 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-left 6s infinite linear 2.25s; }
+.serpixel-snake.s5 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-right 6s infinite linear 3s; }
+.serpixel-snake.s6 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-left 6s infinite linear 3.75s; }
+.serpixel-snake.s7 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-right 6s infinite linear 4.5s; }
+.serpixel-snake.s8 { left: 50%; animation: snake-slither 0.3s infinite step-end, snake-go-left 6s infinite linear 5.25s; }

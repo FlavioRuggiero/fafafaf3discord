@@ -65,8 +65,16 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
 
       {activeDecoration === 'serpixel-agitato' && !clipEffects && (
         <>
-          <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond d1"></div></div>
-          <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond d2"></div></div>
+          <div className="serpixel-scanline"></div>
+          <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond"></div></div>
+          <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond"></div></div>
+          <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond"></div></div>
+          <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond"></div></div>
+          <div className="serpixel-venom v1"></div>
+          <div className="serpixel-venom v2"></div>
+          <div className="serpixel-venom v3"></div>
+          <div className="serpixel-venom v4"></div>
+          <div className="serpixel-venom v5"></div>
           <div className="serpixel-snake s1"></div>
           <div className="serpixel-snake s2"></div>
           <div className="serpixel-snake s3"></div>
@@ -180,8 +188,16 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
 
         {activeDecoration === 'serpixel-agitato' && clipEffects && (
           <>
-            <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond d1"></div></div>
-            <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond d2"></div></div>
+            <div className="serpixel-scanline"></div>
+            <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond"></div></div>
+            <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond"></div></div>
+            <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond"></div></div>
+            <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond"></div></div>
+            <div className="serpixel-venom v1"></div>
+            <div className="serpixel-venom v2"></div>
+            <div className="serpixel-venom v3"></div>
+            <div className="serpixel-venom v4"></div>
+            <div className="serpixel-venom v5"></div>
             <div className="serpixel-snake s1"></div>
             <div className="serpixel-snake s2"></div>
             <div className="serpixel-snake s3"></div>
