@@ -823,6 +823,27 @@ const Index = () => {
     setIsUpdatingServer(false);
   };
 
+  const handleDeleteServer = async (serverId: string) => {
+    if (!currentUser) return;
+    
+    setIsUpdatingServer(true);
+    
+    const { error } = await supabase.from('servers').delete().eq('id', serverId);
+    
+    if (error) {
+      showError("Impossibile eliminare il server. Assicurati di avere i permessi.");
+      setIsUpdatingServer(false);
+      return;
+    }
+    
+    setServers(servers.filter(s => s.id !== serverId));
+    setAllChannels(allChannels.filter(c => c.server_id !== serverId));
+    setActiveServerId('home');
+    setShowSettingsModal(false);
+    showSuccess("Server eliminato con successo!");
+    setIsUpdatingServer(false);
+  };
+
   const handleUpdateProfile = async (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined, entranceAudioFile: File | Blob | null | undefined) => {
     if (!currentUser) return;
 
