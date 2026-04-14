@@ -9,6 +9,7 @@ import { ShopView } from "@/components/discord/ShopView";
 import { InventoryView } from "@/components/discord/InventoryView";
 import { NotificationsView } from "@/components/discord/NotificationsView";
 import { TradeModal } from "@/components/discord/TradeModal";
+import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1025,6 +1026,8 @@ const Index = () => {
             <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'inventory' ? (
             <InventoryView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'daily-minigame' ? (
+            <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'notifications' ? (
             <NotificationsView 
               currentUser={currentUser} 
