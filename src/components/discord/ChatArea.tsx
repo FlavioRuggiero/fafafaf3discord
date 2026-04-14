@@ -269,10 +269,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const customEmojis = ownedEmojiPacks.flatMap((packId: string) => SHOP_ITEMS.find(i => i.id === packId)?.emojis || []);
   const allReactionEmojis = [...EMOJIS, ...customEmojis];
 
-  // Limiti di upload basati sui privilegi
-  const hasUploadPrivilege = currentUserProfile?.purchased_decorations?.includes('privilege-upload');
-  const maxImageSize = hasUploadPrivilege ? 6 * 1024 * 1024 : 2 * 1024 * 1024; // 6MB o 2MB
-  const maxAudioDuration = hasUploadPrivilege ? 45 : 15; // 45s o 15s
+  // Limiti di upload standard
+  const maxImageSize = 2 * 1024 * 1024; // 2MB
+  const maxAudioDuration = 15; // 15s
 
   // Funzioni per gestire il contentEditable
   const parseContentEditable = (element: HTMLElement): string => {
@@ -956,7 +955,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const validateAndSetFile = (file: File) => {
     if (file.type.startsWith('image/')) {
       if (file.size > maxImageSize) {
-        showError(`L'immagine non può superare i ${hasUploadPrivilege ? '6MB' : '2MB'}.`);
+        showError(`L'immagine non può superare i 2MB.`);
         return;
       }
       setSelectedFile(file);
@@ -1897,7 +1896,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <div className="bg-[#2b2d31] p-6 rounded-xl flex flex-col items-center shadow-2xl pointer-events-none">
             <UploadCloud size={48} className="text-brand mb-4" />
             <h3 className="text-xl font-bold text-white">Trascina il file qui</h3>
-            <p className="text-[#b5bac1] mt-2">Rilascia per caricare un'immagine (max {hasUploadPrivilege ? '6MB' : '2MB'}) o un audio (max {hasUploadPrivilege ? '45s' : '15s'})</p>
+            <p className="text-[#b5bac1] mt-2">Rilascia per caricare un'immagine (max 2MB) o un audio (max 15s)</p>
           </div>
         </div>
       )}

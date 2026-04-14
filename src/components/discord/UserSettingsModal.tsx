@@ -77,6 +77,7 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
   const hasBannerPrivilege = user.purchased_decorations?.includes('privilege-banner');
   const canEditBanner = isAdmin || hasBannerPrivilege;
   const hasEntrancePrivilege = user.purchased_decorations?.includes('privilege-entrance-audio');
+  const hasWelcomePrivilege = user.purchased_decorations?.includes('privilege-welcome');
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -393,7 +394,19 @@ export const UserSettingsModal = ({ isOpen, onClose, user, onUpdate }: UserSetti
                   )}
                 </div>
 
-                <WelcomeMessageEditor />
+                {hasWelcomePrivilege ? (
+                  <WelcomeMessageEditor />
+                ) : (
+                  <div className="bg-[#1e1f22] p-4 rounded-md border border-[#3f4147] flex items-center gap-4 mt-6">
+                    <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                      <Crown className="text-yellow-500" size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-white font-bold text-sm">Privilegio Richiesto</h4>
+                      <p className="text-[#949ba4] text-xs mt-1">Devi acquistare il privilegio "Il mio benvenuto" nel Cardi E-Shop per sbloccare questa funzione.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end mt-6">
                   <button 
