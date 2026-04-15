@@ -10,6 +10,7 @@ import { InventoryView } from "@/components/discord/InventoryView";
 import { NotificationsView } from "@/components/discord/NotificationsView";
 import { TradeModal } from "@/components/discord/TradeModal";
 import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
+import { Progression } from "@/components/discord/Progression";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -292,7 +293,10 @@ const Index = () => {
       server_roles: userRoles,
       avatar_decoration: p.avatar_decoration || null,
       purchased_decorations: p.purchased_decorations || [],
-      entrance_audio_url: p.entrance_audio_url || null
+      entrance_audio_url: p.entrance_audio_url || null,
+      claimed_levels: p.claimed_levels || [],
+      standard_chests: p.standard_chests || 0,
+      premium_chests: p.premium_chests || 0
     };
   });
 
@@ -385,7 +389,10 @@ const Index = () => {
             last_reward_date: updatedProfile.last_reward_date, // Accetta null
             avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
             purchased_decorations: updatedProfile.purchased_decorations || [],
-            entrance_audio_url: updatedProfile.entrance_audio_url || null
+            entrance_audio_url: updatedProfile.entrance_audio_url || null,
+            claimed_levels: updatedProfile.claimed_levels || [],
+            standard_chests: updatedProfile.standard_chests || 0,
+            premium_chests: updatedProfile.premium_chests || 0
           };
         });
       })
@@ -452,7 +459,10 @@ const Index = () => {
         last_reward_date: profile?.last_reward_date || null,
         avatar_decoration: profile?.avatar_decoration || null,
         purchased_decorations: profile?.purchased_decorations || [],
-        entrance_audio_url: profile?.entrance_audio_url || null
+        entrance_audio_url: profile?.entrance_audio_url || null,
+        claimed_levels: profile?.claimed_levels || [],
+        standard_chests: profile?.standard_chests || 0,
+        premium_chests: profile?.premium_chests || 0
       };
       
       setCurrentUser(loadedUser);
@@ -1056,6 +1066,8 @@ const Index = () => {
             <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'inventory' ? (
             <InventoryView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'progression' ? (
+            <Progression currentUser={currentUser} />
           ) : activeChannel?.id === 'daily-minigame' ? (
             <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'notifications' ? (
