@@ -800,19 +800,19 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           <div className="h-[1px] bg-[#1e1f22] mx-2 my-2"></div>
 
           <button
-            onClick={() => onChannelSelect({ id: 'daily-minigame', name: 'Minigioco Giornaliero', type: 'text', category: '', server_id: null })}
-            className={`relative w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors overflow-hidden group ${activeChannelId === 'daily-minigame' ? 'text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
+            onClick={() => onChannelSelect({ id: 'daily-minigame-random', name: 'Minigioco Giornaliero', type: 'text', category: '', server_id: null })}
+            className={`relative w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors overflow-hidden group ${activeChannelId === 'daily-minigame-random' ? 'text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
           >
             {/* Sfondo base */}
-            <div className={`absolute inset-0 transition-colors ${activeChannelId === 'daily-minigame' ? 'bg-[#404249]' : 'group-hover:bg-[#35373c]'}`}></div>
+            <div className={`absolute inset-0 transition-colors ${activeChannelId === 'daily-minigame-random' ? 'bg-[#404249]' : 'group-hover:bg-[#35373c]'}`}></div>
             
             {/* Sfumatura celeste da destra */}
-            <div className={`absolute inset-0 bg-gradient-to-l from-[#0ea5e9]/20 to-transparent transition-opacity duration-300 ${activeChannelId === 'daily-minigame' ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}`}></div>
+            <div className={`absolute inset-0 bg-gradient-to-l from-[#0ea5e9]/20 to-transparent transition-opacity duration-300 ${activeChannelId === 'daily-minigame-random' ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}`}></div>
             
             {/* Bastoncini animati */}
             <div className="absolute inset-0 overflow-hidden rounded pointer-events-none">
               <div 
-                className={`absolute -inset-[100%] transition-opacity duration-300 animate-[spin_30s_linear_infinite] ${activeChannelId === 'daily-minigame' ? 'opacity-60' : 'opacity-20 group-hover:opacity-50'}`}
+                className={`absolute -inset-[100%] transition-opacity duration-300 animate-[spin_30s_linear_infinite] ${activeChannelId === 'daily-minigame-random' ? 'opacity-60' : 'opacity-20 group-hover:opacity-50'}`}
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%230ea5e9' fill-opacity='0.6'%3E%3Crect x='10' y='10' width='3' height='20' rx='1.5' transform='rotate(45 12 20)' /%3E%3Crect x='50' y='40' width='3' height='25' rx='1.5' transform='rotate(-30 52 52)' /%3E%3Crect x='80' y='15' width='3' height='15' rx='1.5' transform='rotate(15 82 22)' /%3E%3Crect x='20' y='70' width='3' height='30' rx='1.5' transform='rotate(60 22 85)' /%3E%3Crect x='70' y='80' width='3' height='20' rx='1.5' transform='rotate(-45 72 90)' /%3E%3C/g%3E%3C/svg%3E")`,
                   backgroundSize: '80px 80px'

@@ -406,7 +406,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Fetch Daily Minigame
   useEffect(() => {
-    if (channel?.id === 'daily-minigame') {
+    if (channel?.id === 'daily-minigame-random') {
       const fetchDaily = async () => {
         setIsLoadingDaily(true);
         const { data, error } = await supabase
@@ -1567,7 +1567,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   // VISTA MINIGIOCO GIORNALIERO
-  if (channel.id === 'daily-minigame') {
+  if (channel.id === 'daily-minigame-random') {
     return (
       <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative h-full">
         <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338]">
