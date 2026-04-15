@@ -1,5 +1,10 @@
--- Permette agli utenti di aggiornare la propria iscrizione in server_members (necessario per salvare la posizione)
-DROP POLICY IF EXISTS "Gli utenti possono aggiornare la propria iscrizione" ON public.server_members;
+-- Elimina la vecchia policy restrittiva
+DROP POLICY IF EXISTS "Gli utenti possono unirsi" ON public.server_members;
 
-CREATE POLICY "Gli utenti possono aggiornare la propria iscrizione" ON public.server_members
-FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+-- Crea una nuova policy che permette agli utenti di unirsi da soli (server pubblici) 
+-- OPPURE agli admin di aggiungerli (accettazione richieste server privati)
+CREATE POLICY "Gli utenti possono unirsi o essere aggiunti dagli admin" ON public.server_members
+FOR INSERT TO authenticated WITH CHECK (
+  auth.uid() = user_id OR 
+  has_server_permission(server_id, 'can_manage_server')
+);
