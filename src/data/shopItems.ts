@@ -17,7 +17,11 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'pulse-purple', name: 'Contorno Viola Pulsante', price: 20, type: 'decoration', category: 'Contorni' },
   { id: 'pulse-orange', name: 'Contorno Arancione Pulsante', price: 20, type: 'decoration', category: 'Contorni' },
   { id: 'pulse-blue', name: 'Contorno Blu Pulsante', price: 20, type: 'decoration', category: 'Contorni' },
+  { id: 'circo', name: 'Circo', price: 30, type: 'decoration', category: 'Contorni' },
   { id: 'hazard', name: 'Nastro Pericolo', price: 30, type: 'decoration', category: 'Contorni' },
+  { id: 'puzzle', name: 'Puzzle', price: 35, type: 'decoration', category: 'Contorni' },
+  { id: 'radar', name: 'Radar', price: 40, type: 'decoration', category: 'Contorni' },
+  { id: 'twin-rings', name: 'Anelli Gemelli', price: 45, type: 'decoration', category: 'Contorni' },
   { id: 'electric', name: 'Contorno Elettrico', price: 50, type: 'decoration', category: 'Contorni' },
   { id: 'hands', name: 'Mani Salutanti', price: 50, type: 'decoration', category: 'Contorni' },
   { id: 'dc-emit', name: 'Emanazione Digitalcardus', price: 70, type: 'decoration', category: 'Contorni' },
@@ -42,12 +46,12 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: 'Ti permette di caricare un\'immagine o una GIF personalizzata come banner del tuo profilo, anche se non sei Admin.'
   },
   { 
-    id: 'privilege-welcome', 
-    name: 'Il mio benvenuto', 
+    id: 'privilege-upload', 
+    name: 'Upload Esteso', 
     price: 500, 
     type: 'privilege', 
     category: 'Privilegi',
-    description: 'Permette di personalizzare il messaggio di benvenuto quando entri in un server.'
+    description: 'Ti permette di inviare audio fino a 45 secondi e caricare immagini fino a 6MB in chat.'
   },
   { 
     id: 'privilege-daily-bonus', 
