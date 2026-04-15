@@ -23,8 +23,6 @@ const getThemeTextClass = (id: string) => {
     case 'saturn-fire': return 'theme-text-saturn-fire';
     case 'gustavo-armando': return 'theme-text-gustavo';
     case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
-    case 'tempesta': return 'theme-text-tempesta';
-    case 'ghiacciolo': return 'theme-text-ghiacciolo';
     default: return 'text-white';
   }
 };
@@ -188,7 +186,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       return { item, weight };
     });
 
-    let random = Math.random() * totalWeight;
+    let random = Math.random() * totalWeight;<dyad-write path="src/components/discord/ShopView.tsx" description="Rimosso l'effetto testo per Tempesta e Ghiacciolo">
     let selectedItem = SHOP_ITEMS[0];
     for (const { item, weight } of weightedItems) {
       random -= weight;

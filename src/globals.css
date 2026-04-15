@@ -96,18 +96,6 @@ body {
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
 }
-.theme-text-tempesta {
-  background: linear-gradient(90deg, #475569, #94a3b8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 10px rgba(148, 163, 184, 0.4);
-}
-.theme-text-ghiacciolo {
-  background: linear-gradient(90deg, #7dd3fc, #e0f2fe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 10px rgba(125, 211, 252, 0.4);
-}
 
 /* =========================================
    AVATAR DECORATIONS (SCALABILI CON CQW)
@@ -958,6 +946,13 @@ body {
 
 .serpixel-diamond-wrapper.dw2 { animation: diamond-orbit-ccw 4s infinite linear; }
 .serpixel-diamond-wrapper.dw2 .serpixel-diamond { animation: diamond-spin 1.5s infinite linear reverse; }
+
+/* Aggiunte le animazioni mancanti per dw3 e dw4 */
+.serpixel-diamond-wrapper.dw3 { animation: diamond-orbit-cw 2.5s infinite linear; }
+.serpixel-diamond-wrapper.dw3 .serpixel-diamond { animation: diamond-spin 0.8s infinite linear; }
+
+.serpixel-diamond-wrapper.dw4 { animation: diamond-orbit-ccw 3.5s infinite linear; }
+.serpixel-diamond-wrapper.dw4 .serpixel-diamond { animation: diamond-spin 1.2s infinite linear reverse; }
 
 @keyframes snake-slither {
   0%, 100% { background-image: url('/serpe1.png'); }
