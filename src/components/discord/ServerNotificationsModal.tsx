@@ -28,32 +28,46 @@ export const ServerNotificationsModal = ({ serverId, onClose }: ServerNotificati
 
   const fetchRequests = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // 1. Recupera le richieste
+    const { data: requestsData, error } = await supabase
       .from('server_join_requests')
-      .select(`
-        id,
-        user_id,
-        status,
-        created_at,
-        profiles:user_id (
-          id,
-          first_name,
-          avatar_url
-        )
-      `)
+      .select('*')
       .eq('server_id', serverId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setRequests(data);
+    if (error) {
+      console.error("Errore nel recupero delle richieste:", error);
+      setLoading(false);
+      return;
     }
+
+    if (requestsData && requestsData.length > 0) {
+      // 2. Recupera i profili associati agli user_id delle richieste
+      const userIds = requestsData.map(r => r.user_id);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, first_name, avatar_url')
+        .in('id', userIds);
+
+      // 3. Unisci i dati
+      const combinedRequests = requestsData.map(req => ({
+        ...req,
+        profiles: profilesData?.find(p => p.id === req.user_id) || null
+      }));
+      
+      setRequests(combinedRequests);
+    } else {
+      setRequests([]);
+    }
+    
     setLoading(false);
   };
 
   const handleApprove = async (request: any) => {
     try {
-      // Add to server_members
+      // Aggiungi l'utente ai membri del server
       const { error: memberError } = await supabase.from('server_members').insert({
         server_id: serverId,
         user_id: request.user_id
@@ -61,7 +75,7 @@ export const ServerNotificationsModal = ({ serverId, onClose }: ServerNotificati
 
       if (memberError) throw memberError;
 
-      // Update request status
+      // Aggiorna lo stato della richiesta
       await supabase.from('server_join_requests').update({ status: 'approved' }).eq('id', request.id);
       
       showSuccess("Utente approvato e aggiunto al server!");
