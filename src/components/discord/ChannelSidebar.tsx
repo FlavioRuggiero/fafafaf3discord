@@ -39,6 +39,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [isAddingChannel, setIsAddingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice' | 'minigame'>('text');
+  const [newMinigameUrl, setNewMinigameUrl] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("Generale");
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -57,6 +58,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [settingsCooldown, setSettingsCooldown] = useState(0);
   const [settingsIsLocked, setSettingsIsLocked] = useState(false);
   const [settingsIsWelcome, setSettingsIsWelcome] = useState(false);
+  const [settingsMinigameUrl, setSettingsMinigameUrl] = useState("");
 
   const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel', category?: string } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
@@ -358,6 +360,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setSelectedCategory(category);
     setNewChannelName("");
     setNewChannelType('text');
+    setNewMinigameUrl("");
     setIsAddingChannel(true);
   };
 
@@ -368,6 +371,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     setSelectedCategory(newCategoryName.trim());
     setNewChannelName("");
     setNewChannelType('text');
+    setNewMinigameUrl("");
     setIsAddingCategory(false);
     setIsAddingChannel(true);
   };
@@ -433,26 +437,34 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       category: selectedCategory,
       position: maxPos + 1,
       category_position: catPos,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      ...((newChannelType === 'minigame' ? { minigame_url: newMinigameUrl } : {}) as any)
     };
     
     setLocalChannels(prev => [...prev, newChannel]);
     setIsAddingChannel(false);
     setNewChannelName("");
+    setNewMinigameUrl("");
     
     if (collapsedCategories.has(selectedCategory)) {
       toggleCategory(selectedCategory);
     }
 
     try {
-      const { data, error } = await supabase.from('channels').insert({
+      const insertData: any = {
         server_id: activeServer.id,
         name: newChannel.name,
         type: newChannel.type,
         category: newChannel.category,
         position: newChannel.position,
         category_position: newChannel.category_position
-      }).select().single();
+      };
+
+      if (newChannel.type === 'minigame') {
+        insertData.minigame_url = newMinigameUrl;
+      }
+
+      const { data, error } = await supabase.from('channels').insert(insertData).select().single();
 
       if (error) {
         showError("Permesso negato: non puoi gestire i canali.");
@@ -537,7 +549,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     // Aggiornamento ottimistico
     setLocalChannels(prev => prev.map(c => {
       if (c.id === channelId) {
-        return { ...c, cooldown: settingsCooldown, is_locked: settingsIsLocked, is_welcome_channel: settingsIsWelcome };
+        return { 
+          ...c, 
+          cooldown: settingsCooldown, 
+          is_locked: settingsIsLocked, 
+          is_welcome_channel: settingsIsWelcome,
+          ...((channelToSettings.type === 'minigame' ? { minigame_url: settingsMinigameUrl } : {}) as any)
+        };
       }
       if (settingsIsWelcome && c.server_id === activeServer.id && c.id !== channelId) {
         return { ...c, is_welcome_channel: false };
@@ -552,11 +570,17 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
         await supabase.from('channels').update({ is_welcome_channel: false }).eq('server_id', activeServer.id);
       }
       
-      const { error } = await supabase.from('channels').update({
+      const updateData: any = {
         cooldown: settingsCooldown,
         is_locked: settingsIsLocked,
         is_welcome_channel: settingsIsWelcome
-      }).eq('id', channelId);
+      };
+
+      if (channelToSettings.type === 'minigame') {
+        updateData.minigame_url = settingsMinigameUrl;
+      }
+
+      const { error } = await supabase.from('channels').update(updateData).eq('id', channelId);
 
       if (error) {
         showError("Permesso negato: non puoi gestire i canali.");
@@ -995,7 +1019,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                               )}
                               {canManageChannels && (
                                 <>
-                                  {channel.type === 'text' && (
+                                  {(channel.type === 'text' || channel.type === 'minigame') && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1003,6 +1027,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                         setSettingsCooldown(channel.cooldown || 0);
                                         setSettingsIsLocked(channel.is_locked || false);
                                         setSettingsIsWelcome(channel.is_welcome_channel || false);
+                                        setSettingsMinigameUrl((channel as any).minigame_url || "");
                                       }}
                                       className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all"
                                       title="Impostazioni Canale"
@@ -1337,6 +1362,21 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                     />
                   </div>
                 </div>
+
+                {newChannelType === 'minigame' && (
+                  <div className="mb-2 mt-4">
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">URL Minigioco (Iframe)</label>
+                    <div className="relative flex items-center bg-[#1e1f22] rounded overflow-hidden p-1">
+                      <input 
+                        type="url" 
+                        value={newMinigameUrl}
+                        onChange={(e) => setNewMinigameUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full bg-transparent text-white p-2 pl-2 focus:outline-none placeholder-[#878a91]"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end items-center bg-[#2b2d31] p-4">
@@ -1421,71 +1461,92 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
             <form onSubmit={handleSaveChannelSettings} className="flex flex-col">
               <div className="p-4 space-y-6">
                 
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="flex items-center text-white font-medium">
-                      <Clock size={18} className="mr-2 text-[#949ba4]" />
-                      Slowmode (Cooldown)
-                    </label>
-                  </div>
-                  <p className="text-xs text-[#b5bac1] mb-3">Limita la frequenza con cui gli utenti possono inviare messaggi in questo canale.</p>
-                  <select 
-                    value={settingsCooldown}
-                    onChange={(e) => setSettingsCooldown(Number(e.target.value))}
-                    className="w-full bg-[#1e1f22] text-white p-2 rounded border-none outline-none focus:ring-1 focus:ring-brand"
-                  >
-                    <option value={0}>Disattivata</option>
-                    <option value={5}>5 secondi</option>
-                    <option value={10}>10 secondi</option>
-                    <option value={15}>15 secondi</option>
-                    <option value={30}>30 secondi</option>
-                    <option value={60}>1 minuto</option>
-                    <option value={120}>2 minuti</option>
-                    <option value={300}>5 minuti</option>
-                  </select>
-                </div>
-
-                <div className="h-[1px] bg-[#3f4147] w-full"></div>
-
-                <div className="flex items-center justify-between">
+                {channelToSettings.type === 'minigame' ? (
                   <div>
-                    <div className="flex items-center text-white font-medium mb-1">
-                      <Lock size={18} className="mr-2 text-[#949ba4]" />
-                      Canale Bloccato
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="flex items-center text-white font-medium">
+                        <Gamepad2 size={18} className="mr-2 text-[#949ba4]" />
+                        URL Minigioco (Iframe)
+                      </label>
                     </div>
-                    <div className="text-xs text-[#b5bac1]">Solo il proprietario del server potrà scrivere in questo canale.</div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                    <p className="text-xs text-[#b5bac1] mb-3">Inserisci il link del gioco da incorporare nel canale.</p>
                     <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={settingsIsLocked}
-                      onChange={(e) => setSettingsIsLocked(e.target.checked)}
+                      type="url" 
+                      value={settingsMinigameUrl}
+                      onChange={(e) => setSettingsMinigameUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full bg-[#1e1f22] text-white p-2 rounded border-none outline-none focus:ring-1 focus:ring-brand"
                     />
-                    <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
-                  </label>
-                </div>
-
-                <div className="h-[1px] bg-[#3f4147] w-full"></div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center text-white font-medium mb-1">
-                      <MessageSquare size={18} className="mr-2 text-[#949ba4]" />
-                      Canale di Benvenuto
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="flex items-center text-white font-medium">
+                          <Clock size={18} className="mr-2 text-[#949ba4]" />
+                          Slowmode (Cooldown)
+                        </label>
+                      </div>
+                      <p className="text-xs text-[#b5bac1] mb-3">Limita la frequenza con cui gli utenti possono inviare messaggi in questo canale.</p>
+                      <select 
+                        value={settingsCooldown}
+                        onChange={(e) => setSettingsCooldown(Number(e.target.value))}
+                        className="w-full bg-[#1e1f22] text-white p-2 rounded border-none outline-none focus:ring-1 focus:ring-brand"
+                      >
+                        <option value={0}>Disattivata</option>
+                        <option value={5}>5 secondi</option>
+                        <option value={10}>10 secondi</option>
+                        <option value={15}>15 secondi</option>
+                        <option value={30}>30 secondi</option>
+                        <option value={60}>1 minuto</option>
+                        <option value={120}>2 minuti</option>
+                        <option value={300}>5 minuti</option>
+                      </select>
                     </div>
-                    <div className="text-xs text-[#b5bac1]">Invia un messaggio automatico quando un nuovo utente entra nel server. (Solo un canale per server)</div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={settingsIsWelcome}
-                      onChange={(e) => setSettingsIsWelcome(e.target.checked)}
-                    />
-                    <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
-                  </label>
-                </div>
+
+                    <div className="h-[1px] bg-[#3f4147] w-full"></div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center text-white font-medium mb-1">
+                          <Lock size={18} className="mr-2 text-[#949ba4]" />
+                          Canale Bloccato
+                        </div>
+                        <div className="text-xs text-[#b5bac1]">Solo il proprietario del server potrà scrivere in questo canale.</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={settingsIsLocked}
+                          onChange={(e) => setSettingsIsLocked(e.target.checked)}
+                        />
+                        <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                      </label>
+                    </div>
+
+                    <div className="h-[1px] bg-[#3f4147] w-full"></div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center text-white font-medium mb-1">
+                          <MessageSquare size={18} className="mr-2 text-[#949ba4]" />
+                          Canale di Benvenuto
+                        </div>
+                        <div className="text-xs text-[#b5bac1]">Invia un messaggio automatico quando un nuovo utente entra nel server. (Solo un canale per server)</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={settingsIsWelcome}
+                          onChange={(e) => setSettingsIsWelcome(e.target.checked)}
+                        />
+                        <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                      </label>
+                    </div>
+                  </>
+                )}
 
               </div>
 
