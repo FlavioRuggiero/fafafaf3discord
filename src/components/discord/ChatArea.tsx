@@ -1868,7 +1868,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   // VISTA CANALE MINIGIOCO
   if (channel.type === 'minigame') {
     return (
-      <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative h-full">
         <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338]">
           <div className="flex items-center min-w-0 flex-1">
             <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
@@ -1884,10 +1884,10 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           </div>
         </div>
 
-        <div className="flex-1 w-full h-full p-4 bg-[#2b2d31]">
-          {(channel as any).minigame_url ? (
+        <div className="flex-1 w-full p-4 bg-[#2b2d31] min-h-0">
+          {channel.minigame_url ? (
             <iframe 
-              src={(channel as any).minigame_url} 
+              src={channel.minigame_url} 
               className="w-full h-full rounded-lg border-none bg-black shadow-lg"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen

@@ -64,6 +64,7 @@ export type Channel = {
   cooldown?: number;
   is_locked?: boolean;
   is_welcome_channel?: boolean;
+  minigame_url?: string | null;
 };
 
 export type Message = {
