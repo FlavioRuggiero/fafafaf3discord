@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Server, ServerRole, ServerPermissions } from "@/types/discord";
-import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key } from "lucide-react";
+import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { showError, showSuccess } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,10 @@ interface DiscoverModalProps {
   servers: Server[];
   joinedServerIds: string[];
   onJoin: (server: Server) => void;
+  onRequestJoin: (server: Server) => void;
 }
 
-export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds, onJoin }: DiscoverModalProps) => {
+export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds, onJoin, onRequestJoin }: DiscoverModalProps) => {
   if (!isOpen) return null;
 
   const availableServers = servers.filter(s => !joinedServerIds.includes(s.id));
@@ -41,7 +42,13 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
             ) : (
               availableServers.map(server => (
                 <div key={server.id} className="bg-[#1e1f22] rounded-lg overflow-hidden hover:shadow-lg transition-shadow border border-[#1e1f22] hover:border-[#35373c] group flex flex-col">
-                  <div className="h-24 bg-gradient-to-r from-brand/20 to-[#313338] flex-shrink-0" />
+                  <div className="h-24 bg-gradient-to-r from-brand/20 to-[#313338] flex-shrink-0 relative">
+                    {server.is_private && (
+                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
+                        <Lock size={12} /> Privato
+                      </div>
+                    )}
+                  </div>
                   <div className="p-4 relative flex flex-col flex-1">
                     <div className="absolute -top-8 left-4 w-12 h-12 rounded-xl bg-[#313338] p-1 shadow-lg flex-shrink-0">
                       <img src={server.icon_url} alt="icon" className="w-full h-full rounded-lg object-cover bg-[#1e1f22]" />
@@ -60,12 +67,21 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
                         </div>
                       )}
                       
-                      <button 
-                        onClick={() => { onJoin(server); onClose(); }}
-                        className="w-full mt-auto bg-[#35373c] hover:bg-[#23a559] hover:text-white text-[#dbdee1] font-medium py-2 rounded transition-colors text-sm"
-                      >
-                        Unisciti al Server
-                      </button>
+                      {server.is_private ? (
+                        <button 
+                          onClick={() => { onRequestJoin(server); onClose(); }}
+                          className="w-full mt-auto bg-[#35373c] hover:bg-[#5865F2] hover:text-white text-[#dbdee1] font-medium py-2 rounded transition-colors text-sm"
+                        >
+                          Richiedi di entrare
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => { onJoin(server); onClose(); }}
+                          className="w-full mt-auto bg-[#35373c] hover:bg-[#23a559] hover:text-white text-[#dbdee1] font-medium py-2 rounded transition-colors text-sm"
+                        >
+                          Unisciti al Server
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -81,13 +97,14 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => void;
+  onCreate: (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, isPrivate: boolean) => void;
   isCreating: boolean;
 }
 
 export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: CreateModalProps) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +121,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
     if (isOpen) {
       setName("");
       setDescription("");
+      setIsPrivate(false);
       setImageFile(null);
       setPreviewUrl(null);
       setAudioFile(null);
@@ -118,7 +136,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && !isCreating) {
-      onCreate(name.trim(), description.trim(), imageFile, audioFile);
+      onCreate(name.trim(), description.trim(), imageFile, audioFile, isPrivate);
     }
   };
 
@@ -257,6 +275,26 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                 />
               </div>
 
+              <div className="flex items-center justify-between bg-[#2b2d31] p-3 rounded border border-[#1e1f22]">
+                <div>
+                  <div className="flex items-center text-white font-medium mb-1">
+                    <Lock size={16} className="mr-2 text-[#949ba4]" />
+                    Server Privato
+                  </div>
+                  <div className="text-xs text-[#b5bac1]">Gli utenti dovranno richiedere l'accesso per entrare.</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={isPrivate}
+                    onChange={(e) => setIsPrivate(e.target.checked)}
+                    disabled={isCreating}
+                  />
+                  <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                </label>
+              </div>
+
               <div>
                 <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">
                   Motto Vocale (Max 3s)
@@ -331,7 +369,7 @@ interface ServerSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   server: Server | null;
-  onUpdate: (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined) => void;
+  onUpdate: (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, isPrivate: boolean) => void;
   onDelete: (id: string) => void;
   isUpdating?: boolean;
   serverPermissions?: ServerPermissions;
@@ -341,6 +379,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const [activeTab, setActiveTab] = useState<'main' | 'roles'>('main');
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -378,6 +417,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       setActiveTab('main');
       setName(server.name);
       setDescription(server.description || "");
+      setIsPrivate(server.is_private || false);
       setPreviewUrl(server.icon_url || null);
       setImageFile(null);
       setConfirmDelete(false);
@@ -478,7 +518,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && !isUpdating) {
-      onUpdate(server.id, name.trim(), description.trim(), imageFile, audioFile);
+      onUpdate(server.id, name.trim(), description.trim(), imageFile, audioFile, isPrivate);
     }
   };
 
@@ -679,6 +719,26 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                       rows={2}
                       className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] p-3 outline-none focus:ring-1 focus:ring-brand disabled:opacity-50 resize-none custom-scrollbar"
                     />
+                  </div>
+
+                  <div className="flex items-center justify-between bg-[#2b2d31] p-3 rounded border border-[#1e1f22]">
+                    <div>
+                      <div className="flex items-center text-white font-medium mb-1">
+                        <Lock size={16} className="mr-2 text-[#949ba4]" />
+                        Server Privato
+                      </div>
+                      <div className="text-xs text-[#b5bac1]">Gli utenti dovranno richiedere l'accesso per entrare.</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={isPrivate}
+                        onChange={(e) => setIsPrivate(e.target.checked)}
+                        disabled={isUpdating}
+                      />
+                      <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
+                    </label>
                   </div>
 
                   <div>

@@ -611,7 +611,7 @@ const Index = () => {
     }));
   };
 
-  const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null) => {
+  const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, isPrivate: boolean) => {
     if (!currentUser) return;
     
     setIsCreatingServer(true);
@@ -670,7 +670,8 @@ const Index = () => {
         created_by: currentUser.id,
         description: description || "Il tuo nuovo server privato.",
         icon_url,
-        audio_url
+        audio_url,
+        is_private: isPrivate
       })
       .select()
       .single();
@@ -743,6 +744,35 @@ const Index = () => {
     showSuccess(`Ti sei unito a ${server.name}!`);
   };
 
+  const handleRequestJoinServer = async (server: Server) => {
+    if (!currentUser) return;
+
+    const { data: existing } = await supabase
+      .from('server_join_requests')
+      .select('id')
+      .eq('server_id', server.id)
+      .eq('user_id', currentUser.id)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (existing) {
+      showError("Hai già inviato una richiesta per questo server.");
+      return;
+    }
+
+    const { error } = await supabase.from('server_join_requests').insert({
+      server_id: server.id,
+      user_id: currentUser.id,
+      status: 'pending'
+    });
+
+    if (error) {
+      showError("Errore durante l'invio della richiesta.");
+    } else {
+      showSuccess("Richiesta inviata con successo! Attendi l'approvazione.");
+    }
+  };
+
   const handleLeaveServer = async (serverId: string) => {
     if (!currentUser) return;
 
@@ -770,7 +800,7 @@ const Index = () => {
     setShowDiscoverModal(true);
   };
 
-  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined) => {
+  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, isPrivate: boolean) => {
     if (!currentUser) return;
     setIsUpdatingServer(true);
     
@@ -811,14 +841,14 @@ const Index = () => {
       }
     }
 
-    const { error } = await supabase.from('servers').update({ name, description, icon_url, audio_url }).eq('id', id);
+    const { error } = await supabase.from('servers').update({ name, description, icon_url, audio_url, is_private: isPrivate }).eq('id', id);
     if (error) {
       showError("Impossibile aggiornare il server");
       setIsUpdatingServer(false);
       return;
     }
     
-    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url, audio_url } : s));
+    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url, audio_url, is_private: isPrivate } : s));
     setShowSettingsModal(false);
     showSuccess("Impostazioni salvate con successo!");
     setIsUpdatingServer(false);
@@ -1089,6 +1119,7 @@ const Index = () => {
           servers={publicServers}
           joinedServerIds={servers.map(s => s.id)}
           onJoin={handleJoinServer}
+          onRequestJoin={handleRequestJoinServer}
         />
         
         <CreateServerModal 

@@ -48,6 +48,7 @@ export type Server = {
   created_by: string;
   description?: string;
   audio_url?: string;
+  is_private?: boolean;
 };
 
 export type Channel = {
