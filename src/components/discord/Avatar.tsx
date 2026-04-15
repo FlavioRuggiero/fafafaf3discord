@@ -208,6 +208,22 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             <div className="serpixel-snake s8"></div>
           </>
         )}
+
+        {activeDecoration === 'tempesta' && (
+          <>
+            <div className="storm-drop d1"></div>
+            <div className="storm-drop d2"></div>
+            <div className="storm-drop d3"></div>
+          </>
+        )}
+
+        {activeDecoration === 'ghiacciolo' && (
+          <>
+            <div className="ice-flake f1">❄️</div>
+            <div className="ice-flake f2">❄️</div>
+            <div className="ice-flake f3">❄️</div>
+          </>
+        )}
       </div>
     </div>
   );

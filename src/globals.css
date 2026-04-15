@@ -96,6 +96,18 @@ body {
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
 }
+.theme-text-tempesta {
+  background: linear-gradient(90deg, #475569, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 10px rgba(148, 163, 184, 0.4);
+}
+.theme-text-ghiacciolo {
+  background: linear-gradient(90deg, #7dd3fc, #e0f2fe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 10px rgba(125, 211, 252, 0.4);
+}
 
 /* =========================================
    AVATAR DECORATIONS (SCALABILI CON CQW)
@@ -471,6 +483,73 @@ body {
 .hand-emoji.h1 { top: -20cqw; left: calc(50% - 15cqw); }
 .hand-emoji.h2 { bottom: -10cqw; left: -20cqw; }
 .hand-emoji.h3 { bottom: -10cqw; right: -20cqw; }
+
+/* Tempesta */
+.dec-tempesta {
+  border: 2px solid #334155;
+  position: relative;
+  animation: storm-flash 4s infinite;
+}
+@keyframes storm-flash {
+  0%, 90%, 94%, 100% { box-shadow: 0 0 5px #1e293b; border-color: #334155; }
+  92% { box-shadow: 0 0 20px #eab308, inset 0 0 10px #eab308; border-color: #fef08a; }
+  96% { box-shadow: 0 0 15px #0ea5e9, inset 0 0 10px #0ea5e9; border-color: #7dd3fc; }
+}
+.storm-drop {
+  position: absolute;
+  width: 2px;
+  height: 10cqw;
+  background: #38bdf8;
+  z-index: 20;
+  opacity: 0.6;
+  animation: rain-fall 0.8s infinite linear;
+}
+@keyframes rain-fall {
+  0% { transform: translateY(-20cqw) rotate(15deg); opacity: 0; }
+  20% { opacity: 0.8; }
+  80% { opacity: 0.8; }
+  100% { transform: translateY(40cqw) rotate(15deg); opacity: 0; }
+}
+.storm-drop.d1 { left: 20%; animation-delay: 0.1s; }
+.storm-drop.d2 { left: 50%; animation-delay: 0.5s; }
+.storm-drop.d3 { left: 80%; animation-delay: 0.3s; }
+
+/* Ghiacciolo */
+.dec-ghiacciolo {
+  border: 2px solid #7dd3fc;
+  box-shadow: 0 0 8px #38bdf8, inset 0 0 8px #38bdf8;
+  position: relative;
+}
+.dec-ghiacciolo::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border-top: 3px solid #ffffff;
+  border-right: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 3px solid #e0f2fe;
+  animation: spin-slow 6s linear infinite;
+  z-index: 0;
+  opacity: 0.7;
+}
+.ice-flake {
+  position: absolute;
+  color: #e0f2fe;
+  font-size: 12cqw;
+  z-index: 20;
+  animation: snow-fall 3s infinite linear;
+  pointer-events: none;
+}
+@keyframes snow-fall {
+  0% { transform: translateY(-10cqw) rotate(0deg); opacity: 0; }
+  20% { opacity: 0.8; }
+  80% { opacity: 0.8; }
+  100% { transform: translateY(30cqw) rotate(360deg); opacity: 0; }
+}
+.ice-flake.f1 { left: 15%; animation-delay: 0s; }
+.ice-flake.f2 { left: 50%; animation-delay: 1.5s; }
+.ice-flake.f3 { left: 85%; animation-delay: 0.7s; }
 
 /* 4. Supernova Cosmica (Premium) */
 .dec-supernova {

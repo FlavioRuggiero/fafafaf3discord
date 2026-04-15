@@ -29,6 +29,11 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'matrix', name: 'Hacker Matrix', price: 85, type: 'decoration', category: 'Contorni' },
   { id: 'explosive', name: 'Esplosivo Caotico', price: 100, type: 'decoration', category: 'Contorni' },
   { id: 'holographic', name: 'Riflesso Olografico', price: 100, type: 'decoration', category: 'Contorni' },
+  
+  // Nuovi contorni intermedi
+  { id: 'tempesta', name: 'Tempesta', price: 120, type: 'decoration', category: 'Contorni' },
+  { id: 'ghiacciolo', name: 'Ghiacciolo', price: 120, type: 'decoration', category: 'Contorni' },
+
   { id: 'esquelito', name: 'Esquelito Explosivo', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'supernova', name: 'Supernova Cosmica', price: 250, type: 'decoration', category: 'Contorni Premium' },
   { id: 'oceanic', name: 'Vortice Oceanico', price: 250, type: 'decoration', category: 'Contorni Premium' },
