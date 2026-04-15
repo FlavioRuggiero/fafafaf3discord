@@ -15,6 +15,7 @@ import { ProfilePopover } from "./ProfilePopover";
 import { AdminPanel } from "./AdminPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
+import { ServerNotificationsModal } from "./ServerNotificationsModal";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -68,6 +69,9 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [members, setMembers] = useState<ServerMemberWithProfile[]>([]);
   
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   const { 
     joinVoiceChannel, 
@@ -346,6 +350,32 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
       supabase.removeChannel(memberSub);
     };
   }, [activeServer?.id]);
+
+  useEffect(() => {
+    const canManage = serverPermissions?.can_manage_server || serverPermissions?.can_manage_roles;
+    if (!activeServer?.id || !canManage) return;
+    
+    let isMounted = true;
+    const fetchRequests = async () => {
+      const { count } = await supabase
+        .from('server_join_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('server_id', activeServer.id)
+        .eq('status', 'pending');
+      if (isMounted) setPendingRequestsCount(count || 0);
+    };
+    
+    fetchRequests();
+
+    const sub = supabase.channel(`requests-count-${activeServer.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_join_requests', filter: `server_id=eq.${activeServer.id}` }, fetchRequests)
+      .subscribe();
+
+    return () => { 
+      isMounted = false;
+      supabase.removeChannel(sub); 
+    };
+  }, [activeServer?.id, serverPermissions]);
 
   const displayChannels = useMemo(() => {
     return [...localChannels]
@@ -953,7 +983,22 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               <LogOut size={16} />
             </button>
           )}
-          <ChevronDown size={18} className="text-[#dbdee1] ml-1" />
+          {canManageServer ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowNotifications(true); }}
+              className="p-1 text-[#dbdee1] hover:text-white transition-opacity ml-1 relative"
+              title="Notifiche Server"
+            >
+              <Bell size={16} />
+              {pendingRequestsCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-[#f23f43] text-white text-[10px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </button>
+          ) : (
+            <ChevronDown size={18} className="text-[#dbdee1] ml-1" />
+          )}
         </div>
       </div>
 
@@ -1662,6 +1707,13 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           </div>
         </div>,
         document.body
+      )}
+
+      {showNotifications && activeServer && (
+        <ServerNotificationsModal 
+          serverId={activeServer.id} 
+          onClose={() => setShowNotifications(false)} 
+        />
       )}
     </div>
   );
