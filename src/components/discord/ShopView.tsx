@@ -33,6 +33,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   
   // Stati per la rotazione dello shop
   const [activeItems, setActiveItems] = useState<ShopItem[]>([]);
+  const [discountedIndex, setDiscountedIndex] = useState<number>(0);
   const [countdown, setCountdown] = useState<string>("");
 
   // Stati per i Bauli
@@ -81,6 +82,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
         }
         
         setActiveItems(items.slice(0, 4));
+        // Scegliamo un indice da 0 a 3 per lo sconto basato sul seed dell'ora
+        setDiscountedIndex(hourSeed % 4);
       }
 
       const nextHourTimestamp = (hourSeed + 1) * msPerHour;
@@ -121,8 +124,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     }
   };
 
-  const handlePurchase = async (item: ShopItem) => {
-    if (currentUser.digitalcardus < item.price) {
+  const handlePurchase = async (item: ShopItem, actualPrice: number) => {
+    if (currentUser.digitalcardus < actualPrice) {
       showError("Non hai abbastanza digitalcardus!");
       return;
     }
@@ -134,7 +137,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
     setIsPurchasing(true);
     try {
-      const newBalance = currentUser.digitalcardus - item.price;
+      const newBalance = currentUser.digitalcardus - actualPrice;
       const newPurchased = [...(currentUser.purchased_decorations || []), item.id];
 
       const { error } = await supabase.from('profiles').update({
@@ -326,16 +329,25 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {activeItems.map(item => {
+              {activeItems.map((item, index) => {
                 const isOwned = currentUser.purchased_decorations?.includes(item.id);
+                const isDiscounted = index === discountedIndex;
+                const actualPrice = isDiscounted ? Math.ceil(item.price * 0.8) : item.price;
 
                 return (
-                  <div key={item.id} className="relative bg-[#2b2d31]/90 backdrop-blur-sm border border-[#1e1f22] rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147] group hover:z-50">
+                  <div key={item.id} className={`relative bg-[#2b2d31]/90 backdrop-blur-sm border ${isDiscounted ? 'border-[#f23f43]' : 'border-[#1e1f22]'} rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md hover:border-[#3f4147] group hover:z-50`}>
                     
                     {/* Badge Categoria */}
                     <div className="absolute top-3 left-3 bg-[#1e1f22] text-[#949ba4] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border border-[#3f4147]/50 shadow-sm">
                       {item.category}
                     </div>
+
+                    {/* Badge Sconto */}
+                    {isDiscounted && (
+                      <div className="absolute top-3 right-3 bg-[#f23f43] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shadow-sm z-10 animate-pulse">
+                        -20%
+                      </div>
+                    )}
 
                     {item.type === 'privilege' ? (
                       <Tooltip delayDuration={0}>
@@ -381,15 +393,22 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                         </button>
                       ) : (
                         <button 
-                          onClick={() => handlePurchase(item)} 
-                          disabled={isPurchasing || currentUser.digitalcardus < item.price}
+                          onClick={() => handlePurchase(item, actualPrice)} 
+                          disabled={isPurchasing || currentUser.digitalcardus < actualPrice}
                           className={`w-full py-2 rounded font-medium transition-colors text-sm flex items-center justify-center ${
-                            currentUser.digitalcardus < item.price 
+                            currentUser.digitalcardus < actualPrice 
                               ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
                               : 'bg-[#23a559] text-white hover:bg-[#1a7c43]'
                           }`}
                         >
-                          Acquista - {item.price}
+                          Acquista - {isDiscounted ? (
+                            <span className="flex items-center gap-1.5 ml-1">
+                              <span className="line-through text-white/50 text-xs">{item.price}</span>
+                              <span>{actualPrice}</span>
+                            </span>
+                          ) : (
+                            <span className="ml-1">{item.price}</span>
+                          )}
                           <img src="/digitalcardus.png" alt="Digitalcardus" className="w-3.5 h-3.5 ml-1.5 object-contain" />
                         </button>
                       )}
