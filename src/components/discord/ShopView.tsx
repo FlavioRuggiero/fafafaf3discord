@@ -47,6 +47,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
   const standardChests = currentUser.standard_chests || 0;
   const premiumChests = currentUser.premium_chests || 0;
+  
+  // Calcolo dei DC giornalieri in base al livello
+  const dailyDcAmount = 3 + ((currentUser.level || 1) - 1);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -317,7 +320,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white mb-1">Premio Giornaliero</h2>
-                <p className="text-[#b5bac1] text-sm">Riscatta ogni giorno per ottenere <span className="text-[#23a559] font-bold">3 DC</span> e <span className="text-brand font-bold">5 XP</span>!</p>
+                <p className="text-[#b5bac1] text-sm">Riscatta ogni giorno per ottenere <span className="text-[#23a559] font-bold">{dailyDcAmount} DC</span> e <span className="text-brand font-bold">5 XP</span>!</p>
               </div>
             </div>
             <button 

@@ -65,6 +65,8 @@ export const Progression = ({ currentUser }: ProgressionProps) => {
         </h1>
         <p className="text-[#b5bac1] mt-2">
           Sali di livello guadagnando XP e sblocca ricompense esclusive. Il tuo livello attuale è <strong className="text-white">{currentUser.level || 1}</strong>.
+          <br/>
+          <span className="text-[#23a559] text-sm font-medium mt-1 inline-block">✨ Bonus Passivo: Ottieni +1 Digitalcardus giornaliero per ogni livello! (Attuale: +{(currentUser.level || 1) - 1} DC)</span>
         </p>
       </div>
 
