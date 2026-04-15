@@ -39,6 +39,9 @@ export type User = {
   avatar_decoration?: string | null;
   purchased_decorations?: string[];
   entrance_audio_url?: string | null;
+  claimed_levels?: number[];
+  standard_chests?: number;
+  premium_chests?: number;
 };
 
 export type Server = {
@@ -92,6 +95,9 @@ export type Profile = {
   avatar_decoration?: string | null;
   purchased_decorations?: string[];
   entrance_audio_url?: string | null;
+  claimed_levels?: number[];
+  standard_chests?: number;
+  premium_chests?: number;
 };
 
 export type ServerMember = {

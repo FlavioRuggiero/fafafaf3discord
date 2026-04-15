@@ -45,6 +45,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   const today = new Date().toISOString().split('T')[0];
   const canClaimReward = currentUser?.last_reward_date !== today;
 
+  const standardChests = currentUser.standard_chests || 0;
+  const premiumChests = currentUser.premium_chests || 0;
+
   useEffect(() => {
     const fetchSettings = async () => {
       const { data } = await supabase.from('chest_settings').select('*').eq('id', 1).single();
@@ -155,9 +158,12 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
   };
 
   const openChest = async (type: 'standard' | 'premium') => {
-    const cost = type === 'standard' ? 20 : 50;
-    if (currentUser.digitalcardus < cost) {
-      showError("Non hai abbastanza digitalcardus!");
+    const isPremium = type === 'premium';
+    const hasFreeChest = isPremium ? premiumChests > 0 : standardChests > 0;
+    const cost = isPremium ? 50 : 20;
+
+    if (!hasFreeChest && currentUser.digitalcardus < cost) {
+      showError("Non hai abbastanza digitalcardus o bauli gratuiti!");
       return;
     }
 
@@ -169,7 +175,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       let weight = 50000 / (item.price * item.price); 
       
       // Usa i valori dinamici dal database
-      if (type === 'premium' && item.price >= chestSettings.rare_threshold) {
+      if (isPremium && item.price >= chestSettings.rare_threshold) {
         weight *= chestSettings.premium_multiplier;
       }
       
@@ -189,8 +195,17 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
     const isOwned = currentUser.purchased_decorations?.includes(selectedItem.id);
     let refund = 0;
-    let newBalance = currentUser.digitalcardus - cost;
+    let newBalance = currentUser.digitalcardus;
+    let newStandard = standardChests;
+    let newPremium = premiumChests;
     let newPurchased = currentUser.purchased_decorations || [];
+
+    if (hasFreeChest) {
+      if (isPremium) newPremium -= 1;
+      else newStandard -= 1;
+    } else {
+      newBalance -= cost;
+    }
 
     if (isOwned) {
       refund = Math.ceil(selectedItem.price / 3);
@@ -201,7 +216,9 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
     const { error } = await supabase.from('profiles').update({
       digitalcardus: newBalance,
-      purchased_decorations: newPurchased
+      purchased_decorations: newPurchased,
+      standard_chests: newStandard,
+      premium_chests: newPremium
     }).eq('id', currentUser.id);
 
     if (error) {
@@ -436,6 +453,11 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                   <div className="absolute inset-0 bg-[#2b2d31] rounded-xl border-2 border-blue-400 flex items-center justify-center">
                     <Package size={48} className="text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
                   </div>
+                  {standardChests > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-[#f23f43] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg z-10">
+                      {standardChests}
+                    </div>
+                  )}
                 </div>
                 
                 <h3 className="font-bold text-lg text-blue-400 mb-2">Baule Standard</h3>
@@ -443,16 +465,22 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 
                 <button 
                   onClick={() => openChest('standard')}
-                  disabled={openingChestType !== null || currentUser.digitalcardus < 20}
+                  disabled={openingChestType !== null || (standardChests === 0 && currentUser.digitalcardus < 20)}
                   className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
-                    currentUser.digitalcardus < 20 || openingChestType !== null
+                    (standardChests === 0 && currentUser.digitalcardus < 20) || openingChestType !== null
                       ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
                       : 'bg-blue-600 text-white hover:bg-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)]'
                   }`}
                 >
                   <Unlock size={18} />
-                  Apri - 20
-                  <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
+                  {standardChests > 0 ? (
+                    'Apri Gratis'
+                  ) : (
+                    <>
+                      Apri - 20
+                      <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -467,6 +495,11 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                     <Package size={56} className="text-yellow-400 drop-shadow-[0_0_12px_rgba(234,179,8,0.8)]" />
                     <Sparkles size={24} className="absolute top-2 right-2 text-yellow-200 animate-bounce" />
                   </div>
+                  {premiumChests > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-[#f23f43] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg z-10">
+                      {premiumChests}
+                    </div>
+                  )}
                 </div>
                 
                 <h3 className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">Baule Premium</h3>
@@ -474,16 +507,22 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                 
                 <button 
                   onClick={() => openChest('premium')}
-                  disabled={openingChestType !== null || currentUser.digitalcardus < 50}
+                  disabled={openingChestType !== null || (premiumChests === 0 && currentUser.digitalcardus < 50)}
                   className={`mt-auto w-full py-3 rounded font-bold transition-all flex items-center justify-center gap-2 ${
-                    currentUser.digitalcardus < 50 || openingChestType !== null
+                    (premiumChests === 0 && currentUser.digitalcardus < 50) || openingChestType !== null
                       ? 'bg-[#4f545c] text-[#b5bac1] cursor-not-allowed' 
                       : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white hover:from-yellow-400 hover:to-orange-500 hover:shadow-[0_0_20px_rgba(234,179,8,0.5)]'
                   }`}
                 >
                   <Unlock size={18} />
-                  Apri - 50
-                  <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
+                  {premiumChests > 0 ? (
+                    'Apri Gratis'
+                  ) : (
+                    <>
+                      Apri - 50
+                      <img src="/digitalcardus.png" alt="Digitalcardus" className="w-4 h-4 object-contain" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>

@@ -1,0 +1,3 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS claimed_levels INTEGER[] DEFAULT '{}'::INTEGER[];
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS standard_chests INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS premium_chests INTEGER DEFAULT 0;

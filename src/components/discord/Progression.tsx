@@ -1,40 +1,50 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User } from '@/types/discord';
 import { Award, Gift, Lock, Check } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProgressionProps {
   currentUser: User;
 }
 
 export const Progression = ({ currentUser }: ProgressionProps) => {
-  const [claimedLevels, setClaimedLevels] = useState<number[]>([]);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const claimedLevels = currentUser.claimed_levels || [];
 
-  useEffect(() => {
-    const saved = localStorage.getItem(`claimed_levels_${currentUser.id}`);
-    if (saved) {
-      try {
-        setClaimedLevels(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, [currentUser.id]);
-
-  const handleClaim = (level: number, rewardType: string, count: number) => {
+  const handleClaim = async (level: number, rewardType: string, count: number) => {
     if (level > (currentUser.level || 1)) {
       showError("Non hai ancora raggiunto questo livello!");
       return;
     }
+    if (claimedLevels.includes(level)) {
+      showError("Hai già riscattato questa ricompensa!");
+      return;
+    }
 
+    setIsClaiming(true);
     const newClaimed = [...claimedLevels, level];
-    setClaimedLevels(newClaimed);
-    localStorage.setItem(`claimed_levels_${currentUser.id}`, JSON.stringify(newClaimed));
+    let newStandard = currentUser.standard_chests || 0;
+    let newPremium = currentUser.premium_chests || 0;
 
-    // Qui in futuro potrai aggiungere la logica per salvare i bauli nel database
-    showSuccess(`Hai riscattato ${count}x ${rewardType}!`);
+    if (rewardType === 'Baule Standard') newStandard += count;
+    if (rewardType === 'Baule Premium') newPremium += count;
+
+    const { error } = await supabase.from('profiles').update({
+      claimed_levels: newClaimed,
+      standard_chests: newStandard,
+      premium_chests: newPremium
+    }).eq('id', currentUser.id);
+
+    setIsClaiming(false);
+
+    if (error) {
+      showError("Errore durante il riscatto della ricompensa.");
+    } else {
+      showSuccess(`Hai riscattato ${count}x ${rewardType}! Li trovi nel Cardi E-Shop.`);
+    }
   };
 
   const getRewardForLevel = (level: number) => {
@@ -47,7 +57,7 @@ export const Progression = ({ currentUser }: ProgressionProps) => {
   const levels = Array.from({ length: maxLevel }, (_, i) => i + 1);
 
   return (
-    <div className="flex flex-col h-full bg-[#313338] text-white overflow-hidden">
+    <div className="flex flex-col h-full bg-[#313338] text-white overflow-hidden w-full">
       <div className="p-6 border-b border-[#1f2023] shadow-sm flex-shrink-0">
         <h1 className="text-2xl font-bold flex items-center gap-3">
           <Award className="text-[#5865f2]" size={28} />
@@ -97,7 +107,7 @@ export const Progression = ({ currentUser }: ProgressionProps) => {
 
                 <button
                   onClick={() => handleClaim(level, reward.type, reward.count)}
-                  disabled={!isUnlocked || isClaimed}
+                  disabled={!isUnlocked || isClaimed || isClaiming}
                   className={`w-full py-2.5 rounded font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
                     isClaimed ? 'bg-[#23a559] text-white cursor-default' :
                     isUnlocked ? 'bg-[#5865f2] hover:bg-[#4752c4] text-white shadow-lg' :
