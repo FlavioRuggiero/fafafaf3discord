@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command, Shield } from "lucide-react";
+import { Hash, Users, Menu, Volume2, SmilePlus, Reply as ReplyIcon, Pencil, X, Trash2, MicOff, Headphones, MonitorUp, MonitorOff, Maximize, Minimize, Rocket, Play, Monitor, PlusCircle, UploadCloud, Image as ImageIcon, Mic, Square, Command, Shield, Gamepad2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import EmojiPicker, { Theme } from "emoji-picker-react";
@@ -354,7 +354,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const showCommandMenu = inputValue.startsWith('/') && filteredCommands.length > 0;
 
   const scrollToBottom = () => {
-    if (channel?.type !== 'voice') {
+    if (channel?.type === 'text') {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   };
@@ -371,7 +371,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   useEffect(() => {
-    if (!isLoading && !editingMessageId && channel?.type !== 'voice') scrollToBottom();
+    if (!isLoading && !editingMessageId && channel?.type === 'text') scrollToBottom();
   }, [realMessages, propMessages, typingUsers, isLoading, channel?.type]);
 
   useEffect(() => {
@@ -509,7 +509,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   }, [channel?.id, channel?.type, channel?.server_id, currentUser?.id]);
 
   useEffect(() => {
-    if (!channel?.id || channel?.type === 'voice') {
+    if (!channel?.id || channel?.type !== 'text') {
       setIsLoading(false);
       return;
     }
@@ -776,7 +776,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   }, [channel?.id, channel?.type, tableExists, authUser?.id]);
 
   useEffect(() => {
-    if (!channel?.id || !currentUser?.id || channel?.type === 'voice') return;
+    if (!channel?.id || !currentUser?.id || channel?.type !== 'text') return;
 
     const room = supabase.channel(`typing:${channel.id}`, {
       config: { presence: { key: currentUser.id } },
@@ -993,7 +993,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (channel?.type !== 'voice') setIsDraggingFile(true);
+    if (channel?.type === 'text') setIsDraggingFile(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -1004,7 +1004,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingFile(false);
-    if (channel?.type === 'voice') return;
+    if (channel?.type !== 'text') return;
     
     const file = e.dataTransfer.files?.[0];
     if (file) {
@@ -1015,7 +1015,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>, ref: React.RefObject<HTMLDivElement>, triggerInput: (el: HTMLDivElement) => void) => {
     e.preventDefault();
     
-    if (isUploading || channel?.type === 'voice') return;
+    if (isUploading || channel?.type !== 'text') return;
     
     const items = e.clipboardData?.items;
     let hasImage = false;
@@ -1861,6 +1861,45 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // VISTA CANALE MINIGIOCO
+  if (channel.type === 'minigame') {
+    return (
+      <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
+        <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338]">
+          <div className="flex items-center min-w-0 flex-1">
+            <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
+              <Menu size={24} />
+            </button>
+            <Gamepad2 size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+            <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
+          </div>
+          <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
+            <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
+              <Users size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 w-full h-full p-4 bg-[#2b2d31]">
+          {(channel as any).minigame_url ? (
+            <iframe 
+              src={(channel as any).minigame_url} 
+              className="w-full h-full rounded-lg border-none bg-black shadow-lg"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-[#949ba4]">
+              <Gamepad2 size={64} className="mb-4 opacity-50" />
+              <h2 className="text-xl font-bold text-white mb-2">Nessun minigioco configurato</h2>
+              <p>Il creatore del canale deve impostare un URL nelle impostazioni del canale.</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
