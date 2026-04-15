@@ -186,7 +186,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       return { item, weight };
     });
 
-    let random = Math.random() * totalWeight;<dyad-write path="src/components/discord/ShopView.tsx" description="Rimosso l'effetto testo per Tempesta e Ghiacciolo">
+    let random = Math.random() * totalWeight;
     let selectedItem = SHOP_ITEMS[0];
     for (const { item, weight } of weightedItems) {
       random -= weight;
