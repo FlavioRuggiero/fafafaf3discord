@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell, Image as ImageIcon } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +59,8 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
   const [settingsIsLocked, setSettingsIsLocked] = useState(false);
   const [settingsIsWelcome, setSettingsIsWelcome] = useState(false);
   const [settingsMinigameUrl, setSettingsMinigameUrl] = useState("");
+  const [settingsMinigameIcon, setSettingsMinigameIcon] = useState<string | null>(null);
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
 
   const [dragItem, setDragItem] = useState<{ id: string, type: 'category' | 'channel', category?: string } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ id: string, type: 'category' | 'channel', position: 'top' | 'bottom' } | null>(null);
@@ -539,6 +541,33 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
     }
   };
 
+  const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 100 * 1024) {
+      showError("L'icona non può superare i 100KB.");
+      return;
+    }
+
+    setIsUploadingIcon(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `minigame_icon_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `minigame_icons/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, file);
+    
+    if (uploadError) {
+      showError("Errore durante il caricamento dell'icona.");
+      setIsUploadingIcon(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+    setSettingsMinigameIcon(data.publicUrl);
+    setIsUploadingIcon(false);
+  };
+
   const handleSaveChannelSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!channelToSettings || !activeServer) return;
@@ -554,7 +583,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           cooldown: settingsCooldown, 
           is_locked: settingsIsLocked, 
           is_welcome_channel: settingsIsWelcome,
-          ...((channelToSettings.type === 'minigame' ? { minigame_url: settingsMinigameUrl } : {}) as any)
+          ...((channelToSettings.type === 'minigame' ? { minigame_url: settingsMinigameUrl, minigame_icon_url: settingsMinigameIcon } : {}) as any)
         };
       }
       if (settingsIsWelcome && c.server_id === activeServer.id && c.id !== channelId) {
@@ -578,6 +607,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
 
       if (channelToSettings.type === 'minigame') {
         updateData.minigame_url = settingsMinigameUrl;
+        updateData.minigame_icon_url = settingsMinigameIcon;
       }
 
       const { error } = await supabase.from('channels').update(updateData).eq('id', channelId);
@@ -1010,7 +1040,12 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                 : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'
                             } ${channel.unread && !isActive && channel.type !== 'voice' ? 'text-white font-medium' : ''} ${isDeleting === channel.id ? 'opacity-50 pointer-events-none' : ''}`}
                           >
-                            <Icon size={18} className={`mr-1.5 flex-shrink-0 ${isVoiceChannel && connectedMembers.length > 0 ? 'text-[#23a559]' : 'opacity-70'}`} />
+                            <div className="relative mr-1.5 flex-shrink-0">
+                              <Icon size={18} className={`${isVoiceChannel && connectedMembers.length > 0 ? 'text-[#23a559]' : (isActive && channel.type === 'minigame' ? 'text-[#23a559]' : 'opacity-70')}`} />
+                              {channel.type === 'minigame' && channel.minigame_icon_url && (
+                                <img src={channel.minigame_icon_url} className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full border-[1.5px] border-[#2b2d31] object-cover bg-[#2b2d31]" alt="icon" />
+                              )}
+                            </div>
                             <span className="truncate flex-1">{channel.name}</span>
                             
                             <div className="flex items-center flex-shrink-0">
@@ -1028,6 +1063,7 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                                         setSettingsIsLocked(channel.is_locked || false);
                                         setSettingsIsWelcome(channel.is_welcome_channel || false);
                                         setSettingsMinigameUrl((channel as any).minigame_url || "");
+                                        setSettingsMinigameIcon((channel as any).minigame_icon_url || null);
                                       }}
                                       className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all"
                                       title="Impostazioni Canale"
@@ -1462,21 +1498,44 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               <div className="p-4 space-y-6">
                 
                 {channelToSettings.type === 'minigame' ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="flex items-center text-white font-medium">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="flex items-center text-white font-medium mb-2">
                         <Gamepad2 size={18} className="mr-2 text-[#949ba4]" />
                         URL Minigioco (Iframe)
                       </label>
+                      <input 
+                        type="url" 
+                        value={settingsMinigameUrl}
+                        onChange={(e) => setSettingsMinigameUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full bg-[#1e1f22] text-white p-2 rounded border-none outline-none focus:ring-1 focus:ring-brand"
+                      />
                     </div>
-                    <p className="text-xs text-[#b5bac1] mb-3">Inserisci il link del gioco da incorporare nel canale.</p>
-                    <input 
-                      type="url" 
-                      value={settingsMinigameUrl}
-                      onChange={(e) => setSettingsMinigameUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full bg-[#1e1f22] text-white p-2 rounded border-none outline-none focus:ring-1 focus:ring-brand"
-                    />
+                    <div>
+                      <label className="flex items-center text-white font-medium mb-2">
+                        <ImageIcon size={18} className="mr-2 text-[#949ba4]" />
+                        Icona Minigioco (Max 100KB)
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-[#1e1f22] rounded-lg flex items-center justify-center overflow-hidden border border-[#3f4147]">
+                          {settingsMinigameIcon ? (
+                            <img src={settingsMinigameIcon} alt="Icon" className="w-full h-full object-cover" />
+                          ) : (
+                            <Gamepad2 size={24} className="text-[#4e5058]" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleIconUpload}
+                            disabled={isUploadingIcon}
+                            className="block w-full text-sm text-[#b5bac1] file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-[#5865f2] file:text-white hover:file:bg-[#4752c4] cursor-pointer disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -1560,9 +1619,10 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
                 </button>
                 <button 
                   type="submit" 
-                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] transition-colors"
+                  disabled={isUploadingIcon}
+                  className="bg-[#5865f2] text-white rounded text-sm px-6 py-2 hover:bg-[#4752c4] disabled:opacity-50 transition-colors"
                 >
-                  Salva Modifiche
+                  {isUploadingIcon ? 'Caricamento...' : 'Salva Modifiche'}
                 </button>
               </div>
             </form>

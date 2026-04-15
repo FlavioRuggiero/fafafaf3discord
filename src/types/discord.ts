@@ -65,6 +65,7 @@ export type Channel = {
   is_locked?: boolean;
   is_welcome_channel?: boolean;
   minigame_url?: string | null;
+  minigame_icon_url?: string | null;
 };
 
 export type Message = {
