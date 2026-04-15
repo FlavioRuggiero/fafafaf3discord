@@ -46,12 +46,12 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: 'Ti permette di caricare un\'immagine o una GIF personalizzata come banner del tuo profilo, anche se non sei Admin.'
   },
   { 
-    id: 'privilege-upload', 
-    name: 'Upload Esteso', 
+    id: 'privilege-welcome', 
+    name: 'Il mio benvenuto', 
     price: 500, 
     type: 'privilege', 
     category: 'Privilegi',
-    description: 'Ti permette di inviare audio fino a 45 secondi e caricare immagini fino a 6MB in chat.'
+    description: 'Personalizza il testo, il colore di sfondo e del bordo del messaggio che appare automaticamente quando entri in un server.'
   },
   { 
     id: 'privilege-daily-bonus', 
