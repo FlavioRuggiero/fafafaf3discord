@@ -1869,7 +1869,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   if (channel.type === 'minigame') {
     return (
       <div className="flex-1 flex flex-col min-w-0 bg-[#313338] relative h-full">
-        <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338]">
+        <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-between px-4 flex-shrink-0 bg-[#313338] z-10">
           <div className="flex items-center min-w-0 flex-1">
             <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
               <Menu size={24} />
@@ -1884,19 +1884,39 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           </div>
         </div>
 
-        <div className="flex-1 w-full p-4 bg-[#2b2d31] min-h-0">
-          {channel.minigame_url ? (
-            <iframe 
-              src={channel.minigame_url} 
-              className="w-full h-full rounded-lg border-none bg-black shadow-lg"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+        <div className="flex-1 w-full p-4 md:p-6 bg-[#2b2d31] min-h-0 flex flex-col">
+          {(channel as any).minigame_url ? (
+            <div className="flex-1 w-full h-full bg-[#111214] rounded-xl border border-[#1e1f22] shadow-2xl flex flex-col overflow-hidden relative group">
+              {/* Activity Header */}
+              <div className="h-10 bg-[#1e1f22] border-b border-[#111214] flex items-center justify-between px-4 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#23a559] animate-pulse"></div>
+                  <span className="text-xs font-bold text-[#dbdee1] uppercase tracking-wider">Attività in corso</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-[#949ba4] bg-[#2b2d31] px-2 py-0.5 rounded font-medium">
+                    {(() => {
+                      try { return new URL((channel as any).minigame_url).hostname; } 
+                      catch { return "Sconosciuto"; }
+                    })()}
+                  </span>
+                </div>
+              </div>
+              {/* Iframe */}
+              <div className="flex-1 relative bg-black">
+                <iframe 
+                  src={(channel as any).minigame_url} 
+                  className="absolute inset-0 w-full h-full border-none"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-[#949ba4]">
+            <div className="flex-1 flex flex-col items-center justify-center h-full text-[#949ba4] bg-[#1e1f22] rounded-xl border border-[#2b2d31] border-dashed">
               <Gamepad2 size={64} className="mb-4 opacity-50" />
               <h2 className="text-xl font-bold text-white mb-2">Nessun minigioco configurato</h2>
-              <p>Il creatore del canale deve impostare un URL nelle impostazioni del canale.</p>
+              <p className="text-sm">Il creatore del canale deve impostare un URL nelle impostazioni del canale.</p>
             </div>
           )}
         </div>
