@@ -147,22 +147,28 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
   };
 
   const handleAcceptFriend = async (id: string) => {
+    // Aggiornamento ottimistico
+    setFriendRequests(prev => prev.filter(r => r.id !== id));
+    
     const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', id);
     if (!error) {
       showSuccess("Richiesta di amicizia accettata!");
-      setFriendRequests(prev => prev.filter(r => r.id !== id));
     } else {
       showError("Errore durante l'accettazione.");
+      fetchNotifications(); // Ripristina in caso di errore
     }
   };
 
   const handleDeclineFriend = async (id: string) => {
+    // Aggiornamento ottimistico
+    setFriendRequests(prev => prev.filter(r => r.id !== id));
+    
     const { error } = await supabase.from('friendships').delete().eq('id', id);
     if (!error) {
       showSuccess("Richiesta rifiutata.");
-      setFriendRequests(prev => prev.filter(r => r.id !== id));
     } else {
       showError("Errore durante il rifiuto.");
+      fetchNotifications(); // Ripristina in caso di errore
     }
   };
 

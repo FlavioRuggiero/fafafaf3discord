@@ -266,6 +266,13 @@ const Index = () => {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => fetchFriendRequestCount())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => fetchFriendRequestCount())
+      // Listener per notificare il mittente quando la sua richiesta viene accettata
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `sender_id=eq.${userId}` }, (payload) => {
+        if (payload.new.status === 'accepted') {
+          playSound('/notifica.mp3');
+          showSuccess("Una tua richiesta di amicizia è stata accettata!");
+        }
+      })
       .subscribe();
 
     return () => {

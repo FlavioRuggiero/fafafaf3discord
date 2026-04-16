@@ -3,6 +3,7 @@ import { Users, Search, Check, X, MessageSquare } from "lucide-react";
 import { User, Friendship } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { playSound } from "@/utils/sounds";
 
 interface FriendsAreaProps {
   currentUser: User;
@@ -103,6 +104,7 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
       if (error.code === '23505') showError("Richiesta di amicizia già inviata o siete già amici.");
       else showError("Errore durante l'invio della richiesta.");
     } else {
+      playSound('/notifica.mp3');
       showSuccess("Richiesta di amicizia inviata!");
       setAddFriendQuery("");
       setSearchResults([]);
@@ -110,18 +112,36 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
   };
 
   const acceptRequest = async (friendshipId: string) => {
+    // Aggiornamento ottimistico per UI istantanea
+    setFriendships(prev => prev.map(f => f.id === friendshipId ? { ...f, status: 'accepted' } : f));
+    
     const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
-    if (error) showError("Errore durante l'accettazione.");
+    if (error) {
+      showError("Errore durante l'accettazione.");
+      fetchFriendships(); // Ripristina in caso di errore
+    }
   };
 
   const declineRequest = async (friendshipId: string) => {
+    // Aggiornamento ottimistico
+    setFriendships(prev => prev.filter(f => f.id !== friendshipId));
+    
     const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
-    if (error) showError("Errore durante il rifiuto.");
+    if (error) {
+      showError("Errore durante il rifiuto.");
+      fetchFriendships();
+    }
   };
 
   const removeFriend = async (friendshipId: string) => {
+    // Aggiornamento ottimistico
+    setFriendships(prev => prev.filter(f => f.id !== friendshipId));
+    
     const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
-    if (error) showError("Errore durante la rimozione.");
+    if (error) {
+      showError("Errore durante la rimozione.");
+      fetchFriendships();
+    }
   };
 
   const pendingRequests = friendships.filter(f => f.status === 'pending');
