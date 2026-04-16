@@ -17,7 +17,7 @@ import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus } from "lucide-react";
+import { Menu, Home, MessageSquare, Compass, Plus, Gamepad2 } from "lucide-react";
 import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
 import { playSound } from "@/utils/sounds";
@@ -1456,39 +1456,66 @@ const Index = () => {
         </div>
 
         {activeServerId !== 'home' && activeChannel ? (
-          <>
-            <ChatArea 
-              channel={activeChannel} 
-              messages={currentMessages} 
-              onSendMessage={handleSendMessage}
-              onToggleMembers={() => setShowMembers(!showMembers)}
-              onToggleSidebar={() => setShowSidebar(true)}
-              showMembers={showMembers}
-              serverCreatorId={activeServer?.created_by}
-              serverMembers={serverMembersList}
-              serverPermissions={serverPermissions}
-            />
-            {showMembers && (
-              <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
-            )}
-            <div className={`
-              absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
-              h-full transition-all duration-300
-              ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
-              overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
-            `}>
-              <MemberList 
-                users={serverMembersList} 
-                isOpen={showMembers} 
-                creatorId={activeServer?.created_by} 
-                serverPermissions={serverPermissions}
-                onKickMember={handleKickMember}
-                onBanMember={handleBanMember}
-                serverRoles={serverRoles}
-                onToggleMemberRole={handleToggleMemberRole}
-              />
+          activeChannel.type === 'minigame' ? (
+            <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
+              <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
+                <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
+                  <Menu size={24} />
+                </button>
+                <Gamepad2 size={20} className="text-[#80848e] mr-2" />
+                <h2 className="font-semibold text-white">{activeChannel.name}</h2>
+              </div>
+              <div className="flex-1 w-full h-full bg-[#111214]">
+                {(activeChannel as any).minigame_url ? (
+                  <iframe 
+                    src={(activeChannel as any).minigame_url} 
+                    className="w-full h-full border-none"
+                    title={activeChannel.name}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-[#949ba4]">
+                    Nessun URL configurato per questo minigioco.
+                  </div>
+                )}
+              </div>
             </div>
-          </>
+          ) : (
+            <>
+              <ChatArea 
+                channel={activeChannel} 
+                messages={currentMessages} 
+                onSendMessage={handleSendMessage}
+                onToggleMembers={() => setShowMembers(!showMembers)}
+                onToggleSidebar={() => setShowSidebar(true)}
+                showMembers={showMembers}
+                serverCreatorId={activeServer?.created_by}
+                serverMembers={serverMembersList}
+                serverPermissions={serverPermissions}
+              />
+              {showMembers && (
+                <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
+              )}
+              <div className={`
+                absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
+                h-full transition-all duration-300
+                ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
+                overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
+              `}>
+                <MemberList 
+                  users={serverMembersList} 
+                  isOpen={showMembers} 
+                  creatorId={activeServer?.created_by} 
+                  serverPermissions={serverPermissions}
+                  onKickMember={handleKickMember}
+                  onBanMember={handleBanMember}
+                  serverRoles={serverRoles}
+                  onToggleMemberRole={handleToggleMemberRole}
+                />
+              </div>
+            </>
+          )
         ) : activeServerId === 'home' ? (
           activeChannel?.id === 'shop' ? (
             <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
