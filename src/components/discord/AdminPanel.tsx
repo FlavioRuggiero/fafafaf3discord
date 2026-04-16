@@ -153,18 +153,34 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   };
 
   const handleSendJumpscare = async () => {
+    // Ottieni il canale globale già esistente
     const channel = supabase.channel('global_jumpscare');
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channel.send({
-          type: 'broadcast',
-          event: 'trigger',
-          payload: { targetId: selectedJumpscareTarget }
-        });
-        showSuccess("Jumpscare inviato!");
-        setTimeout(() => supabase.removeChannel(channel), 500);
-      }
-    });
+    
+    const sendPayload = () => {
+      channel.send({
+        type: 'broadcast',
+        event: 'trigger',
+        payload: { targetId: selectedJumpscareTarget }
+      }).then((resp) => {
+        if (resp === 'ok') {
+          showSuccess("Jumpscare inviato con successo!");
+        } else {
+          showError("Errore nell'invio del Jumpscare.");
+        }
+      });
+    };
+
+    // Se il canale è già connesso (grazie a Index.tsx), invia direttamente
+    if (channel.state === 'joined') {
+      sendPayload();
+    } else {
+      // Altrimenti iscriviti e poi invia
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          sendPayload();
+        }
+      });
+    }
   };
 
   // Calcolo live delle probabilità
