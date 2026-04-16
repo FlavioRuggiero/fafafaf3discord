@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Server, ServerRole, ServerPermissions } from "@/types/discord";
-import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock } from "lucide-react";
+import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock, Ban } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { showError, showSuccess } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -376,7 +376,7 @@ interface ServerSettingsModalProps {
 }
 
 export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete, isUpdating = false, serverPermissions }: ServerSettingsModalProps) => {
-  const [activeTab, setActiveTab] = useState<'main' | 'roles'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'roles' | 'bans'>('main');
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -415,6 +415,10 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     can_ban_members: false
   });
 
+  // Bans states
+  const [bannedUsers, setBannedUsers] = useState<any[]>([]);
+  const [isLoadingBans, setIsLoadingBans] = useState(false);
+
   useEffect(() => {
     if (server && isOpen) {
       setActiveTab('main');
@@ -447,9 +451,33 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     }
   };
 
+  const fetchBans = async () => {
+    if (!server) return;
+    setIsLoadingBans(true);
+    const { data, error } = await supabase
+      .from('server_bans')
+      .select('id, user_id, reason, created_at')
+      .eq('server_id', server.id);
+
+    if (data && data.length > 0) {
+      const userIds = data.map(b => b.user_id);
+      const { data: profiles } = await supabase.from('profiles').select('id, first_name, avatar_url').in('id', userIds);
+      const combined = data.map(b => ({
+        ...b,
+        profiles: profiles?.find(p => p.id === b.user_id)
+      }));
+      setBannedUsers(combined);
+    } else {
+      setBannedUsers([]);
+    }
+    setIsLoadingBans(false);
+  };
+
   useEffect(() => {
     if (activeTab === 'roles' && server) {
       loadRolesData();
+    } else if (activeTab === 'bans' && server) {
+      fetchBans();
     }
   }, [activeTab, server]);
 
@@ -612,6 +640,16 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     }
   };
 
+  const handleRevokeBan = async (banId: string) => {
+    const { error } = await supabase.from('server_bans').delete().eq('id', banId);
+    if (error) {
+      showError("Errore durante la revoca del ban.");
+    } else {
+      showSuccess("Ban revocato con successo.");
+      setBannedUsers(prev => prev.filter(b => b.id !== banId));
+    }
+  };
+
   const PERMISSIONS_LIST = [
     { key: 'can_manage_channels', label: 'Gestione Canali', desc: 'Permette di creare, modificare o eliminare canali.' },
     { key: 'can_delete_messages', label: 'Elimina Messaggi', desc: 'Permette di eliminare i messaggi degli altri utenti.' },
@@ -651,6 +689,15 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                 className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'roles' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
               >
                 Gestione ruoli
+              </button>
+            )}
+
+            {(serverPermissions?.can_ban_members || serverPermissions?.isOwner) && (
+              <button 
+                onClick={() => setActiveTab('bans')} 
+                className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'bans' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+              >
+                Gestione Ban
               </button>
             )}
           </div>
@@ -1003,6 +1050,42 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'bans' && (
+              <div className="animate-in fade-in duration-200 h-full flex flex-col">
+                <h2 className="text-xl font-bold text-white mb-6">Utenti Bannati</h2>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  {isLoadingBans ? (
+                    <div className="text-center text-[#949ba4] py-8">Caricamento...</div>
+                  ) : bannedUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-[#949ba4] py-12">
+                      <Ban size={48} className="mb-4 opacity-50" />
+                      <p>Nessun utente è stato bannato da questo server.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {bannedUsers.map(ban => (
+                        <div key={ban.id} className="flex items-center justify-between bg-[#2b2d31] p-3 rounded border border-[#1e1f22]">
+                          <div className="flex items-center gap-3">
+                            <img src={ban.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ban.user_id}`} className="w-10 h-10 rounded-full object-cover bg-[#1e1f22]" />
+                            <div className="flex flex-col">
+                              <span className="text-white font-medium">{ban.profiles?.first_name || 'Utente Sconosciuto'}</span>
+                              <span className="text-xs text-[#949ba4]">Bannato il {new Date(ban.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleRevokeBan(ban.id)}
+                            className="px-3 py-1.5 bg-[#35373c] hover:bg-[#404249] text-white text-sm font-medium rounded transition-colors"
+                          >
+                            Revoca Ban
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

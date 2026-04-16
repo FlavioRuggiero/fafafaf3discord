@@ -251,6 +251,57 @@ const Index = () => {
     };
   }, [currentUser?.id]);
 
+  // Listener globale per la rimozione istantanea dai server (Kick/Ban)
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const sub = supabase.channel(`global_server_members_${user.id}`)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'server_members',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        const removedServerId = payload.old.server_id;
+        
+        setServers(prev => prev.filter(s => s.id !== removedServerId));
+        setAllChannels(prev => prev.filter(c => c.server_id !== removedServerId));
+        
+        if (activeServerIdRef.current === removedServerId) {
+          setActiveServerId('home');
+          showError("Sei stato rimosso dal server.");
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'server_members',
+        filter: `user_id=eq.${user.id}`
+      }, async (payload) => {
+        const newServerId = payload.new.server_id;
+        const { data: serverData } = await supabase.from('servers').select('*').eq('id', newServerId).single();
+        if (serverData) {
+          setServers(prev => {
+            if (prev.some(s => s.id === newServerId)) return prev;
+            return [...prev, serverData];
+          });
+          const { data: channelsData } = await supabase.from('channels').select('*').eq('server_id', newServerId);
+          if (channelsData) {
+            setAllChannels(prev => {
+              const existingIds = new Set(prev.map(c => c.id));
+              const newChannels = channelsData.filter(c => !existingIds.has(c.id));
+              return [...prev, ...newChannels];
+            });
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [user?.id]);
+
   // Listener per conteggio scambi attivi e richieste di amicizia
   useEffect(() => {
     if (!currentUser?.id) return;
