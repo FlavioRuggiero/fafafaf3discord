@@ -409,6 +409,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     can_use_commands: false,
     can_manage_server: false,
     can_manage_roles: false,
+    can_assign_roles: false,
     can_bypass_restrictions: false,
     can_kick_members: false,
     can_ban_members: false
@@ -535,6 +536,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       can_use_commands: false,
       can_manage_server: false,
       can_manage_roles: false,
+      can_assign_roles: false,
       can_bypass_restrictions: false,
       can_kick_members: false,
       can_ban_members: false
@@ -551,6 +553,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
         can_use_commands: false,
         can_manage_server: false,
         can_manage_roles: false,
+        can_assign_roles: false,
         can_bypass_restrictions: false,
         can_kick_members: false,
         can_ban_members: false
@@ -614,7 +617,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     { key: 'can_delete_messages', label: 'Elimina Messaggi', desc: 'Permette di eliminare i messaggi degli altri utenti.' },
     { key: 'can_use_commands', label: 'Usa Comandi', desc: 'Permette di usare comandi speciali come /statusmessage e /mentionseveryone.' },
     { key: 'can_manage_server', label: 'Gestione Server', desc: 'Permette di modificare le impostazioni generali del server.' },
-    { key: 'can_manage_roles', label: 'Gestione Ruoli', desc: 'Permette di creare, modificare o eliminare ruoli e assegnarli agli utenti.' },
+    { key: 'can_manage_roles', label: 'Gestione Ruoli', desc: 'Permette di creare, modificare o eliminare ruoli.' },
+    { key: 'can_assign_roles', label: 'Assegna Ruoli', desc: 'Permette di assegnare o rimuovere ruoli agli altri utenti.' },
     { key: 'can_bypass_restrictions', label: 'Bypass Restrizioni', desc: 'Permette di ignorare il cooldown (slowmode) e di scrivere nei canali bloccati.' },
     { key: 'can_kick_members', label: 'Espelli Membri', desc: 'Permette di rimuovere gli utenti dal server.' },
     { key: 'can_ban_members', label: 'Banna Membri', desc: 'Permette di bannare gli utenti dal server in modo permanente.' },
@@ -874,6 +878,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                               can_use_commands: role.can_use_commands || false,
                               can_manage_server: role.can_manage_server || false,
                               can_manage_roles: role.can_manage_roles || false,
+                              can_assign_roles: role.can_assign_roles || false,
                               can_bypass_restrictions: role.can_bypass_restrictions || false,
                               can_kick_members: role.can_kick_members || false,
                               can_ban_members: role.can_ban_members || false,

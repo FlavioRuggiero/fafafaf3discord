@@ -1,0 +1,1 @@
+ALTER TABLE public.server_roles ADD COLUMN IF NOT EXISTS can_assign_roles BOOLEAN DEFAULT false;

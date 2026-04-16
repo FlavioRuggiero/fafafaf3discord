@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { User, ServerPermissions } from "@/types/discord";
-import { Crown, Shield, Search } from "lucide-react";
+import { User, ServerPermissions, ServerRole } from "@/types/discord";
+import { Crown, Shield, Search, Check, ChevronRight } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,6 +16,8 @@ interface MemberListProps {
   serverPermissions?: ServerPermissions;
   onKickMember?: (id: string) => void;
   onBanMember?: (id: string) => void;
+  serverRoles?: ServerRole[];
+  onToggleMemberRole?: (userId: string, roleId: string, hasRole: boolean) => void;
 }
 
 const statusColors = {
@@ -32,7 +34,7 @@ const statusText = {
   offline: "Offline",
 };
 
-export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, onBanMember }: MemberListProps) => {
+export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, onBanMember, serverRoles, onToggleMemberRole }: MemberListProps) => {
   const { adminId, moderatorIds, user: authUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -50,7 +52,7 @@ export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, 
     const isAdmin = user.id === adminId;
     const isModerator = moderatorIds.includes(user.id);
 
-    const canInteract = !isCreator && user.id !== authUser?.id && (serverPermissions?.can_kick_members || serverPermissions?.can_ban_members);
+    const canInteract = !isCreator && user.id !== authUser?.id && (serverPermissions?.can_kick_members || serverPermissions?.can_ban_members || serverPermissions?.can_assign_roles);
 
     const innerContent = (
       <div className="w-full">
@@ -117,6 +119,37 @@ export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, 
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-1.5 min-w-[160px] z-[99999] animate-in fade-in zoom-in-95 duration-100">
+              
+              {serverPermissions?.can_assign_roles && serverRoles && serverRoles.length > 0 && (
+                <ContextMenu.Sub>
+                  <ContextMenu.SubTrigger className="flex items-center justify-between px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none mb-0.5">
+                    <span>Ruoli</span>
+                    <ChevronRight size={14} />
+                  </ContextMenu.SubTrigger>
+                  <ContextMenu.Portal>
+                    <ContextMenu.SubContent className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-1.5 min-w-[160px] z-[99999] animate-in fade-in zoom-in-95 duration-100">
+                      {serverRoles.map(role => {
+                        const hasRole = user.server_roles?.some(r => r.id === role.id);
+                        return (
+                          <ContextMenu.CheckboxItem
+                            key={role.id}
+                            checked={hasRole}
+                            onCheckedChange={() => onToggleMemberRole?.(user.id, role.id, !!hasRole)}
+                            className="flex items-center px-2 py-1.5 text-sm text-[#dbdee1] hover:bg-[#5865F2] hover:text-white rounded cursor-pointer outline-none mb-0.5"
+                          >
+                            <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: role.color }} />
+                            <span className="flex-1 truncate pr-4">{role.name}</span>
+                            <ContextMenu.ItemIndicator className="ml-2">
+                              <Check size={14} />
+                            </ContextMenu.ItemIndicator>
+                          </ContextMenu.CheckboxItem>
+                        );
+                      })}
+                    </ContextMenu.SubContent>
+                  </ContextMenu.Portal>
+                </ContextMenu.Sub>
+              )}
+
               {serverPermissions?.can_kick_members && (
                 <ContextMenu.Item 
                   className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none mb-0.5" 

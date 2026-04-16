@@ -402,6 +402,7 @@ const Index = () => {
     can_use_commands: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_use_commands) ?? false),
     can_manage_server: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_server) ?? false),
     can_manage_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_roles) ?? false),
+    can_assign_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_assign_roles) ?? false),
     can_bypass_restrictions: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_bypass_restrictions) ?? false),
     can_kick_members: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_kick_members) ?? false),
     can_ban_members: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_ban_members) ?? false),
@@ -1010,6 +1011,19 @@ const Index = () => {
     showSuccess("Utente bannato dal server.");
   };
 
+  const handleToggleMemberRole = async (userId: string, roleId: string, hasRole: boolean) => {
+    if (!activeServerId) return;
+    if (hasRole) {
+      const { error } = await supabase.from('server_member_roles').delete().eq('server_id', activeServerId).eq('user_id', userId).eq('role_id', roleId);
+      if (error) showError("Errore durante la rimozione del ruolo.");
+      else showSuccess("Ruolo rimosso.");
+    } else {
+      const { error } = await supabase.from('server_member_roles').insert({ server_id: activeServerId, user_id: userId, role_id: roleId });
+      if (error) showError("Errore durante l'assegnazione del ruolo.");
+      else showSuccess("Ruolo assegnato.");
+    }
+  };
+
   const handleOpenDiscover = async () => {
     const { data } = await supabase.from('servers').select('*');
     if (data) setPublicServers(data);
@@ -1365,6 +1379,8 @@ const Index = () => {
                 serverPermissions={serverPermissions}
                 onKickMember={handleKickMember}
                 onBanMember={handleBanMember}
+                serverRoles={serverRoles}
+                onToggleMemberRole={handleToggleMemberRole}
               />
             </div>
           </>
