@@ -55,12 +55,7 @@ const ScreenSelectionModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, 
           const formatted = res.map((s: any) => ({
             ...s,
             type: s.id.startsWith('screen') ? 'screen' : 'window',
-            thumbnail: s.thumbnail<think>**Analyzing and Correcting the Code**
-
-I've examined the code snippet, and the previous "think" tag did, indeed, create the syntax error. The goal now is to properly remove that erroneous tag, and ensure the line is correctly formatted. I will rewrite the specified section of `ChatArea.tsx` and verify the `isInputDisabled` line. My next step will be to output the file's content.
-
-
-</think>?.toDataURL ? s.thumbnail.toDataURL() : s.thumbnail
+            thumbnail: s.thumbnail?.toDataURL ? s.thumbnail.toDataURL() : s.thumbnail
           }));
           setSources(formatted);
         } catch (err) {
