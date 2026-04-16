@@ -262,6 +262,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const typingChannelRef = useRef<any>(null);
   const lastTypingStatus = useRef(false);
 
+  // Refs per evitare stale closures in saveEdit
+  const editContentRef = useRef(editContent);
+  useEffect(() => { editContentRef.current = editContent; }, [editContent]);
+
+  const pendingMentionsRef = useRef(pendingMentions);
+  useEffect(() => { pendingMentionsRef.current = pendingMentions; }, [pendingMentions]);
+
   const isServerCreator = currentUser?.id === serverCreatorId;
   const isLocked = channel.type !== 'dm' && channel.is_locked && !isServerCreator && !serverPermissions?.can_bypass_restrictions;
 
@@ -1473,16 +1480,16 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   const saveEdit = async (msgId: string) => {
-    if (!editContent.trim()) {
+    if (!editContentRef.current.trim()) {
       cancelEditing();
       return;
     }
 
     const originalMsg = realMessages.find(m => m.id === msgId);
-    let finalContent = editContent.trim();
+    let finalContent = editContentRef.current.trim();
     
     // Sostituisci le menzioni @nome con <@id>
-    pendingMentions.forEach(m => {
+    pendingMentionsRef.current.forEach(m => {
       const escapedName = m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`@${escapedName}(?=[\\s.,!?]|$)`, 'gi');
       finalContent = finalContent.replace(regex, `<@${m.id}>`);
@@ -1639,6 +1646,381 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
       return <React.Fragment key={i}>{part}</React.Fragment>;
     });
   };
+
+  const renderedMessages = useMemo(() => {
+    return displayMessages.map((msg, idx) => {
+      const isSystemWelcome = msg.content === '<system:welcome>';
+      const isSystemStatus = msg.content.startsWith('<system:status>');
+      
+      const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
+      const isReply = !!replyMatch;
+      const replyToId = isReply ? replyMatch[1] : null;
+      const displayContent = isReply ? replyMatch[2] : msg.content;
+      
+      const imgRegex = /<img:(.*?)>/g;
+      const audioRegex = /<audio:(.*?)>/g;
+      const images: string[] = [];
+      const audios: string[] = [];
+      let match;
+      while ((match = imgRegex.exec(displayContent)) !== null) {
+        images.push(match[1]);
+      }
+      while ((match = audioRegex.exec(displayContent)) !== null) {
+        audios.push(match[1]);
+      }
+      const textContent = displayContent.replace(imgRegex, '').replace(audioRegex, '').trim();
+      
+      let repliedMessage = null;
+      let repliedMessageContent = "";
+      
+      if (isReply) {
+        repliedMessage = displayMessages.find(m => m.id === replyToId);
+        if (repliedMessage) {
+          repliedMessageContent = repliedMessage.content;
+          const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
+          if (nestedMatch) repliedMessageContent = nestedMatch[2];
+          repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@everyone>/g, '@tutti').replace(/<@([a-zA-Z0-9-]+)>/g, (m, id) => {
+            const member = serverMembers?.find(sm => sm.id === id);
+            return member ? `@${member.name}` : '@Sconosciuto';
+          }).trim();
+        } else {
+          repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
+        }
+      }
+
+      const isSameUserAsPrevious = idx > 0 && 
+                                   displayMessages[idx - 1].user.id === msg.user.id && 
+                                   !isReply && 
+                                   displayMessages[idx - 1].content !== '<system:welcome>' && 
+                                   !displayMessages[idx - 1].content.startsWith('<system:status>') &&
+                                   !isSystemWelcome &&
+                                   !isSystemStatus;
+      const isMyMessage = currentUser?.id === msg.user.id;
+      
+      const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome && !isSystemStatus;
+      const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || (serverPermissions?.can_delete_messages ?? false) || (isSystemStatus && isMyMessage);
+      
+      const isEditing = editingMessageId === msg.id;
+      const isPopoverOpen = openPopoverId === msg.id;
+      
+      const msgReactions = reactionsByMessage[msg.id] || [];
+      const reactionCounts: Record<string, { count: number, hasReacted: boolean }> = {};
+      msgReactions.forEach(r => {
+        if (!reactionCounts[r.emoji]) reactionCounts[r.emoji] = { count: 0, hasReacted: false };
+        reactionCounts[r.emoji].count++;
+        if (r.user_id === currentUser?.id) reactionCounts[r.emoji].hasReacted = true;
+      });
+
+      const isMentioned = msg.content.includes(`<@${currentUser?.id}>`) || msg.content.includes('<@everyone>');
+
+      if (isSystemWelcome) {
+        return (
+          <div id={`msg-${msg.id}`} key={msg.id} className="group relative flex flex-col items-center justify-center my-4 px-4 py-2">
+            {canDelete && (
+              <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10">
+                <button 
+                  className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
+                  title="Elimina" 
+                  onClick={() => setMessageToDelete(msg.id)}
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            )}
+            <div 
+              className="flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm"
+              style={{
+                backgroundColor: msg.user.welcome_bg_color || '#2b2d31',
+                borderColor: msg.user.welcome_border_color || '#1e1f22',
+                color: '#949ba4'
+              }}
+            >
+              <span className="text-xl">👋</span>
+              <span className="flex items-center">
+                <ProfilePopover user={getUserWithRoles(msg.user as User)}>
+                  <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline mr-1.5">{msg.user.name}</span>
+                </ProfilePopover>
+                {msg.user.id === adminId && (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                      admin di discord canary 2
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                      moderatore ufficiale
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <span className="text-[#dbdee1]">{msg.user.welcome_text || 'è appena entrato nel server!'}</span>
+              </span>
+              <span className="text-[10px] ml-2 opacity-50">{msg.timestamp}</span>
+            </div>
+          </div>
+        );
+      }
+
+      if (isSystemStatus) {
+        const statusText = msg.content.replace('<system:status>', '');
+        return (
+          <div id={`msg-${msg.id}`} key={msg.id} className="group relative flex flex-col items-center justify-center my-4 px-4 py-2">
+            {canDelete && (
+              <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10">
+                <button 
+                  className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
+                  title="Elimina" 
+                  onClick={() => setMessageToDelete(msg.id)}
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            )}
+            <div className="flex flex-col items-center text-center text-white bg-yellow-500/10 px-6 py-3 rounded-lg border border-yellow-600 shadow-sm max-w-3xl">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[11px] text-[#949ba4] uppercase tracking-wider flex items-center">
+                  da {msg.user.name}
+                  {msg.user.id === adminId && <Shield size={10} className="text-red-500 ml-1" />}
+                  {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && <Shield size={10} className="text-blue-400 ml-1" />}
+                  <span className="ml-1.5">• {msg.timestamp}</span>
+                </span>
+              </div>
+              <div className="text-[15px] text-[#dbdee1] leading-relaxed whitespace-pre-wrap break-words">
+                {renderContentWithMentions(statusText)}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-yellow-500/10 border-l-2 border-yellow-500 hover:bg-yellow-500/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
+          
+          {!isEditing && (
+            <div className={`absolute right-4 -top-3 ${isPopoverOpen ? 'flex' : 'hidden group-hover:flex'} items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all`}>
+              
+              <Popover.Root 
+                open={isPopoverOpen} 
+                onOpenChange={(isOpen) => setOpenPopoverId(isOpen ? msg.id : null)}
+              >
+                <Popover.Trigger asChild>
+                  <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors focus:outline-none" title="Aggiungi reazione">
+                    <SmilePlus size={18} />
+                  </button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content 
+                    side="top" 
+                    align="end" 
+                    sideOffset={5} 
+                    className="bg-[#2b2d31] border border-[#1e1f22] p-2 rounded-lg shadow-xl z-[99999] w-[280px]"
+                    onInteractOutside={() => setOpenPopoverId(null)}
+                  >
+                    <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                      {allReactionEmojis.map(emoji => (
+                        <button 
+                          key={emoji}
+                          onClick={() => {
+                            toggleReaction(msg.id, emoji);
+                            setOpenPopoverId(null);
+                          }}
+                          className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-2xl transition-colors focus:outline-none"
+                        >
+                          {emoji.startsWith('/') ? <img src={emoji} className="w-7 h-7 object-contain" /> : emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+
+              <button 
+                className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" 
+                title="Rispondi" 
+                onClick={() => { 
+                  setReplyingTo(msg); 
+                  setTimeout(() => chatInputRef.current?.focus(), 10); 
+                }}
+              >
+                <ReplyIcon size={18} />
+              </button>
+              {canEdit && (
+                <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Modifica" onClick={() => startEditing(msg)}>
+                  <Pencil size={18} />
+                </button>
+              )}
+              {canDelete && (
+                <button 
+                  className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
+                  title={!isMyMessage ? "Elimina come Moderatore" : "Elimina"} 
+                  onClick={() => setMessageToDelete(msg.id)}
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {isReply && (
+            <div className="relative flex items-center pl-[72px] mb-1 cursor-pointer group/reply select-none" onClick={() => replyToId && scrollToMessage(replyToId)}>
+              <div className="absolute left-[36px] top-1/2 w-[32px] h-[14px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md -translate-y-[2px]"></div>
+              {repliedMessage ? (
+                <>
+                  <Avatar src={repliedMessage.user.avatar} decoration={repliedMessage.user.avatar_decoration} className="w-4 h-4 mr-1.5 object-cover" alt="" />
+                  <span className="font-medium text-[#dbdee1] text-xs mr-2 hover:underline opacity-80 group-hover/reply:opacity-100 whitespace-nowrap">{repliedMessage.user.name}</span>
+                  <span className="text-[#b5bac1] text-xs truncate max-w-[50%] md:max-w-[70%] opacity-80 group-hover/reply:opacity-100 group-hover/reply:text-white">
+                    {repliedMessageContent}
+                  </span>
+                </>
+              ) : (
+                <span className="text-[#949ba4] text-xs italic">{repliedMessageContent}</span>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-start">
+            {!isSameUserAsPrevious || isEditing ? (
+              <ProfilePopover user={getUserWithRoles(msg.user as User)}>
+                <Avatar src={msg.user.avatar} decoration={msg.user.avatar_decoration} alt={msg.user.name} className="w-10 h-10 mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
+              </ProfilePopover>
+            ) : (
+              <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
+                {msg.timestamp?.split(' ')[2] || msg.timestamp}
+              </div>
+            )}
+            
+            <div className="flex-1 min-w-0">
+              {(!isSameUserAsPrevious || isEditing) && (
+                <div className="flex items-center min-w-0 mb-0.5">
+                  <ProfilePopover user={getUserWithRoles(msg.user as User)}>
+                    <span className="font-medium text-[#dbdee1] mr-1.5 cursor-pointer hover:underline truncate">{msg.user.name}</span>
+                  </ProfilePopover>
+                  {msg.user.id === adminId && (
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                        admin di discord canary 2
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && (
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                        moderatore ufficiale
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
+                </div>
+              )}
+              
+              {isEditing ? (
+                <div className="mt-1 mr-4">
+                  <div className="bg-[#383a40] p-2.5 rounded-md border border-[#1f2023]">
+                    <div
+                      ref={editInputRef}
+                      contentEditable={true}
+                      onInput={handleEditInput}
+                      onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
+                      onPaste={(e) => handlePaste(e, editInputRef, (el) => handleEditInput({ currentTarget: el } as any))}
+                      className="w-full bg-transparent border-none outline-none text-[#dbdee1] custom-scrollbar max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words"
+                      role="textbox"
+                      aria-multiline="true"
+                    />
+                  </div>
+                  <div className="text-[11px] text-[#b5bac1] mt-1.5">
+                    Premi esc per <button className="text-[#00a8fc] hover:underline" onClick={cancelEditing}>annullare</button> • invio per <button className="text-[#00a8fc] hover:underline" onClick={() => saveEdit(msg.id)}>salvare</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">
+                  {renderContentWithMentions(textContent)}
+                  {msg.updatedAt && textContent && (
+                    <span 
+                      className="text-[10px] text-[#949ba4] ml-1.5 select-none hover:text-[#dbdee1] cursor-default transition-colors" 
+                      title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
+                    >
+                      (modificato)
+                    </span>
+                  )}
+                  {images.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      {images.map((imgUrl, i) => (
+                        <div key={i} className="inline-block max-w-sm cursor-pointer" onClick={() => setViewingImage(imgUrl)}>
+                          <img src={imgUrl} alt="Attachment" className="max-h-80 rounded-lg object-contain bg-[#2b2d31] border border-[#1e1f22] hover:opacity-90 transition-opacity" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {audios.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-2 max-w-md">
+                      {audios.map((audioUrl, i) => (
+                        <CustomAudioPlayer key={i} src={audioUrl} />
+                      ))}
+                    </div>
+                  )}
+                  {msg.updatedAt && !textContent && (images.length > 0 || audios.length > 0) && (
+                    <span 
+                      className="text-[10px] text-[#949ba4] mt-1 block select-none hover:text-[#dbdee1] cursor-default transition-colors" 
+                      title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
+                    >
+                      (modificato)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {Object.keys(reactionCounts).length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5 mb-1">
+                  {Object.entries(reactionCounts).map(([emoji, { count, hasReacted }]) => (
+                    <button 
+                      key={emoji}
+                      onClick={() => toggleReaction(msg.id, emoji)}
+                      className={`flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${hasReacted ? 'bg-brand/20 border-brand text-brand' : 'bg-[#2b2d31] border-transparent text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'} transition-colors`}
+                    >
+                      {emoji.startsWith('/') ? (
+                        <img src={emoji} className="w-4 h-4 mr-1.5 object-contain" />
+                      ) : (
+                        <span className="mr-1.5 text-sm">{emoji}</span>
+                      )}
+                      <span>{count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      );
+    });
+  }, [
+    displayMessages,
+    editingMessageId,
+    openPopoverId,
+    reactionsByMessage,
+    currentUser?.id,
+    serverMembers,
+    adminId,
+    moderatorIds,
+    messageToDelete,
+    serverPermissions,
+    mentionQuery,
+    mentionIndex,
+    currentUserProfile
+  ]);
 
   // VISTA CANALE VOCALE
   if (channel.type === 'voice') {
@@ -2117,364 +2499,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           </div>
         )}
 
-        {!isLoading && displayMessages.map((msg, idx) => {
-          const isSystemWelcome = msg.content === '<system:welcome>';
-          const isSystemStatus = msg.content.startsWith('<system:status>');
-          
-          const replyMatch = msg.content.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
-          const isReply = !!replyMatch;
-          const replyToId = isReply ? replyMatch[1] : null;
-          const displayContent = isReply ? replyMatch[2] : msg.content;
-          
-          const imgRegex = /<img:(.*?)>/g;
-          const audioRegex = /<audio:(.*?)>/g;
-          const images: string[] = [];
-          const audios: string[] = [];
-          let match;
-          while ((match = imgRegex.exec(displayContent)) !== null) {
-            images.push(match[1]);
-          }
-          while ((match = audioRegex.exec(displayContent)) !== null) {
-            audios.push(match[1]);
-          }
-          const textContent = displayContent.replace(imgRegex, '').replace(audioRegex, '').trim();
-          
-          let repliedMessage = null;
-          let repliedMessageContent = "";
-          
-          if (isReply) {
-            repliedMessage = displayMessages.find(m => m.id === replyToId);
-            if (repliedMessage) {
-              repliedMessageContent = repliedMessage.content;
-              const nestedMatch = repliedMessageContent.match(/^<reply:([a-zA-Z0-9-]+)>(.*)$/s);
-              if (nestedMatch) repliedMessageContent = nestedMatch[2];
-              repliedMessageContent = repliedMessageContent.replace(/<img:.*?>/g, '[Immagine]').replace(/<audio:.*?>/g, '[Audio]').replace(/<@everyone>/g, '@tutti').replace(/<@([a-zA-Z0-9-]+)>/g, (m, id) => {
-                const member = serverMembers?.find(sm => sm.id === id);
-                return member ? `@${member.name}` : '@Sconosciuto';
-              }).trim();
-            } else {
-              repliedMessageContent = "Il messaggio originale è stato eliminato o non è stato caricato.";
-            }
-          }
-
-          const isSameUserAsPrevious = idx > 0 && 
-                                       displayMessages[idx - 1].user.id === msg.user.id && 
-                                       !isReply && 
-                                       displayMessages[idx - 1].content !== '<system:welcome>' && 
-                                       !displayMessages[idx - 1].content.startsWith('<system:status>') &&
-                                       !isSystemWelcome &&
-                                       !isSystemStatus;
-          const isMyMessage = currentUser?.id === msg.user.id;
-          
-          const canEdit = isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome && !isSystemStatus;
-          const canDelete = (isMyMessage && isWithin5Minutes(msg.rawCreatedAt) && !isSystemWelcome) || (serverPermissions?.can_delete_messages ?? false) || (isSystemStatus && isMyMessage);
-          
-          const isEditing = editingMessageId === msg.id;
-          const isPopoverOpen = openPopoverId === msg.id;
-          
-          const msgReactions = reactionsByMessage[msg.id] || [];
-          const reactionCounts: Record<string, { count: number, hasReacted: boolean }> = {};
-          msgReactions.forEach(r => {
-            if (!reactionCounts[r.emoji]) reactionCounts[r.emoji] = { count: 0, hasReacted: false };
-            reactionCounts[r.emoji].count++;
-            if (r.user_id === currentUser?.id) reactionCounts[r.emoji].hasReacted = true;
-          });
-
-          const isMentioned = msg.content.includes(`<@${currentUser?.id}>`) || msg.content.includes('<@everyone>');
-
-          if (isSystemWelcome) {
-            return (
-              <div id={`msg-${msg.id}`} key={msg.id} className="group relative flex flex-col items-center justify-center my-4 px-4 py-2">
-                {canDelete && (
-                  <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10">
-                    <button 
-                      className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
-                      title="Elimina" 
-                      onClick={() => setMessageToDelete(msg.id)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                )}
-                <div 
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm"
-                  style={{
-                    backgroundColor: msg.user.welcome_bg_color || '#2b2d31',
-                    borderColor: msg.user.welcome_border_color || '#1e1f22',
-                    color: '#949ba4'
-                  }}
-                >
-                  <span className="text-xl">👋</span>
-                  <span className="flex items-center">
-                    <ProfilePopover user={getUserWithRoles(msg.user as User)}>
-                      <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline mr-1.5">{msg.user.name}</span>
-                    </ProfilePopover>
-                    {msg.user.id === adminId && (
-                      <Tooltip delayDuration={0}>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                          admin di discord canary 2
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && (
-                      <Tooltip delayDuration={0}>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                          moderatore ufficiale
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    <span className="text-[#dbdee1]">{msg.user.welcome_text || 'è appena entrato nel server!'}</span>
-                  </span>
-                  <span className="text-[10px] ml-2 opacity-50">{msg.timestamp}</span>
-                </div>
-              </div>
-            );
-          }
-
-          if (isSystemStatus) {
-            const statusText = msg.content.replace('<system:status>', '');
-            return (
-              <div id={`msg-${msg.id}`} key={msg.id} className="group relative flex flex-col items-center justify-center my-4 px-4 py-2">
-                {canDelete && (
-                  <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10">
-                    <button 
-                      className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
-                      title="Elimina" 
-                      onClick={() => setMessageToDelete(msg.id)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                )}
-                <div className="flex flex-col items-center text-center text-white bg-yellow-500/10 px-6 py-3 rounded-lg border border-yellow-600 shadow-sm max-w-3xl">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[11px] text-[#949ba4] uppercase tracking-wider flex items-center">
-                      da {msg.user.name}
-                      {msg.user.id === adminId && <Shield size={10} className="text-red-500 ml-1" />}
-                      {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && <Shield size={10} className="text-blue-400 ml-1" />}
-                      <span className="ml-1.5">• {msg.timestamp}</span>
-                    </span>
-                  </div>
-                  <div className="text-[15px] text-[#dbdee1] leading-relaxed whitespace-pre-wrap break-words">
-                    {renderContentWithMentions(statusText)}
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <div id={`msg-${msg.id}`} key={msg.id} className={`group relative flex flex-col -mx-4 px-4 py-0.5 rounded transition-colors duration-500 ${isSameUserAsPrevious && !isEditing ? 'mt-0' : 'mt-4'} ${isMentioned ? 'bg-yellow-500/10 border-l-2 border-yellow-500 hover:bg-yellow-500/20' : 'hover:bg-[#2e3035] border-l-2 border-transparent'}`}>
-              
-              {!isEditing && (
-                <div className={`absolute right-4 -top-3 ${isPopoverOpen ? 'flex' : 'hidden group-hover:flex'} items-center bg-[#313338] border border-[#1f2023] rounded shadow-md overflow-hidden z-10 transition-all`}>
-                  
-                  <Popover.Root 
-                    open={isPopoverOpen} 
-                    onOpenChange={(isOpen) => setOpenPopoverId(isOpen ? msg.id : null)}
-                  >
-                    <Popover.Trigger asChild>
-                      <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors focus:outline-none" title="Aggiungi reazione">
-                        <SmilePlus size={18} />
-                      </button>
-                    </Popover.Trigger>
-                    <Popover.Portal>
-                      <Popover.Content 
-                        side="top" 
-                        align="end" 
-                        sideOffset={5} 
-                        className="bg-[#2b2d31] border border-[#1e1f22] p-2 rounded-lg shadow-xl z-[99999] w-[280px]"
-                        onInteractOutside={() => setOpenPopoverId(null)}
-                      >
-                        <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                          {allReactionEmojis.map(emoji => (
-                            <button 
-                              key={emoji}
-                              onClick={() => {
-                                toggleReaction(msg.id, emoji);
-                                setOpenPopoverId(null);
-                              }}
-                              className="w-10 h-10 flex items-center justify-center hover:bg-[#35373c] rounded text-2xl transition-colors focus:outline-none"
-                            >
-                              {emoji.startsWith('/') ? <img src={emoji} className="w-7 h-7 object-contain" /> : emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </Popover.Content>
-                    </Popover.Portal>
-                  </Popover.Root>
-
-                  <button 
-                    className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" 
-                    title="Rispondi" 
-                    onClick={() => { 
-                      setReplyingTo(msg); 
-                      setTimeout(() => chatInputRef.current?.focus(), 10); 
-                    }}
-                  >
-                    <ReplyIcon size={18} />
-                  </button>
-                  {canEdit && (
-                    <button className="p-1.5 hover:bg-[#404249] text-[#b5bac1] hover:text-[#dbdee1] transition-colors" title="Modifica" onClick={() => startEditing(msg)}>
-                      <Pencil size={18} />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button 
-                      className="p-1.5 hover:bg-[#f23f43] text-[#b5bac1] hover:text-white transition-colors" 
-                      title={!isMyMessage ? "Elimina come Moderatore" : "Elimina"} 
-                      onClick={() => setMessageToDelete(msg.id)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {isReply && (
-                <div className="relative flex items-center pl-[72px] mb-1 cursor-pointer group/reply select-none" onClick={() => replyToId && scrollToMessage(replyToId)}>
-                  <div className="absolute left-[36px] top-1/2 w-[32px] h-[14px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md -translate-y-[2px]"></div>
-                  {repliedMessage ? (
-                    <>
-                      <Avatar src={repliedMessage.user.avatar} decoration={repliedMessage.user.avatar_decoration} className="w-4 h-4 mr-1.5 object-cover" alt="" />
-                      <span className="font-medium text-[#dbdee1] text-xs mr-2 hover:underline opacity-80 group-hover/reply:opacity-100 whitespace-nowrap">{repliedMessage.user.name}</span>
-                      <span className="text-[#b5bac1] text-xs truncate max-w-[50%] md:max-w-[70%] opacity-80 group-hover/reply:opacity-100 group-hover/reply:text-white">
-                        {repliedMessageContent}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[#949ba4] text-xs italic">{repliedMessageContent}</span>
-                  )}
-                </div>
-              )}
-
-              <div className="flex items-start">
-                {!isSameUserAsPrevious || isEditing ? (
-                  <ProfilePopover user={getUserWithRoles(msg.user as User)}>
-                    <Avatar src={msg.user.avatar} decoration={msg.user.avatar_decoration} alt={msg.user.name} className="w-10 h-10 mr-4 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover" />
-                  </ProfilePopover>
-                ) : (
-                  <div className="w-10 mr-4 text-[10px] text-[#949ba4] opacity-0 group-hover:opacity-100 text-right pt-1 select-none flex-shrink-0">
-                    {msg.timestamp?.split(' ')[2] || msg.timestamp}
-                  </div>
-                )}
-                
-                <div className="flex-1 min-w-0">
-                  {(!isSameUserAsPrevious || isEditing) && (
-                    <div className="flex items-center min-w-0 mb-0.5">
-                      <ProfilePopover user={getUserWithRoles(msg.user as User)}>
-                        <span className="font-medium text-[#dbdee1] mr-1.5 cursor-pointer hover:underline truncate">{msg.user.name}</span>
-                      </ProfilePopover>
-                      {msg.user.id === adminId && (
-                        <Tooltip delayDuration={0}>
-                          <TooltipTrigger asChild>
-                            <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                            admin di discord canary 2
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && (
-                        <Tooltip delayDuration={0}>
-                          <TooltipTrigger asChild>
-                            <div className="cursor-help flex items-center mr-1.5"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                            moderatore ufficiale
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      <span className="text-xs text-[#949ba4] flex-shrink-0">{msg.timestamp}</span>
-                    </div>
-                  )}
-                  
-                  {isEditing ? (
-                    <div className="mt-1 mr-4">
-                      <div className="bg-[#383a40] p-2.5 rounded-md border border-[#1f2023]">
-                        <div
-                          ref={editInputRef}
-                          contentEditable={true}
-                          onInput={handleEditInput}
-                          onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
-                          onPaste={(e) => handlePaste(e, editInputRef, (el) => handleEditInput({ currentTarget: el } as any))}
-                          className="w-full bg-transparent border-none outline-none text-[#dbdee1] custom-scrollbar max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words"
-                          role="textbox"
-                          aria-multiline="true"
-                        />
-                      </div>
-                      <div className="text-[11px] text-[#b5bac1] mt-1.5">
-                        Premi esc per <button className="text-[#00a8fc] hover:underline" onClick={cancelEditing}>annullare</button> • invio per <button className="text-[#00a8fc] hover:underline" onClick={() => saveEdit(msg.id)}>salvare</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed break-words">
-                      {renderContentWithMentions(textContent)}
-                      {msg.updatedAt && textContent && (
-                        <span 
-                          className="text-[10px] text-[#949ba4] ml-1.5 select-none hover:text-[#dbdee1] cursor-default transition-colors" 
-                          title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
-                        >
-                          (modificato)
-                        </span>
-                      )}
-                      {images.length > 0 && (
-                        <div className="mt-2 flex flex-col gap-2">
-                          {images.map((imgUrl, i) => (
-                            <div key={i} className="inline-block max-w-sm cursor-pointer" onClick={() => setViewingImage(imgUrl)}>
-                              <img src={imgUrl} alt="Attachment" className="max-h-80 rounded-lg object-contain bg-[#2b2d31] border border-[#1e1f22] hover:opacity-90 transition-opacity" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {audios.length > 0 && (
-                        <div className="mt-2 flex flex-col gap-2 max-w-md">
-                          {audios.map((audioUrl, i) => (
-                            <CustomAudioPlayer key={i} src={audioUrl} />
-                          ))}
-                        </div>
-                      )}
-                      {msg.updatedAt && !textContent && (images.length > 0 || audios.length > 0) && (
-                        <span 
-                          className="text-[10px] text-[#949ba4] mt-1 block select-none hover:text-[#dbdee1] cursor-default transition-colors" 
-                          title={`Modificato il ${new Date(msg.updatedAt).toLocaleString()}`}
-                        >
-                          (modificato)
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {Object.keys(reactionCounts).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5 mb-1">
-                      {Object.entries(reactionCounts).map(([emoji, { count, hasReacted }]) => (
-                        <button 
-                          key={emoji}
-                          onClick={() => toggleReaction(msg.id, emoji)}
-                          className={`flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${hasReacted ? 'bg-brand/20 border-brand text-brand' : 'bg-[#2b2d31] border-transparent text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'} transition-colors`}
-                        >
-                          {emoji.startsWith('/') ? (
-                            <img src={emoji} className="w-4 h-4 mr-1.5 object-contain" />
-                          ) : (
-                            <span className="mr-1.5 text-sm">{emoji}</span>
-                          )}
-                          <span>{count}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {!isLoading && renderedMessages}
         <div ref={messagesEndRef} className="h-4 flex-shrink-0" />
       </div>
 
