@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -29,7 +29,7 @@ const getThemeTextClass = (id: string) => {
 
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const { adminId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests'>('dc');
+  const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests' | 'jumpscare'>('dc');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,6 +39,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   // Stati per la gestione dei bauli
   const [chestSettings, setChestSettings] = useState({ premium_multiplier: 2.0, rare_threshold: 100 });
   const [isSavingChests, setIsSavingChests] = useState(false);
+
+  // Stato per Jumpscare
+  const [selectedJumpscareTarget, setSelectedJumpscareTarget] = useState<string>('all');
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -149,6 +152,21 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     setIsSavingChests(false);
   };
 
+  const handleSendJumpscare = async () => {
+    const channel = supabase.channel('global_jumpscare');
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.send({
+          type: 'broadcast',
+          event: 'trigger',
+          payload: { targetId: selectedJumpscareTarget }
+        });
+        showSuccess("Jumpscare inviato!");
+        setTimeout(() => supabase.removeChannel(channel), 500);
+      }
+    });
+  };
+
   // Calcolo live delle probabilità
   const calculateChances = (isPremium: boolean) => {
     let totalWeight = 0;
@@ -218,11 +236,58 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
               Gestione Bauli
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('jumpscare')}
+            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'jumpscare' ? 'border-[#f23f43] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
+          >
+            <div className="flex items-center gap-2">
+              <Ghost size={16} className={activeTab === 'jumpscare' ? 'text-[#f23f43]' : ''} />
+              Jumpscare
+            </div>
+          </button>
         </div>
 
         {/* Content */}
         <div className="p-4 flex-1 overflow-hidden flex flex-col">
           
+          {activeTab === 'jumpscare' && (
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex-shrink-0 bg-[#2b2d31] p-6 rounded-lg border border-[#1e1f22] mb-4 text-center">
+                <Ghost size={48} className="text-[#f23f43] mx-auto mb-4" />
+                <h3 className="text-white font-bold text-xl mb-2">Invia un Jumpscare</h3>
+                <p className="text-[#b5bac1] text-sm mb-6">
+                  Spaventa un utente specifico o tutti gli utenti attualmente online. L'effetto apparirà istantaneamente sui loro schermi.
+                </p>
+                
+                <div className="max-w-sm mx-auto space-y-4">
+                  <div className="text-left">
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona Bersaglio</label>
+                    <select
+                      value={selectedJumpscareTarget}
+                      onChange={(e) => setSelectedJumpscareTarget(e.target.value)}
+                      className="w-full bg-[#1e1f22] text-white rounded p-2.5 focus:outline-none border border-[#3f4147] cursor-pointer"
+                    >
+                      <option value="all">Tutti gli utenti attivi</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.first_name || 'Utente'} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <button 
+                    onClick={handleSendJumpscare}
+                    className="w-full py-3 bg-[#f23f43] hover:bg-[#da373c] text-white font-bold rounded transition-colors shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Ghost size={18} />
+                    Invia Jumpscare Ora
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'chests' && (
             <div className="flex flex-col flex-1 min-h-0">
               <div className="flex-shrink-0 bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22] mb-4">
@@ -303,7 +368,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             </div>
           )}
 
-          {activeTab !== 'chests' && (
+          {activeTab !== 'chests' && activeTab !== 'jumpscare' && (
             <>
               {activeTab === 'cosmetics' && (
                 <div className="flex-shrink-0 mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#1e1f22]">

@@ -96,6 +96,9 @@ const Index = () => {
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const prevNotifCountRef = useRef(0);
 
+  // Jumpscare State
+  const [jumpscareActive, setJumpscareActive] = useState(false);
+
   // Gestione intelligente della scomparsa del badge notifiche
   useEffect(() => {
     if (notificationCount === 0) {
@@ -150,6 +153,23 @@ const Index = () => {
 
   const notificationSettingsRef = useRef(notificationSettings);
   useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
+
+  // Listener globale per Jumpscare
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const sub = supabase.channel('global_jumpscare')
+      .on('broadcast', { event: 'trigger' }, (payload) => {
+        if (payload.payload.targetId === 'all' || payload.payload.targetId === currentUser.id) {
+          setJumpscareActive(true);
+          const audio = new Audio('/jumpscare.mp3');
+          audio.volume = 1.0;
+          audio.play().catch(e => console.error("Audio play failed", e));
+          setTimeout(() => setJumpscareActive(false), 2500);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [currentUser?.id]);
 
   // Listener globale per le notifiche (Messaggi e Menzioni)
   useEffect(() => {
@@ -1583,6 +1603,13 @@ const Index = () => {
             currentUser={currentUser} 
             onClose={() => setActiveTradeId(null)} 
           />
+        )}
+
+        {/* Jumpscare Overlay */}
+        {jumpscareActive && (
+          <div className="fixed inset-0 z-[999999] pointer-events-none flex items-center justify-center overflow-hidden">
+            <img src="/jumpscare.png" alt="Jumpscare" className="animate-jumpscare object-contain w-full h-full" />
+          </div>
         )}
       </div>
     </VoiceChannelProvider>

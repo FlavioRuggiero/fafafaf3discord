@@ -1005,3 +1005,14 @@ body {
 .serpixel-snake.s6 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 5s; }
 .serpixel-snake.s7 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-right 8s infinite linear 6s; }
 .serpixel-snake.s8 { left: 50%; animation: snake-slither 0.4s infinite step-end, snake-go-left 8s infinite linear 7s; }
+
+/* Jumpscare Animation */
+@keyframes jumpscare-pop {
+  0% { transform: scale(0); opacity: 0; }
+  5% { transform: scale(1.5); opacity: 1; }
+  80% { transform: scale(2.5); opacity: 1; }
+  100% { transform: scale(4); opacity: 0; }
+}
+.animate-jumpscare {
+  animation: jumpscare-pop 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
