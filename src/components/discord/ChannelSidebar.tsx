@@ -909,19 +909,26 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
                 <span className="text-xs font-bold text-[#949ba4] hover:text-[#dbdee1] cursor-pointer transition-colors">MESSAGGI DIRETTI</span>
                 <Plus size={14} className="text-[#949ba4] hover:text-[#dbdee1] cursor-pointer" />
               </div>
-              {dmChannels.map(dm => (
-                <button
-                  key={dm.id}
-                  onClick={() => onChannelSelect(dm)}
-                  className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-0.5 transition-colors group ${activeChannelId === dm.id ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
-                >
-                  <div className="relative mr-3 flex-shrink-0">
-                    <Avatar src={dm.recipient?.avatar || ''} decoration={dm.recipient?.avatar_decoration} className="w-8 h-8" />
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2b2d31] ${dm.recipient?.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
-                  </div>
-                  <span className="font-medium truncate">{dm.name}</span>
-                </button>
-              ))}
+              {dmChannels.map(dm => {
+                const isActive = activeChannelId === dm.id;
+                const isUnread = dm.unread && !isActive;
+                return (
+                  <button
+                    key={dm.id}
+                    onClick={() => onChannelSelect(dm)}
+                    className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-0.5 transition-colors group ${isActive ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+                  >
+                    <div className="relative mr-3 flex-shrink-0">
+                      <Avatar src={dm.recipient?.avatar || ''} decoration={dm.recipient?.avatar_decoration} className="w-8 h-8" />
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2b2d31] ${dm.recipient?.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
+                    </div>
+                    <span className={`font-medium truncate flex-1 text-left ${isUnread ? 'text-white' : ''}`}>{dm.name}</span>
+                    {isUnread && (
+                      <div className="w-2 h-2 rounded-full bg-white ml-2 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
 

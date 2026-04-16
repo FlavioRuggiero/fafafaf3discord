@@ -139,8 +139,14 @@ const Index = () => {
   const allChannelsRef = useRef(allChannels);
   useEffect(() => { allChannelsRef.current = allChannels; }, [allChannels]);
 
+  const dmChannelsRef = useRef(dmChannels);
+  useEffect(() => { dmChannelsRef.current = dmChannels; }, [dmChannels]);
+
   const activeServerIdRef = useRef(activeServerId);
   useEffect(() => { activeServerIdRef.current = activeServerId; }, [activeServerId]);
+
+  const activeChannelIdRef = useRef(activeChannel?.id);
+  useEffect(() => { activeChannelIdRef.current = activeChannel?.id; }, [activeChannel?.id]);
 
   const notificationSettingsRef = useRef(notificationSettings);
   useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
@@ -153,6 +159,56 @@ const Index = () => {
       const newMsg = payload.new;
       if (newMsg.user_id === currentUser.id) return; // Non notificare i propri messaggi
 
+      // Gestione notifiche DM
+      if (newMsg.dm_channel_id) {
+        let dmChannel = dmChannelsRef.current.find(c => c.id === newMsg.dm_channel_id);
+        
+        if (!dmChannel) {
+          // Se il canale DM non è ancora nello stato, lo recuperiamo
+          const fetchNewDm = async () => {
+            const { data: dmData } = await supabase.from('dm_channels').select('*').eq('id', newMsg.dm_channel_id).single();
+            if (dmData) {
+              const otherId = dmData.user1_id === currentUser.id ? dmData.user2_id : dmData.user1_id;
+              const { data: p } = await supabase.from('profiles').select('*').eq('id', otherId).single();
+              const newDm: Channel = {
+                id: dmData.id,
+                name: p?.first_name || 'Utente',
+                type: 'dm',
+                category: 'DM',
+                server_id: null,
+                unread: true,
+                recipient: {
+                  id: otherId,
+                  name: p?.first_name || 'Utente',
+                  avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
+                  status: 'offline',
+                  avatar_decoration: p?.avatar_decoration
+                } as User
+              };
+              setDmChannels(prev => {
+                if (prev.some(d => d.id === newDm.id)) return prev;
+                return [...prev, newDm];
+              });
+              playSound('/notifica.mp3');
+              if (activeServerIdRef.current !== 'home') {
+                setUnreadServers(prev => new Set(prev).add('home'));
+              }
+            }
+          };
+          fetchNewDm();
+        } else {
+          playSound('/notifica.mp3');
+          if (activeChannelIdRef.current !== newMsg.dm_channel_id) {
+            setDmChannels(prev => prev.map(dm => dm.id === newMsg.dm_channel_id ? { ...dm, unread: true } : dm));
+            if (activeServerIdRef.current !== 'home') {
+              setUnreadServers(prev => new Set(prev).add('home'));
+            }
+          }
+        }
+        return;
+      }
+
+      // Gestione notifiche Server
       const channel = allChannelsRef.current.find(c => c.id === newMsg.channel_id);
       if (!channel || !channel.server_id) return;
 
@@ -573,7 +629,7 @@ const Index = () => {
               id: otherId,
               name: p?.first_name || 'Utente',
               avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
-              status: 'offline',
+              status: 'offline', // Verrà aggiornato dinamicamente
               avatar_decoration: p?.avatar_decoration
             } as User
           };
@@ -1215,7 +1271,13 @@ const Index = () => {
             channels={allChannels}
             dmChannels={dmChannelsWithStatus}
             activeChannelId={activeChannel?.id || ''} 
-            onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
+            onChannelSelect={(channel) => { 
+              setActiveChannel(channel); 
+              setShowSidebar(false); 
+              if (channel.type === 'dm') {
+                setDmChannels(prev => prev.map(dm => dm.id === channel.id ? { ...dm, unread: false } : dm));
+              }
+            }} 
             currentUser={currentUser}
             onOpenSettings={() => setShowSettingsModal(true)}
             onLeaveServer={() => handleLeaveServer(activeServer!.id)}
