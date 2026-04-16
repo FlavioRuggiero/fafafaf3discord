@@ -16,6 +16,7 @@ import { AdminPanel } from "./AdminPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
 import { ServerNotificationsModal } from "./ServerNotificationsModal";
+import { JumpscareOverlay } from "./JumpscareOverlay";
 
 type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 
@@ -994,6 +995,7 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
         <UserPanel currentUser={currentUser} onOpenUserSettings={onOpenUserSettings} />
 
         {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
+        <JumpscareOverlay />
       </div>
     );
   }
@@ -1784,6 +1786,7 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
           onClose={() => setShowNotifications(false)} 
         />
       )}
+      <JumpscareOverlay />
     </div>
   );
 };
