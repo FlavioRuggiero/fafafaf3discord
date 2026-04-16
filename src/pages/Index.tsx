@@ -1608,7 +1608,7 @@ const Index = () => {
         {/* Jumpscare Overlay */}
         {jumpscareActive && (
           <div className="fixed inset-0 z-[999999] pointer-events-none flex items-center justify-center overflow-hidden">
-            <img src="/jumpscare.png" alt="Jumpscare" className="animate-jumpscare object-contain w-full h-full" />
+            <img src="/jumpscare.png" alt="Jumpscare" className="animate-jumpscare object-cover w-full h-full" />
           </div>
         )}
       </div>
