@@ -1647,6 +1647,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     });
   };
 
+  const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages as LocalMessage[]);
+  const msgToDeleteData = messageToDelete ? displayMessages.find(m => m.id === messageToDelete) : null;
+
   const renderedMessages = useMemo(() => {
     return displayMessages.map((msg, idx) => {
       const isSystemWelcome = msg.content === '<system:welcome>';
@@ -2403,24 +2406,6 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   }
 
   // VISTA CANALE TESTUALE O DM
-  const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages as LocalMessage[]);
-  const msgToDeleteData = messageToDelete ? displayMessages.find(m => m.id === messageToDelete) : null;
-
-  const typingNames = Object.values(typingUsers);
-  let typingText = "";
-  if (typingNames.length === 1) typingText = `${typingNames[0]} sta scrivendo...`;
-  else if (typingNames.length === 2) typingText = `${typingNames[0]} e ${typingNames[1]} stanno scrivendo...`;
-  else if (typingNames.length > 2) typingText = "Più utenti stanno scrivendo...";
-
-  const hasTopAttachment = replyingTo || filePreview;
-
-  const isInputDisabled = isUploading || isLocked || cooldownRemaining > 0;
-  let placeholderText = `Invia un messaggio in ${channel.type === 'dm' ? '@' : '#'}${channel.name}`;
-  if (isUploading) placeholderText = "Caricamento file in corso...";
-  else if (isLocked) placeholderText = "Solo il proprietario può scrivere qui.";
-  else if (cooldownRemaining > 0) placeholderText = `Slowmode attiva. Attendi ${cooldownRemaining}s...`;
-  else if (replyingTo) placeholderText = `Rispondi a @${replyingTo.user.name}`;
-
   return (
     <div 
       className="flex-1 flex flex-col min-w-0 bg-[#313338] relative"
