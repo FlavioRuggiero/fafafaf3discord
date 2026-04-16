@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Server, ServerRole, ServerPermissions } from "@/types/discord";
-import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock, Ban, Globe, Coins, Inbox, Check } from "lucide-react";
+import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock, Ban, Globe, Inbox, Check } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { showError, showSuccess } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +49,7 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
                       </div>
                     ) : server.server_type === 'paid' ? (
                       <div className="absolute top-2 right-2 bg-yellow-500/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
-                        <Coins size={12} /> {server.entry_fee} DC
+                        <img src="/digitalcardus.png" alt="DC" className="w-3 h-3 object-contain" /> {server.entry_fee} DC
                       </div>
                     ) : null}
                   </div>
@@ -300,7 +300,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                     <span className="text-xs font-medium">Privato</span>
                   </button>
                   <button type="button" onClick={() => setServerType('paid')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'paid' ? 'bg-yellow-500/20 border-yellow-500 text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
-                    <Coins size={20} className={serverType === 'paid' ? 'text-yellow-500' : ''} />
+                    <img src="/digitalcardus.png" alt="DC" className={`w-5 h-5 object-contain ${serverType !== 'paid' ? 'opacity-70 grayscale' : ''}`} />
                     <span className="text-xs font-medium">A Pagamento</span>
                   </button>
                 </div>
@@ -309,7 +309,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                   <div className="mt-3 animate-in fade-in slide-in-from-top-2">
                     <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">Costo di ingresso (DC)</label>
                     <div className="relative">
-                      <Coins size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500" />
+                      <img src="/digitalcardus.png" alt="DC" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 object-contain" />
                       <input 
                         type="number" 
                         min="1"
@@ -883,7 +883,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                         <span className="text-xs font-medium">Privato</span>
                       </button>
                       <button type="button" onClick={() => setServerType('paid')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'paid' ? 'bg-yellow-500/20 border-yellow-500 text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
-                        <Coins size={20} className={serverType === 'paid' ? 'text-yellow-500' : ''} />
+                        <img src="/digitalcardus.png" alt="DC" className={`w-5 h-5 object-contain ${serverType !== 'paid' ? 'opacity-70 grayscale' : ''}`} />
                         <span className="text-xs font-medium">A Pagamento</span>
                       </button>
                     </div>
@@ -892,7 +892,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                       <div className="mt-3 animate-in fade-in slide-in-from-top-2">
                         <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">Costo di ingresso (DC)</label>
                         <div className="relative">
-                          <Coins size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500" />
+                          <img src="/digitalcardus.png" alt="DC" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 object-contain" />
                           <input 
                             type="number" 
                             min="1"
@@ -1233,7 +1233,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                             )}
                             {req.status === 'accepted' && <span className="text-xs font-bold text-[#23a559] uppercase px-2">Accettato</span>}
                             {req.status === 'rejected' && <span className="text-xs font-bold text-[#da373c] uppercase px-2">Rifiutato</span>}
-                            {req.status === 'paid_joined' && <span className="text-xs font-bold text-yellow-500 uppercase px-2 flex items-center gap-1"><Coins size={12}/> Pagato</span>}
+                            {req.status === 'paid_joined' && <span className="text-xs font-bold text-yellow-500 uppercase px-2 flex items-center gap-1"><img src="/digitalcardus.png" alt="DC" className="w-3 h-3 object-contain" /> Pagato</span>}
                           </div>
                         </div>
                       ))}
