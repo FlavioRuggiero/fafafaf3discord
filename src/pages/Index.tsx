@@ -86,11 +86,12 @@ const Index = () => {
   // Calcolo dinamico delle notifiche
   const [tradeCount, setTradeCount] = useState(0);
   const [mentionCount, setMentionCount] = useState(0);
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
   
   const today = new Date().toISOString().split('T')[0];
   const dailyRewardCount = currentUser && currentUser.last_reward_date !== today ? 1 : 0;
   
-  const notificationCount = tradeCount + mentionCount + dailyRewardCount;
+  const notificationCount = tradeCount + mentionCount + dailyRewardCount + friendRequestCount;
   
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const prevNotifCountRef = useRef(0);
@@ -190,7 +191,7 @@ const Index = () => {
     };
   }, [currentUser?.id]);
 
-  // Listener per conteggio scambi attivi
+  // Listener per conteggio scambi attivi e richieste di amicizia
   useEffect(() => {
     if (!currentUser?.id) return;
     
@@ -206,7 +207,16 @@ const Index = () => {
       setTradeCount(count || 0);
     };
 
+    const fetchFriendRequestCount = async () => {
+      const { count } = await supabase.from('friendships')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userId)
+        .eq('status', 'pending');
+      setFriendRequestCount(count || 0);
+    };
+
     fetchTradeCount();
+    fetchFriendRequestCount();
     
     // Controlla ogni 10 secondi se ci sono richieste scadute da rimuovere dal contatore
     const expireInterval = setInterval(fetchTradeCount, 10000);
@@ -248,9 +258,20 @@ const Index = () => {
       })
       .subscribe();
 
+    const friendSub = supabase.channel(`friend_requests_global_${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => {
+        fetchFriendRequestCount();
+        playSound('/notifica.mp3');
+        showSuccess("Hai ricevuto una nuova richiesta di amicizia!");
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => fetchFriendRequestCount())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => fetchFriendRequestCount())
+      .subscribe();
+
     return () => {
       clearInterval(expireInterval);
       supabase.removeChannel(tradeSub);
+      supabase.removeChannel(friendSub);
     };
   }, [currentUser?.id]);
 

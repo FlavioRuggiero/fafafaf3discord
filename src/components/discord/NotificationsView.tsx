@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '@/types/discord';
-import { Bell, Menu, Gift, AtSign, ArrowRightLeft, Check, X } from 'lucide-react';
+import { Bell, Menu, Gift, AtSign, ArrowRightLeft, Check, X, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { Avatar } from './Avatar';
 
 interface NotificationsViewProps {
   currentUser: User;
@@ -17,6 +18,7 @@ interface NotificationsViewProps {
 export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToShop, onNavigateToMessage, onNavigateToTrade }: NotificationsViewProps) => {
   const [mentions, setMentions] = useState<any[]>([]);
   const [trades, setTrades] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const today = new Date().toISOString().split('T')[0];
@@ -25,6 +27,7 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
   const fetchNotifications = async () => {
     setIsLoading(true);
     
+    // Fetch Mentions
     const { data: mentionData } = await supabase
       .from('messages')
       .select('id, content, created_at, channel_id, user_id, profiles(first_name, avatar_url), channels(name, server_id, servers(name))')
@@ -34,6 +37,7 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
       
     if (mentionData) setMentions(mentionData);
 
+    // Fetch Trades
     const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: tradeData } = await supabase
       .from('trades')
@@ -44,6 +48,26 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
       .order('created_at', { ascending: false });
       
     if (tradeData) setTrades(tradeData);
+
+    // Fetch Friend Requests
+    const { data: frData } = await supabase
+      .from('friendships')
+      .select('*')
+      .eq('receiver_id', currentUser.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (frData && frData.length > 0) {
+      const senderIds = frData.map(fr => fr.sender_id);
+      const { data: profiles } = await supabase.from('profiles').select('id, first_name, avatar_url, avatar_decoration').in('id', senderIds);
+      const combined = frData.map(fr => ({
+        ...fr,
+        profiles: profiles?.find(p => p.id === fr.sender_id)
+      }));
+      setFriendRequests(combined);
+    } else {
+      setFriendRequests([]);
+    }
 
     setIsLoading(false);
   };
@@ -57,6 +81,12 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
       })
       .subscribe();
 
+    const frSub = supabase.channel(`friendships_notif_${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${currentUser.id}` }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
     // Rimuove localmente le richieste scadute ogni 10 secondi
     const expireInterval = setInterval(() => {
       const twoMinsAgoMs = Date.now() - 2 * 60 * 1000;
@@ -66,6 +96,7 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
     return () => {
       clearInterval(expireInterval);
       supabase.removeChannel(tradeSub);
+      supabase.removeChannel(frSub);
     };
   }, [currentUser.id]);
 
@@ -112,6 +143,26 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
       fetchNotifications(); // Ripristina se fallisce
     } else {
       showSuccess("Scambio rifiutato.");
+    }
+  };
+
+  const handleAcceptFriend = async (id: string) => {
+    const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', id);
+    if (!error) {
+      showSuccess("Richiesta di amicizia accettata!");
+      setFriendRequests(prev => prev.filter(r => r.id !== id));
+    } else {
+      showError("Errore durante l'accettazione.");
+    }
+  };
+
+  const handleDeclineFriend = async (id: string) => {
+    const { error } = await supabase.from('friendships').delete().eq('id', id);
+    if (!error) {
+      showSuccess("Richiesta rifiutata.");
+      setFriendRequests(prev => prev.filter(r => r.id !== id));
+    } else {
+      showError("Errore durante il rifiuto.");
     }
   };
 
@@ -163,6 +214,40 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
                   </button>
                 </div>
               )}
+
+              {/* Friend Requests */}
+              {friendRequests.map(req => (
+                <div key={req.id} className="bg-[#2b2d31] border border-[#1e1f22] rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-[#3f4147] transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0">
+                      <Users className="text-[#5865F2]" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold">Richiesta di Amicizia</h3>
+                      <p className="text-[#b5bac1] text-sm flex items-center gap-2">
+                        <Avatar src={req.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${req.sender_id}`} decoration={req.profiles?.avatar_decoration} className="w-5 h-5" />
+                        <span className="font-medium text-[#dbdee1]">{req.profiles?.first_name || 'Utente'}</span> ti ha inviato una richiesta.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button 
+                      onClick={() => handleAcceptFriend(req.id)}
+                      className="w-10 h-10 bg-[#23a559] hover:bg-[#1a7c43] text-white rounded-full flex items-center justify-center transition-colors"
+                      title="Accetta"
+                    >
+                      <Check size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeclineFriend(req.id)}
+                      className="w-10 h-10 bg-[#f23f43] hover:bg-[#da373c] text-white rounded-full flex items-center justify-center transition-colors"
+                      title="Rifiuta"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+              ))}
 
               {/* Trades */}
               {trades.map(trade => (
@@ -231,7 +316,7 @@ export const NotificationsView = ({ currentUser, onToggleSidebar, onNavigateToSh
                 );
               })}
 
-              {!canClaimReward && trades.length === 0 && mentions.length === 0 && (
+              {!canClaimReward && trades.length === 0 && mentions.length === 0 && friendRequests.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-[#949ba4]">
                   <Bell size={64} className="mb-4 opacity-50" />
                   <h2 className="text-xl font-medium text-white mb-2">Tutto tranquillo</h2>
