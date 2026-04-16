@@ -189,6 +189,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [isLoading, setIsLoading] = useState(true);
   const [tableExists, setTableExists] = useState(true);
   
+  // Pagination States
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const MESSAGES_PER_PAGE = 50;
+  
   const [reactionsByMessage, setReactionsByMessage] = useState<Record<string, { id: string, message_id: string, emoji: string, user_id: string }[]>>({});
   const [reactionsEnabled, setReactionsEnabled] = useState(false);
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
@@ -247,7 +252,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isScrolledToBottomRef = useRef(true);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editInputRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLDivElement>(null);
@@ -370,8 +377,23 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }
   };
 
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      isScrolledToBottomRef.current = scrollHeight - scrollTop - clientHeight < 50;
+
+      if (scrollTop === 0) {
+        loadMoreMessages();
+      }
+    }
+  };
+
   useEffect(() => {
-    if (!isLoading && !editingMessageId && (channel?.type === 'text' || channel?.type === 'dm')) scrollToBottom();
+    if (!isLoading && !editingMessageId && (channel?.type === 'text' || channel?.type === 'dm')) {
+      if (isScrolledToBottomRef.current) {
+        scrollToBottom();
+      }
+    }
   }, [realMessages, propMessages, typingUsers, isLoading, channel?.type]);
 
   useEffect(() => {
@@ -508,6 +530,123 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     };
   }, [channel?.id, channel?.type, channel?.server_id, currentUser?.id]);
 
+  const formatMessagesData = (data: any[]) => {
+    return data.map((m: any) => {
+      const name = m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente';
+      
+      let role: User['global_role'] = 'USER';
+      if (m.user_id === adminIdRef.current) {
+          role = 'CREATOR';
+      } else if (m.profiles?.role === 'moderator' || moderatorIdsRef.current.includes(m.user_id)) {
+          role = 'MODERATOR';
+      }
+      
+      return {
+        id: m.id,
+        content: m.content,
+        timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        rawCreatedAt: m.created_at,
+        updatedAt: m.updated_at,
+        user: {
+          id: m.profiles?.id || m.user_id,
+          name: name,
+          avatar: m.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`,
+          bio: m.profiles?.bio || "",
+          banner_color: m.profiles?.banner_color || "#5865F2",
+          banner_url: m.profiles?.banner_url || undefined,
+          level: m.profiles?.level || 1,
+          digitalcardus: m.profiles?.digitalcardus ?? 25,
+          xp: m.profiles?.xp || 0,
+          global_role: role,
+          status: "online" as const,
+          avatar_decoration: m.profiles?.avatar_decoration || null,
+          purchased_decorations: m.profiles?.purchased_decorations || [],
+          welcome_text: m.profiles?.welcome_text,
+          welcome_bg_color: m.profiles?.welcome_bg_color,
+          welcome_border_color: m.profiles?.welcome_border_color
+        }
+      };
+    });
+  };
+
+  const loadMoreMessages = async () => {
+    if (isLoadingMore || !hasMore || realMessages.length === 0) return;
+    setIsLoadingMore(true);
+
+    const oldestMessage = realMessages[0];
+
+    let { data, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        content,
+        created_at,
+        updated_at,
+        user_id,
+        profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
+      `)
+      .eq(channel.type === 'dm' ? 'dm_channel_id' : 'channel_id', channel.id)
+      .lt('created_at', oldestMessage.rawCreatedAt)
+      .order('created_at', { ascending: false })
+      .limit(MESSAGES_PER_PAGE);
+
+    if (error && error.message.includes('updated_at')) {
+      const fallback = await supabase
+        .from('messages')
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
+        `)
+        .eq(channel.type === 'dm' ? 'dm_channel_id' : 'channel_id', channel.id)
+        .lt('created_at', oldestMessage.rawCreatedAt)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE);
+      data = fallback.data;
+      error = fallback.error;
+    }
+
+    if (data && data.length > 0) {
+      const formatted = formatMessagesData(data).reverse();
+      
+      const container = messagesContainerRef.current;
+      const previousScrollHeight = container?.scrollHeight || 0;
+
+      setRealMessages(prev => [...formatted, ...prev]);
+      setHasMore(data.length === MESSAGES_PER_PAGE);
+
+      setTimeout(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight - previousScrollHeight;
+        }
+      }, 0);
+      
+      const msgIds = data.map((m: any) => m.id);
+      const { data: reactionsData, error: reactionsError } = await supabase
+        .from('message_reactions')
+        .select('id, message_id, emoji, user_id')
+        .in('message_id', msgIds);
+        
+      if (!reactionsError && reactionsData) {
+        setReactionsByMessage(prev => {
+          const grouped = { ...prev };
+          reactionsData.forEach(r => {
+            if (!grouped[r.message_id]) grouped[r.message_id] = [];
+            if (!grouped[r.message_id].some(existing => existing.id === r.id)) {
+              grouped[r.message_id].push(r);
+            }
+          });
+          return grouped;
+        });
+      }
+    } else {
+      setHasMore(false);
+    }
+    setIsLoadingMore(false);
+  };
+
   useEffect(() => {
     if (!channel?.id || (channel?.type !== 'text' && channel?.type !== 'dm')) {
       setIsLoading(false);
@@ -537,7 +676,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
         `)
         .eq(channel.type === 'dm' ? 'dm_channel_id' : 'channel_id', channel.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE);
 
       if (error && error.message.includes('updated_at')) {
         const fallback = await supabase
@@ -550,7 +690,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
           `)
           .eq(channel.type === 'dm' ? 'dm_channel_id' : 'channel_id', channel.id)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: false })
+          .limit(MESSAGES_PER_PAGE);
         data = fallback.data;
         error = fallback.error;
       }
@@ -564,43 +705,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
       setTableExists(true);
       if (data) {
-        const formatted = data.map((m: any) => {
-          const name = m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() || 'Utente' : 'Utente';
-          
-          let role: User['global_role'] = 'USER';
-          if (m.user_id === adminIdRef.current) {
-              role = 'CREATOR';
-          } else if (m.profiles?.role === 'moderator' || moderatorIdsRef.current.includes(m.user_id)) {
-              role = 'MODERATOR';
-          }
-          
-          return {
-            id: m.id,
-            content: m.content,
-            timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            rawCreatedAt: m.created_at,
-            updatedAt: m.updated_at,
-            user: {
-              id: m.profiles?.id || m.user_id,
-              name: name,
-              avatar: m.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`,
-              bio: m.profiles?.bio || "",
-              banner_color: m.profiles?.banner_color || "#5865F2",
-              banner_url: m.profiles?.banner_url || undefined,
-              level: m.profiles?.level || 1,
-              digitalcardus: m.profiles?.digitalcardus ?? 25,
-              xp: m.profiles?.xp || 0,
-              global_role: role,
-              status: "online" as const,
-              avatar_decoration: m.profiles?.avatar_decoration || null,
-              purchased_decorations: m.profiles?.purchased_decorations || [],
-              welcome_text: m.profiles?.welcome_text,
-              welcome_bg_color: m.profiles?.welcome_bg_color,
-              welcome_border_color: m.profiles?.welcome_border_color
-            }
-          };
-        });
+        const formatted = formatMessagesData(data).reverse();
         setRealMessages(formatted);
+        setHasMore(data.length === MESSAGES_PER_PAGE);
 
         if (data.length > 0) {
           const msgIds = data.map((m: any) => m.id);
@@ -626,6 +733,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         }
       }
       setIsLoading(false);
+      isScrolledToBottomRef.current = true;
+      setTimeout(scrollToBottom, 100);
     };
 
     fetchMessages();
@@ -1971,7 +2080,11 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
+      <div 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8"
+      >
         <div className="mb-8 mt-4">
           {channel.type === 'dm' ? (
             <>
@@ -1992,7 +2105,13 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           )}
         </div>
 
-        {isLoading && (
+        {isLoadingMore && (
+          <div className="flex justify-center my-4">
+            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin opacity-70"></div>
+          </div>
+        )}
+
+        {isLoading && !isLoadingMore && (
           <div className="flex justify-center my-4">
             <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin opacity-70"></div>
           </div>
