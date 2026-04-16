@@ -134,6 +134,10 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
   };
 
   const removeFriend = async (friendshipId: string) => {
+    const friendship = friendships.find(f => f.id === friendshipId);
+    if (!friendship) return;
+    const friendId = friendship.otherUser.id;
+
     // Aggiornamento ottimistico
     setFriendships(prev => prev.filter(f => f.id !== friendshipId));
     
@@ -141,6 +145,18 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
     if (error) {
       showError("Errore durante la rimozione.");
       fetchFriendships();
+      return;
+    }
+
+    // Elimina anche la chat DM se esiste
+    const { data: dmChannel } = await supabase
+      .from('dm_channels')
+      .select('id')
+      .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},user2_id.eq.${currentUser.id})`)
+      .maybeSingle();
+
+    if (dmChannel) {
+      await supabase.from('dm_channels').delete().eq('id', dmChannel.id);
     }
   };
 

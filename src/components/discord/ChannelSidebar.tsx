@@ -781,6 +781,19 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
     }
   };
 
+  const handleDeleteDM = async (dmId: string, recipientId?: string) => {
+    if (!currentUser || !recipientId) return;
+
+    // Elimina il canale DM dal DB
+    await supabase.from('dm_channels').delete().eq('id', dmId);
+
+    // Elimina anche l'amicizia
+    await supabase.from('friendships').delete()
+      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${recipientId}),and(sender_id.eq.${recipientId},receiver_id.eq.${currentUser.id})`);
+      
+    showSuccess("Chat e amicizia rimosse.");
+  };
+
   const getDropIndicator = (id: string, type: 'category' | 'channel') => {
     if (dragOverInfo?.id === id && dragOverInfo?.type === type) {
       return dragOverInfo.position === 'top' 
@@ -924,8 +937,18 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
                     </div>
                     <span className={`font-medium truncate flex-1 text-left ${isUnread ? 'text-white' : ''}`}>{dm.name}</span>
                     {isUnread && (
-                      <div className="w-2 h-2 rounded-full bg-white ml-2 flex-shrink-0" />
+                      <div className="w-2 h-2 rounded-full bg-white mx-2 flex-shrink-0" />
                     )}
+                    <div 
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-[#f23f43] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteDM(dm.id, dm.recipient?.id);
+                      }}
+                      title="Elimina Chat e Amicizia"
+                    >
+                      <X size={14} />
+                    </div>
                   </button>
                 );
               })}
