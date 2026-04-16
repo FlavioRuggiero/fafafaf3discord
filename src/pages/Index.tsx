@@ -849,7 +849,7 @@ const Index = () => {
     }));
   };
 
-  const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, isPrivate: boolean) => {
+  const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, serverType: 'public' | 'private' | 'paid', entryFee: number) => {
     if (!currentUser) return;
     
     setIsCreatingServer(true);
@@ -906,10 +906,12 @@ const Index = () => {
       .insert({
         name,
         created_by: currentUser.id,
-        description: description || "Il tuo nuovo server privato.",
+        description: description || "Il tuo nuovo server.",
         icon_url,
         audio_url,
-        is_private: isPrivate
+        is_private: serverType === 'private',
+        server_type: serverType,
+        entry_fee: serverType === 'paid' ? entryFee : 0
       })
       .select()
       .single();
@@ -956,16 +958,38 @@ const Index = () => {
       return;
     }
 
-    const maxPosition = servers.length;
-    const { error } = await supabase.from('server_members').insert({ 
-      server_id: server.id, 
-      user_id: currentUser.id,
-      position: maxPosition
-    });
+    if (server.server_type === 'paid') {
+      const fee = server.entry_fee || 0;
+      if ((currentUser.digitalcardus || 0) < fee) {
+        showError(`Non hai abbastanza DigitalCardus. Costo: ${fee} DC`);
+        return;
+      }
 
-    if (error) {
-      showError("Errore durante l'unione al server");
-      return;
+      const { data, error } = await supabase.rpc('join_paid_server', {
+        p_server_id: server.id,
+        p_user_id: currentUser.id,
+        p_owner_id: server.created_by,
+        p_fee: fee
+      });
+
+      if (error || (data && !data.success)) {
+        showError(data?.error || "Errore durante il pagamento. Hai eseguito lo script SQL?");
+        return;
+      }
+
+      setCurrentUser(prev => prev ? { ...prev, digitalcardus: (prev.digitalcardus || 0) - fee } : null);
+    } else {
+      const maxPosition = servers.length;
+      const { error } = await supabase.from('server_members').insert({ 
+        server_id: server.id, 
+        user_id: currentUser.id,
+        position: maxPosition
+      });
+
+      if (error) {
+        showError("Errore durante l'unione al server");
+        return;
+      }
     }
 
     const { data: newChannels } = await supabase.from('channels').select('*').eq('server_id', server.id);
@@ -1081,7 +1105,7 @@ const Index = () => {
     setShowDiscoverModal(true);
   };
 
-  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, isPrivate: boolean) => {
+  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, serverType: 'public' | 'private' | 'paid', entryFee: number) => {
     if (!currentUser) return;
     setIsUpdatingServer(true);
     
@@ -1122,14 +1146,23 @@ const Index = () => {
       }
     }
 
-    const { error } = await supabase.from('servers').update({ name, description, icon_url, audio_url, is_private: isPrivate }).eq('id', id);
+    const { error } = await supabase.from('servers').update({ 
+      name, 
+      description, 
+      icon_url, 
+      audio_url, 
+      is_private: serverType === 'private',
+      server_type: serverType,
+      entry_fee: serverType === 'paid' ? entryFee : 0
+    }).eq('id', id);
+    
     if (error) {
       showError("Impossibile aggiornare il server");
       setIsUpdatingServer(false);
       return;
     }
     
-    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url, audio_url, is_private: isPrivate } : s));
+    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url, audio_url, is_private: serverType === 'private', server_type: serverType, entry_fee: serverType === 'paid' ? entryFee : 0 } : s));
     setShowSettingsModal(false);
     showSuccess("Impostazioni salvate con successo!");
     setIsUpdatingServer(false);

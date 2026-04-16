@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Server, ServerRole, ServerPermissions } from "@/types/discord";
-import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock, Ban } from "lucide-react";
+import { X, Trash2, Upload, Mic, Square, Volume2, Shield, Plus, Users, Key, Lock, Ban, Globe, Coins, Inbox, Check } from "lucide-react";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { showError, showSuccess } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,11 +43,15 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
               availableServers.map(server => (
                 <div key={server.id} className="bg-[#1e1f22] rounded-lg overflow-hidden hover:shadow-lg transition-shadow border border-[#1e1f22] hover:border-[#35373c] group flex flex-col">
                   <div className="h-24 bg-gradient-to-r from-brand/20 to-[#313338] flex-shrink-0 relative">
-                    {server.is_private && (
+                    {server.server_type === 'private' || server.is_private ? (
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
                         <Lock size={12} /> Privato
                       </div>
-                    )}
+                    ) : server.server_type === 'paid' ? (
+                      <div className="absolute top-2 right-2 bg-yellow-500/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
+                        <Coins size={12} /> {server.entry_fee} DC
+                      </div>
+                    ) : null}
                   </div>
                   <div className="p-4 relative flex flex-col flex-1">
                     <div className="absolute -top-8 left-4 w-12 h-12 rounded-xl bg-[#313338] p-1 shadow-lg flex-shrink-0">
@@ -67,12 +71,19 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
                         </div>
                       )}
                       
-                      {server.is_private ? (
+                      {server.server_type === 'private' || server.is_private ? (
                         <button 
                           onClick={() => { onRequestJoin(server); onClose(); }}
                           className="w-full mt-auto bg-[#35373c] hover:bg-[#5865F2] hover:text-white text-[#dbdee1] font-medium py-2 rounded transition-colors text-sm"
                         >
                           Richiedi di entrare
+                        </button>
+                      ) : server.server_type === 'paid' ? (
+                        <button 
+                          onClick={() => { onJoin(server); onClose(); }}
+                          className="w-full mt-auto bg-yellow-500/20 hover:bg-yellow-500 hover:text-white text-yellow-500 font-medium py-2 rounded transition-colors text-sm border border-yellow-500/50 hover:border-yellow-500"
+                        >
+                          Paga {server.entry_fee} DC ed Entra
                         </button>
                       ) : (
                         <button 
@@ -97,14 +108,15 @@ export const DiscoverServersModal = ({ isOpen, onClose, servers, joinedServerIds
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, isPrivate: boolean) => void;
+  onCreate: (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, serverType: 'public' | 'private' | 'paid', entryFee: number) => void;
   isCreating: boolean;
 }
 
 export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: CreateModalProps) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [serverType, setServerType] = useState<'public' | 'private' | 'paid'>('public');
+  const [entryFee, setEntryFee] = useState<number>(10);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,7 +133,8 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
     if (isOpen) {
       setName("");
       setDescription("");
-      setIsPrivate(false);
+      setServerType('public');
+      setEntryFee(10);
       setImageFile(null);
       setPreviewUrl(null);
       setAudioFile(null);
@@ -136,7 +149,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && !isCreating) {
-      onCreate(name.trim(), description.trim(), imageFile, audioFile, isPrivate);
+      onCreate(name.trim(), description.trim(), imageFile, audioFile, serverType, entryFee);
     }
   };
 
@@ -155,7 +168,7 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
       
       const audio = new Audio(tempUrl);
       audio.onloadedmetadata = () => {
-        if (audio.duration > 3.5) { // 3.5s limite per dare un leggero margine
+        if (audio.duration > 3.5) {
           showError("Il motto vocale può durare massimo 3 secondi.");
           if (audioInputRef.current) audioInputRef.current.value = '';
         } else {
@@ -184,7 +197,6 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
       mediaRecorder.start();
       setIsRecording(true);
 
-      // Limita la registrazione a 3 secondi
       recordingTimeoutRef.current = setTimeout(() => {
         stopRecording();
       }, 3000);
@@ -275,24 +287,41 @@ export const CreateServerModal = ({ isOpen, onClose, onCreate, isCreating }: Cre
                 />
               </div>
 
-              <div className="flex items-center justify-between bg-[#2b2d31] p-3 rounded border border-[#1e1f22]">
-                <div>
-                  <div className="flex items-center text-white font-medium mb-1">
-                    <Lock size={16} className="mr-2 text-[#949ba4]" />
-                    Server Privato
-                  </div>
-                  <div className="text-xs text-[#b5bac1]">Gli utenti dovranno richiedere l'accesso per entrare.</div>
+              <div className="space-y-3">
+                <label className="block text-[#b5bac1] uppercase text-xs font-bold">Modalità Server</label>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <button type="button" onClick={() => setServerType('public')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'public' ? 'bg-brand/20 border-brand text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
+                    <Globe size={20} />
+                    <span className="text-xs font-medium">Pubblico</span>
+                  </button>
+                  <button type="button" onClick={() => setServerType('private')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'private' ? 'bg-brand/20 border-brand text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
+                    <Lock size={20} />
+                    <span className="text-xs font-medium">Privato</span>
+                  </button>
+                  <button type="button" onClick={() => setServerType('paid')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'paid' ? 'bg-yellow-500/20 border-yellow-500 text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
+                    <Coins size={20} className={serverType === 'paid' ? 'text-yellow-500' : ''} />
+                    <span className="text-xs font-medium">A Pagamento</span>
+                  </button>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={isPrivate}
-                    onChange={(e) => setIsPrivate(e.target.checked)}
-                    disabled={isCreating}
-                  />
-                  <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
-                </label>
+
+                {serverType === 'paid' && (
+                  <div className="mt-3 animate-in fade-in slide-in-from-top-2">
+                    <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">Costo di ingresso (DC)</label>
+                    <div className="relative">
+                      <Coins size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500" />
+                      <input 
+                        type="number" 
+                        min="1"
+                        value={entryFee}
+                        onChange={(e) => setEntryFee(parseInt(e.target.value) || 0)}
+                        disabled={isCreating}
+                        className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 pl-9 pr-3 outline-none focus:ring-1 focus:ring-yellow-500 disabled:opacity-50"
+                      />
+                    </div>
+                    <p className="text-xs text-[#949ba4] mt-1.5">Gli utenti pagheranno questa cifra per entrare. I DC andranno direttamente a te.</p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -369,17 +398,18 @@ interface ServerSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   server: Server | null;
-  onUpdate: (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, isPrivate: boolean) => void;
+  onUpdate: (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, serverType: 'public' | 'private' | 'paid', entryFee: number) => void;
   onDelete: (id: string) => void;
   isUpdating?: boolean;
   serverPermissions?: ServerPermissions;
 }
 
 export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelete, isUpdating = false, serverPermissions }: ServerSettingsModalProps) => {
-  const [activeTab, setActiveTab] = useState<'main' | 'roles' | 'bans'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'roles' | 'bans' | 'requests'>('main');
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [serverType, setServerType] = useState<'public' | 'private' | 'paid'>('public');
+  const [entryFee, setEntryFee] = useState<number>(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -419,12 +449,17 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const [bannedUsers, setBannedUsers] = useState<any[]>([]);
   const [isLoadingBans, setIsLoadingBans] = useState(false);
 
+  // Requests states
+  const [requests, setRequests] = useState<any[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+
   useEffect(() => {
     if (server && isOpen) {
       setActiveTab('main');
       setName(server.name);
       setDescription(server.description || "");
-      setIsPrivate(server.is_private || false);
+      setServerType(server.server_type || (server.is_private ? 'private' : 'public'));
+      setEntryFee(server.entry_fee || 10);
       setPreviewUrl(server.icon_url || null);
       setImageFile(null);
       setConfirmDelete(false);
@@ -473,11 +508,36 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     setIsLoadingBans(false);
   };
 
+  const fetchRequests = async () => {
+    if (!server) return;
+    setIsLoadingRequests(true);
+    const { data, error } = await supabase
+      .from('server_join_requests')
+      .select('id, user_id, status, created_at')
+      .eq('server_id', server.id)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      const userIds = data.map(r => r.user_id);
+      const { data: profiles } = await supabase.from('profiles').select('id, first_name, avatar_url').in('id', userIds);
+      const combined = data.map(r => ({
+        ...r,
+        profiles: profiles?.find(p => p.id === r.user_id)
+      }));
+      setRequests(combined);
+    } else {
+      setRequests([]);
+    }
+    setIsLoadingRequests(false);
+  };
+
   useEffect(() => {
     if (activeTab === 'roles' && server) {
       loadRolesData();
     } else if (activeTab === 'bans' && server) {
       fetchBans();
+    } else if (activeTab === 'requests' && server) {
+      fetchRequests();
     }
   }, [activeTab, server]);
 
@@ -498,7 +558,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       
       const audio = new Audio(tempUrl);
       audio.onloadedmetadata = () => {
-        if (audio.duration > 3.5) { // 3.5s limite per dare un leggero margine
+        if (audio.duration > 3.5) {
           showError("Il motto vocale può durare massimo 3 secondi.");
           if (audioInputRef.current) audioInputRef.current.value = '';
         } else {
@@ -527,7 +587,6 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       mediaRecorder.start();
       setIsRecording(true);
 
-      // Limita la registrazione a 3 secondi
       recordingTimeoutRef.current = setTimeout(() => {
         stopRecording();
       }, 3000);
@@ -549,7 +608,7 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && !isUpdating) {
-      onUpdate(server.id, name.trim(), description.trim(), imageFile, audioFile, isPrivate);
+      onUpdate(server.id, name.trim(), description.trim(), imageFile, audioFile, serverType, entryFee);
     }
   };
 
@@ -650,6 +709,28 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     }
   };
 
+  const handleAcceptRequest = async (requestId: string, userId: string) => {
+    if (!server) return;
+    const { error: joinError } = await supabase.from('server_members').insert({
+      server_id: server.id,
+      user_id: userId,
+      position: 0
+    });
+    if (joinError) {
+      showError("Errore durante l'accettazione.");
+      return;
+    }
+    await supabase.from('server_join_requests').update({ status: 'accepted' }).eq('id', requestId);
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'accepted' } : r));
+    showSuccess("Richiesta accettata!");
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    await supabase.from('server_join_requests').update({ status: 'rejected' }).eq('id', requestId);
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'rejected' } : r));
+    showSuccess("Richiesta rifiutata.");
+  };
+
   const PERMISSIONS_LIST = [
     { key: 'can_manage_channels', label: 'Gestione Canali', desc: 'Permette di creare, modificare o eliminare canali.' },
     { key: 'can_delete_messages', label: 'Elimina Messaggi', desc: 'Permette di eliminare i messaggi degli altri utenti.' },
@@ -698,6 +779,15 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                 className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'bans' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
               >
                 Gestione Ban
+              </button>
+            )}
+
+            {(serverPermissions?.can_manage_server || serverPermissions?.isOwner) && (
+              <button 
+                onClick={() => setActiveTab('requests')} 
+                className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'requests' ? 'bg-[#404249] text-white' : 'text-[#b5bac1] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+              >
+                Richieste & Ingressi
               </button>
             )}
           </div>
@@ -780,24 +870,41 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                     />
                   </div>
 
-                  <div className="flex items-center justify-between bg-[#2b2d31] p-3 rounded border border-[#1e1f22]">
-                    <div>
-                      <div className="flex items-center text-white font-medium mb-1">
-                        <Lock size={16} className="mr-2 text-[#949ba4]" />
-                        Server Privato
-                      </div>
-                      <div className="text-xs text-[#b5bac1]">Gli utenti dovranno richiedere l'accesso per entrare.</div>
+                  <div className="space-y-3">
+                    <label className="block text-[#b5bac1] uppercase text-xs font-bold">Modalità Server</label>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <button type="button" onClick={() => setServerType('public')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'public' ? 'bg-brand/20 border-brand text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
+                        <Globe size={20} />
+                        <span className="text-xs font-medium">Pubblico</span>
+                      </button>
+                      <button type="button" onClick={() => setServerType('private')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'private' ? 'bg-brand/20 border-brand text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
+                        <Lock size={20} />
+                        <span className="text-xs font-medium">Privato</span>
+                      </button>
+                      <button type="button" onClick={() => setServerType('paid')} className={`p-3 rounded border flex flex-col items-center gap-2 transition-colors ${serverType === 'paid' ? 'bg-yellow-500/20 border-yellow-500 text-white' : 'bg-[#2b2d31] border-[#1e1f22] text-[#b5bac1] hover:bg-[#35373c]'}`}>
+                        <Coins size={20} className={serverType === 'paid' ? 'text-yellow-500' : ''} />
+                        <span className="text-xs font-medium">A Pagamento</span>
+                      </button>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={isPrivate}
-                        onChange={(e) => setIsPrivate(e.target.checked)}
-                        disabled={isUpdating}
-                      />
-                      <div className="w-10 h-6 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#23a559]"></div>
-                    </label>
+
+                    {serverType === 'paid' && (
+                      <div className="mt-3 animate-in fade-in slide-in-from-top-2">
+                        <label className="block text-[#b5bac1] uppercase text-xs font-bold mb-2">Costo di ingresso (DC)</label>
+                        <div className="relative">
+                          <Coins size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500" />
+                          <input 
+                            type="number" 
+                            min="1"
+                            value={entryFee}
+                            onChange={(e) => setEntryFee(parseInt(e.target.value) || 0)}
+                            disabled={isUpdating}
+                            className="w-full text-white bg-[#1e1f22] border-none rounded-[3px] h-10 pl-9 pr-3 outline-none focus:ring-1 focus:ring-yellow-500 disabled:opacity-50"
+                          />
+                        </div>
+                        <p className="text-xs text-[#949ba4] mt-1.5">Gli utenti pagheranno questa cifra per entrare. I DC andranno direttamente a te.</p>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1082,6 +1189,52 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                           >
                             Revoca Ban
                           </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'requests' && (
+              <div className="animate-in fade-in duration-200 h-full flex flex-col">
+                <h2 className="text-xl font-bold text-white mb-6">Richieste & Ingressi</h2>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  {isLoadingRequests ? (
+                    <div className="text-center text-[#949ba4] py-8">Caricamento...</div>
+                  ) : requests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-[#949ba4] py-12">
+                      <Inbox size={48} className="mb-4 opacity-50" />
+                      <p>Nessuna richiesta o ingresso recente.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {requests.map(req => (
+                        <div key={req.id} className="flex items-center justify-between bg-[#2b2d31] p-3 rounded border border-[#1e1f22]">
+                          <div className="flex items-center gap-3">
+                            <img src={req.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${req.user_id}`} className="w-10 h-10 rounded-full object-cover bg-[#1e1f22]" />
+                            <div className="flex flex-col">
+                              <span className="text-white font-medium">{req.profiles?.first_name || 'Utente Sconosciuto'}</span>
+                              <span className="text-xs text-[#949ba4]">{new Date(req.created_at).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {req.status === 'pending' && (
+                              <>
+                                <button onClick={() => handleAcceptRequest(req.id, req.user_id)} className="p-2 bg-[#23a559] hover:bg-[#1a7c43] text-white rounded transition-colors" title="Accetta">
+                                  <Check size={16} />
+                                </button>
+                                <button onClick={() => handleRejectRequest(req.id)} className="p-2 bg-[#da373c] hover:bg-[#a12828] text-white rounded transition-colors" title="Rifiuta">
+                                  <X size={16} />
+                                </button>
+                              </>
+                            )}
+                            {req.status === 'accepted' && <span className="text-xs font-bold text-[#23a559] uppercase px-2">Accettato</span>}
+                            {req.status === 'rejected' && <span className="text-xs font-bold text-[#da373c] uppercase px-2">Rifiutato</span>}
+                            {req.status === 'paid_joined' && <span className="text-xs font-bold text-yellow-500 uppercase px-2 flex items-center gap-1"><Coins size={12}/> Pagato</span>}
+                          </div>
                         </div>
                       ))}
                     </div>

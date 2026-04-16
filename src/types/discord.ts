@@ -1,4 +1,26 @@
-export type ServerRole = {
+export interface User {
+  id: string;
+  name: string;
+  avatar: string;
+  status: 'online' | 'offline' | 'idle' | 'dnd';
+  global_role?: 'USER' | 'MODERATOR' | 'ADMIN' | 'CREATOR';
+  bio?: string;
+  banner_color?: string;
+  banner_url?: string;
+  level?: number;
+  digitalcardus?: number;
+  xp?: number;
+  last_reward_date?: string;
+  server_roles?: ServerRole[];
+  avatar_decoration?: string | null;
+  purchased_decorations?: string[];
+  entrance_audio_url?: string | null;
+  claimed_levels?: number[];
+  standard_chests?: number;
+  premium_chests?: number;
+}
+
+export interface ServerRole {
   id: string;
   server_id: string;
   name: string;
@@ -12,9 +34,9 @@ export type ServerRole = {
   can_bypass_restrictions?: boolean;
   can_kick_members?: boolean;
   can_ban_members?: boolean;
-};
+}
 
-export type ServerPermissions = {
+export interface ServerPermissions {
   isOwner: boolean;
   can_manage_channels: boolean;
   can_delete_messages: boolean;
@@ -25,108 +47,39 @@ export type ServerPermissions = {
   can_bypass_restrictions: boolean;
   can_kick_members: boolean;
   can_ban_members: boolean;
-};
+}
 
-export type User = {
+export interface Server {
   id: string;
   name: string;
-  avatar: string;
-  status: "online" | "idle" | "dnd" | "offline";
-  customStatus?: string;
-  global_role?: "USER" | "MODERATOR" | "CREATOR" | "ADMIN";
-  bio?: string;
-  banner_color?: string;
-  banner_url?: string;
-  level?: number;
-  digitalcardus?: number;
-  xp?: number;
-  server_roles?: ServerRole[];
-  last_reward_date?: string | null;
-  avatar_decoration?: string | null;
-  purchased_decorations?: string[];
-  entrance_audio_url?: string | null;
-  claimed_levels?: number[];
-  standard_chests?: number;
-  premium_chests?: number;
-};
-
-export type Server = {
-  id: string;
-  name: string;
+  description?: string;
   icon_url?: string;
   created_by: string;
-  description?: string;
+  created_at: string;
   audio_url?: string;
   is_private?: boolean;
-};
+  server_type?: 'public' | 'private' | 'paid';
+  entry_fee?: number;
+}
 
-export type Channel = {
+export interface Channel {
   id: string;
   server_id: string | null;
   name: string;
-  type: "text" | "voice" | "minigame" | "dm";
+  type: 'text' | 'voice' | 'dm' | 'minigame';
   category: string;
   unread?: boolean;
-  position?: number;
-  category_position?: number;
-  created_at?: string;
   recipient?: User;
-  cooldown?: number;
   is_locked?: boolean;
+  cooldown?: number;
   is_welcome_channel?: boolean;
-  minigame_url?: string | null;
-  minigame_icon_url?: string | null;
-};
+  minigame_url?: string;
+  minigame_icon_url?: string;
+}
 
-export type Message = {
+export interface Message {
   id: string;
   user: User;
   content: string;
   timestamp: string;
-};
-
-export type Profile = {
-  id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  avatar_url?: string | null;
-  updated_at?: string | null;
-  bio?: string | null;
-  digitalcardus?: number | null;
-  banner_color?: string | null;
-  banner_url?: string | null;
-  level?: number | null;
-  xp?: number | null;
-  last_reward_date?: string | null;
-  avatar_decoration?: string | null;
-  purchased_decorations?: string[];
-  entrance_audio_url?: string | null;
-  claimed_levels?: number[];
-  standard_chests?: number;
-  premium_chests?: number;
-};
-
-export type ServerMember = {
-  server_id: string;
-  user_id: string;
-  joined_at?: string;
-  position?: number;
-  voice_channel_id?: string | null;
-  is_muted?: boolean;
-  is_deafened?: boolean;
-};
-
-export type Friendship = {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  status: 'pending' | 'accepted';
-  created_at: string;
-};
-
-export type DMChannel = {
-  id: string;
-  user1_id: string;
-  user2_id: string;
-  created_at: string;
-};
+}
