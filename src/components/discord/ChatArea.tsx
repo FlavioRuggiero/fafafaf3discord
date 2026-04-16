@@ -256,7 +256,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const lastTypingStatus = useRef(false);
 
   const isServerCreator = currentUser?.id === serverCreatorId;
-  const isLocked = channel.is_locked && !isServerCreator && !serverPermissions?.can_bypass_restrictions;
+  const isLocked = channel.type !== 'dm' && channel.is_locked && !isServerCreator && !serverPermissions?.can_bypass_restrictions;
 
   // Helper per aggiungere i ruoli all'utente
   const getUserWithRoles = (baseUser: User) => {
@@ -354,7 +354,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const showCommandMenu = inputValue.startsWith('/') && filteredCommands.length > 0;
 
   const scrollToBottom = () => {
-    if (channel?.type === 'text') {
+    if (channel?.type === 'text' || channel?.type === 'dm') {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   };
@@ -371,7 +371,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   };
 
   useEffect(() => {
-    if (!isLoading && !editingMessageId && channel?.type === 'text') scrollToBottom();
+    if (!isLoading && !editingMessageId && (channel?.type === 'text' || channel?.type === 'dm')) scrollToBottom();
   }, [realMessages, propMessages, typingUsers, isLoading, channel?.type]);
 
   useEffect(() => {
@@ -402,7 +402,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Cooldown Logic
   useEffect(() => {
-    if (!channel.cooldown || channel.cooldown === 0 || isServerCreator || !currentUser || serverPermissions?.can_bypass_restrictions) {
+    if (channel.type === 'dm' || !channel.cooldown || channel.cooldown === 0 || isServerCreator || !currentUser || serverPermissions?.can_bypass_restrictions) {
       setCooldownRemaining(0);
       return;
     }
@@ -429,7 +429,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [realMessages, channel.cooldown, currentUser?.id, isServerCreator, serverPermissions?.can_bypass_restrictions]);
+  }, [realMessages, channel.cooldown, currentUser?.id, isServerCreator, serverPermissions?.can_bypass_restrictions, channel.type]);
 
   useEffect(() => {
     if (channel?.type !== 'voice') {
@@ -509,7 +509,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   }, [channel?.id, channel?.type, channel?.server_id, currentUser?.id]);
 
   useEffect(() => {
-    if (!channel?.id || channel?.type !== 'text') {
+    if (!channel?.id || (channel?.type !== 'text' && channel?.type !== 'dm')) {
       setIsLoading(false);
       return;
     }
@@ -536,7 +536,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           user_id,
           profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
         `)
-        .eq('channel_id', channel.id)
+        .eq(channel.type === 'dm' ? 'dm_channel_id' : 'channel_id', channel.id)
         .order('created_at', { ascending: true });
 
       if (error && error.message.includes('updated_at')) {
@@ -549,7 +549,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             user_id,
             profiles(id, first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color)
           `)
-          .eq('channel_id', channel.id)
+          .eq(channel.type === 'dm' ? 'dm_channel_id' : 'channel_id', channel.id)
           .order('created_at', { ascending: true });
         data = fallback.data;
         error = fallback.error;
@@ -632,13 +632,14 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
     if (!tableExists) return;
 
+    const filterCol = channel.type === 'dm' ? 'dm_channel_id' : 'channel_id';
     const channelSubscription = supabase
       .channel(`messages_and_profiles:${channel.id}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public',
         table: 'messages',
-        filter: `channel_id=eq.${channel.id}`
+        filter: `${filterCol}=eq.${channel.id}`
       }, async (payload) => {
         const { data: profileData } = await supabase
           .from('profiles')
@@ -694,7 +695,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         event: 'UPDATE', 
         schema: 'public',
         table: 'messages',
-        filter: `channel_id=eq.${channel.id}`
+        filter: `${filterCol}=eq.${channel.id}`
       }, (payload) => {
         setRealMessages(prev => prev.map(m => m.id === payload.new.id ? { 
           ...m, 
@@ -776,7 +777,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   }, [channel?.id, channel?.type, tableExists, authUser?.id]);
 
   useEffect(() => {
-    if (!channel?.id || !currentUser?.id || channel?.type !== 'text') return;
+    if (!channel?.id || !currentUser?.id || (channel?.type !== 'text' && channel?.type !== 'dm')) return;
 
     const room = supabase.channel(`typing:${channel.id}`, {
       config: { presence: { key: currentUser.id } },
@@ -993,7 +994,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (channel?.type === 'text') setIsDraggingFile(true);
+    if (channel?.type === 'text' || channel?.type === 'dm') setIsDraggingFile(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -1004,7 +1005,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingFile(false);
-    if (channel?.type !== 'text') return;
+    if (channel?.type !== 'text' && channel?.type !== 'dm') return;
     
     const file = e.dataTransfer.files?.[0];
     if (file) {
@@ -1015,7 +1016,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>, ref: React.RefObject<HTMLDivElement>, triggerInput: (el: HTMLDivElement) => void) => {
     e.preventDefault();
     
-    if (isUploading || channel?.type !== 'text') return;
+    if (isUploading || (channel?.type !== 'text' && channel?.type !== 'dm')) return;
     
     const items = e.clipboardData?.items;
     let hasImage = false;
@@ -1264,11 +1265,17 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
         setFileType(null);
         setIsUploading(false);
 
-        const { data, error } = await supabase.from('messages').insert({
-          channel_id: channel.id,
+        const insertData: any = {
           user_id: currentUser.id,
           content: finalContent
-        }).select().single();
+        };
+        if (channel.type === 'dm') {
+          insertData.dm_channel_id = channel.id;
+        } else {
+          insertData.channel_id = channel.id;
+        }
+
+        const { data, error } = await supabase.from('messages').insert(insertData).select().single();
         
         if (error) {
           console.error("Errore durante l'invio:", error);
@@ -1904,7 +1911,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
     );
   }
 
-  // VISTA CANALE TESTUALE
+  // VISTA CANALE TESTUALE O DM
   const displayMessages = isLoading ? [] : (tableExists ? realMessages : propMessages as LocalMessage[]);
   const msgToDeleteData = messageToDelete ? displayMessages.find(m => m.id === messageToDelete) : null;
 
@@ -1916,8 +1923,8 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   const hasTopAttachment = replyingTo || filePreview;
 
-  const isInputDisabled = isUploading || isLocked || cooldownRemaining > 0;
-  let placeholderText = `Invia un messaggio in #${channel.name}`;
+  const isInputDisabled = isUploading || isLocked || cooldownRemaining > <think>Continuing the `ChatArea.tsx` file from where it was cut off.</think>0;
+  let placeholderText = `Invia un messaggio in ${channel.type === 'dm' ? '@' : '#'}${channel.name}`;
   if (isUploading) placeholderText = "Caricamento file in corso...";
   else if (isLocked) placeholderText = "Solo il proprietario può scrivere qui.";
   else if (cooldownRemaining > 0) placeholderText = `Slowmode attiva. Attendi ${cooldownRemaining}s...`;
@@ -1945,23 +1952,44 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
           <button onClick={onToggleSidebar} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors flex-shrink-0">
             <Menu size={24} />
           </button>
-          <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+          {channel.type === 'dm' ? (
+            <div className="relative mr-2 flex-shrink-0">
+              <Avatar src={channel.recipient?.avatar || ''} decoration={channel.recipient?.avatar_decoration} className="w-6 h-6" />
+              <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#313338] ${channel.recipient?.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
+            </div>
+          ) : (
+            <Hash size={24} className="text-[#80848e] mr-2 flex-shrink-0" />
+          )}
           <h2 className="font-semibold text-white truncate min-w-0">{channel.name}</h2>
         </div>
-        <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
-          <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
-            <Users size={24} />
-          </button>
-        </div>
+        {channel.type !== 'dm' && (
+          <div className="flex items-center text-[#b5bac1] flex-shrink-0 ml-4">
+            <button onClick={onToggleMembers} className={`p-1 transition-colors ${showMembers ? 'text-white' : 'hover:text-[#dbdee1]'}`} title="Alterna Elenco Membri">
+              <Users size={24} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 custom-scrollbar min-w-0 flex flex-col relative pb-8">
         <div className="mb-8 mt-4">
-          <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
-            <Hash size={32} />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in #{channel.name}!</h1>
-          <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">#{channel.name}</span>.</p>
+          {channel.type === 'dm' ? (
+            <>
+              <div className="w-20 h-20 mb-4">
+                <Avatar src={channel.recipient?.avatar || ''} decoration={channel.recipient?.avatar_decoration} className="w-full h-full" />
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">{channel.name}</h1>
+              <p className="text-[#b5bac1]">Questo è l'inizio della tua cronologia dei messaggi diretti con <span className="font-medium text-[#dbdee1]">@{channel.name}</span>.</p>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
+                <Hash size={32} />
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">Benvenuto in #{channel.name}!</h1>
+              <p className="text-[#b5bac1]">Questo è l'inizio del canale <span className="font-medium text-[#dbdee1]">#{channel.name}</span>.</p>
+            </>
+          )}
         </div>
 
         {isLoading && (

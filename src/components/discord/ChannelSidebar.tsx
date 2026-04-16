@@ -22,6 +22,7 @@ type ServerMemberWithProfile = ServerMember & { profiles: Profile | null };
 interface ChannelSidebarProps {
   activeServer: Server | null;
   channels: Channel[];
+  dmChannels?: Channel[];
   activeChannelId: string;
   onChannelSelect: (channel: Channel) => void;
   currentUser: User;
@@ -32,7 +33,7 @@ interface ChannelSidebarProps {
   notificationCount?: number;
 }
 
-export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings, serverPermissions, notificationCount = 0 }: ChannelSidebarProps) => {
+export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], activeChannelId, onChannelSelect, currentUser, onOpenSettings, onLeaveServer, onOpenUserSettings, serverPermissions, notificationCount = 0 }: ChannelSidebarProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
   const [localChannels, setLocalChannels] = useState<Channel[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -810,6 +811,14 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
           </button>
           
           <button
+            onClick={() => onChannelSelect({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null })}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'friends' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+          >
+            <Users size={20} className="mr-3" />
+            <span className="font-medium">Amici</span>
+          </button>
+
+          <button
             onClick={() => onChannelSelect({ id: 'notifications', name: 'Notifiche', type: 'text', category: '', server_id: null })}
             className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'notifications' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
           >
@@ -893,6 +902,28 @@ export const ChannelSidebar = ({ activeServer, channels, activeChannelId, onChan
               <span className="font-medium">Minigioco Giornaliero</span>
             </div>
           </button>
+
+          {dmChannels && dmChannels.length > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between px-2 mb-1">
+                <span className="text-xs font-bold text-[#949ba4] hover:text-[#dbdee1] cursor-pointer transition-colors">MESSAGGI DIRETTI</span>
+                <Plus size={14} className="text-[#949ba4] hover:text-[#dbdee1] cursor-pointer" />
+              </div>
+              {dmChannels.map(dm => (
+                <button
+                  key={dm.id}
+                  onClick={() => onChannelSelect(dm)}
+                  className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-0.5 transition-colors group ${activeChannelId === dm.id ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+                >
+                  <div className="relative mr-3 flex-shrink-0">
+                    <Avatar src={dm.recipient?.avatar || ''} decoration={dm.recipient?.avatar_decoration} className="w-8 h-8" />
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2b2d31] ${dm.recipient?.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
+                  </div>
+                  <span className="font-medium truncate">{dm.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {currentUser?.id === adminId && (
             <div className="mt-auto pt-4">

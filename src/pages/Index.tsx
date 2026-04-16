@@ -11,6 +11,7 @@ import { NotificationsView } from "@/components/discord/NotificationsView";
 import { TradeModal } from "@/components/discord/TradeModal";
 import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
 import { Progression } from "@/components/discord/Progression";
+import { FriendsArea } from "@/components/discord/FriendsArea";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +50,7 @@ const Index = () => {
   const [publicServers, setPublicServers] = useState<Server[]>([]);
   const [activeServerId, setActiveServerId] = useState<string>('home');
   const [allChannels, setAllChannels] = useState<Channel[]>([]);
+  const [dmChannels, setDmChannels] = useState<Channel[]>([]);
   
   const activeServer = servers.find(s => s.id === activeServerId);
   const serverChannels = allChannels.filter(c => c.server_id === activeServerId);
@@ -487,10 +489,78 @@ const Index = () => {
         const { data: channelsData } = await supabase.from('channels').select('*').in('server_id', joinedServerIds);
         if (channelsData) setAllChannels(channelsData);
       }
+
+      // Fetch DMs
+      const { data: dmsData } = await supabase
+        .from('dm_channels')
+        .select('*')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+        
+      if (dmsData && dmsData.length > 0) {
+        const otherUserIds = dmsData.map(dm => dm.user1_id === user.id ? dm.user2_id : dm.user1_id);
+        const { data: profiles } = await supabase.from('profiles').select('*').in('id', otherUserIds);
+        
+        const formattedDms: Channel[] = dmsData.map(dm => {
+          const otherId = dm.user1_id === user.id ? dm.user2_id : dm.user1_id;
+          const p = profiles?.find(p => p.id === otherId);
+          return {
+            id: dm.id,
+            name: p?.first_name || 'Utente',
+            type: 'dm',
+            category: 'DM',
+            server_id: null,
+            recipient: {
+              id: otherId,
+              name: p?.first_name || 'Utente',
+              avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
+              status: 'offline', // Verrà aggiornato dinamicamente
+              avatar_decoration: p?.avatar_decoration
+            } as User
+          };
+        });
+        setDmChannels(formattedDms);
+      }
     };
     
     loadInitialData();
   }, [user, adminId, moderatorIds]);
+
+  // Listener per nuovi DM
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const dmSub = supabase.channel('dm_channels_changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_channels' }, async (payload) => {
+        const dm = payload.new;
+        if (dm.user1_id === user.id || dm.user2_id === user.id) {
+          const otherId = dm.user1_id === user.id ? dm.user2_id : dm.user1_id;
+          const { data: p } = await supabase.from('profiles').select('*').eq('id', otherId).single();
+          const newDm: Channel = {
+            id: dm.id,
+            name: p?.first_name || 'Utente',
+            type: 'dm',
+            category: 'DM',
+            server_id: null,
+            recipient: {
+              id: otherId,
+              name: p?.first_name || 'Utente',
+              avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
+              status: 'offline',
+              avatar_decoration: p?.avatar_decoration
+            } as User
+          };
+          setDmChannels(prev => {
+            if (prev.some(d => d.id === newDm.id)) return prev;
+            return [...prev, newDm];
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dmSub);
+    };
+  }, [user?.id]);
 
   // Caricamento Membri e Sottoscrizione Realtime
   useEffect(() => {
@@ -589,7 +659,10 @@ const Index = () => {
         setActiveChannel(null);
       }
     } else {
-      setActiveChannel(null);
+      // Se siamo in home, non resettare activeChannel se è un DM o un tab speciale
+      if (activeChannel && activeChannel.server_id !== null) {
+        setActiveChannel(null);
+      }
     }
   }, [activeServerId, allChannels]);
 
@@ -984,12 +1057,99 @@ const Index = () => {
     setTargetMessageId(messageId);
   };
 
+  const handleStartDM = async (userId: string) => {
+    if (!currentUser) return;
+
+    // Controlla se esiste già un DM
+    const existing = dmChannels.find(dm => dm.recipient?.id === userId);
+    if (existing) {
+      setActiveChannel(existing);
+      return;
+    }
+
+    // Controlla nel DB
+    let { data: existingDb } = await supabase
+      .from('dm_channels')
+      .select('*')
+      .eq('user1_id', currentUser.id)
+      .eq('user2_id', userId)
+      .maybeSingle();
+
+    if (!existingDb) {
+      const { data: existingDb2 } = await supabase
+        .from('dm_channels')
+        .select('*')
+        .eq('user1_id', userId)
+        .eq('user2_id', currentUser.id)
+        .maybeSingle();
+      existingDb = existingDb2;
+    }
+
+    if (existingDb) {
+      const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const newDm: Channel = {
+        id: existingDb.id,
+        name: p?.first_name || 'Utente',
+        type: 'dm',
+        category: 'DM',
+        server_id: null,
+        recipient: {
+          id: userId,
+          name: p?.first_name || 'Utente',
+          avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+          status: onlineUserIds.has(userId) ? 'online' : 'offline',
+          avatar_decoration: p?.avatar_decoration
+        } as User
+      };
+      setDmChannels(prev => [...prev, newDm]);
+      setActiveChannel(newDm);
+    } else {
+      // Crea nuovo DM
+      const { data, error } = await supabase
+        .from('dm_channels')
+        .insert({ user1_id: currentUser.id, user2_id: userId })
+        .select()
+        .single();
+
+      if (data) {
+        const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        const newDm: Channel = {
+          id: data.id,
+          name: p?.first_name || 'Utente',
+          type: 'dm',
+          category: 'DM',
+          server_id: null,
+          recipient: {
+            id: userId,
+            name: p?.first_name || 'Utente',
+            avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+            status: onlineUserIds.has(userId) ? 'online' : 'offline',
+            avatar_decoration: p?.avatar_decoration
+          } as User
+        };
+        setDmChannels(prev => [...prev, newDm]);
+        setActiveChannel(newDm);
+      } else {
+        showError("Errore durante la creazione della chat privata.");
+      }
+    }
+  };
+
   if (!currentUser) {
     return <div className="h-screen w-full bg-[#313338] flex items-center justify-center text-[#dbdee1]">Caricamento profilo...</div>;
   }
 
   const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
   const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
+
+  // Aggiorna lo stato online dei destinatari dei DM
+  const dmChannelsWithStatus = dmChannels.map(dm => ({
+    ...dm,
+    recipient: dm.recipient ? {
+      ...dm.recipient,
+      status: onlineUserIds.has(dm.recipient.id) ? 'online' : 'offline'
+    } : undefined
+  }));
 
   return (
     <VoiceChannelProvider currentUser={currentUser}>
@@ -1025,6 +1185,7 @@ const Index = () => {
           <ChannelSidebar 
             activeServer={activeServer || null}
             channels={allChannels}
+            dmChannels={dmChannelsWithStatus}
             activeChannelId={activeChannel?.id || ''} 
             onChannelSelect={(channel) => { setActiveChannel(channel); setShowSidebar(false); }} 
             currentUser={currentUser}
@@ -1070,6 +1231,8 @@ const Index = () => {
             <Progression currentUser={currentUser} />
           ) : activeChannel?.id === 'daily-minigame' ? (
             <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'friends' ? (
+            <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
           ) : activeChannel?.id === 'notifications' ? (
             <NotificationsView 
               currentUser={currentUser} 
@@ -1077,6 +1240,16 @@ const Index = () => {
               onNavigateToShop={() => setActiveChannel({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
               onNavigateToMessage={handleNavigateToMessage}
               onNavigateToTrade={(id) => setActiveTradeId(id)}
+            />
+          ) : activeChannel?.type === 'dm' ? (
+            <ChatArea 
+              channel={activeChannel} 
+              messages={currentMessages} 
+              onSendMessage={handleSendMessage}
+              onToggleMembers={() => {}}
+              onToggleSidebar={() => setShowSidebar(true)}
+              showMembers={false}
+              serverMembers={[]}
             />
           ) : (
             <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
