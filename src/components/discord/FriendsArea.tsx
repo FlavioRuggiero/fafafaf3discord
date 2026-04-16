@@ -156,8 +156,13 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
       .maybeSingle();
 
     if (dmChannel) {
-      await supabase.from('dm_channels').delete().eq('id', dmChannel.id);
+      const { error: dmError } = await supabase.from('dm_channels').delete().eq('id', dmChannel.id);
+      if (dmError) {
+        console.error("Errore eliminazione DM:", dmError);
+      }
     }
+    
+    showSuccess("Amicizia e chat rimosse.");
   };
 
   const pendingRequests = friendships.filter(f => f.status === 'pending');

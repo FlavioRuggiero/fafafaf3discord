@@ -609,7 +609,7 @@ const Index = () => {
     loadInitialData();
   }, [user, adminId, moderatorIds]);
 
-  // Listener per nuovi DM
+  // Listener per nuovi DM e cancellazioni
   useEffect(() => {
     if (!user?.id) return;
     
@@ -637,6 +637,12 @@ const Index = () => {
             if (prev.some(d => d.id === newDm.id)) return prev;
             return [...prev, newDm];
           });
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'dm_channels' }, (payload) => {
+        setDmChannels(prev => prev.filter(dm => dm.id !== payload.old.id));
+        if (activeChannelIdRef.current === payload.old.id) {
+          setActiveChannel({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null });
         }
       })
       .subscribe();
