@@ -409,7 +409,9 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     can_use_commands: false,
     can_manage_server: false,
     can_manage_roles: false,
-    can_bypass_restrictions: false
+    can_bypass_restrictions: false,
+    can_kick_members: false,
+    can_ban_members: false
   });
 
   useEffect(() => {
@@ -533,7 +535,9 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
       can_use_commands: false,
       can_manage_server: false,
       can_manage_roles: false,
-      can_bypass_restrictions: false
+      can_bypass_restrictions: false,
+      can_kick_members: false,
+      can_ban_members: false
     }).select().single();
     
     if (data) {
@@ -547,7 +551,9 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
         can_use_commands: false,
         can_manage_server: false,
         can_manage_roles: false,
-        can_bypass_restrictions: false
+        can_bypass_restrictions: false,
+        can_kick_members: false,
+        can_ban_members: false
       });
       setActiveRoleTab('members');
     } else {
@@ -610,6 +616,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
     { key: 'can_manage_server', label: 'Gestione Server', desc: 'Permette di modificare le impostazioni generali del server.' },
     { key: 'can_manage_roles', label: 'Gestione Ruoli', desc: 'Permette di creare, modificare o eliminare ruoli e assegnarli agli utenti.' },
     { key: 'can_bypass_restrictions', label: 'Bypass Restrizioni', desc: 'Permette di ignorare il cooldown (slowmode) e di scrivere nei canali bloccati.' },
+    { key: 'can_kick_members', label: 'Espelli Membri', desc: 'Permette di rimuovere gli utenti dal server.' },
+    { key: 'can_ban_members', label: 'Banna Membri', desc: 'Permette di bannare gli utenti dal server in modo permanente.' },
   ] as const;
 
   return (
@@ -867,6 +875,8 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onUpdate, onDelet
                               can_manage_server: role.can_manage_server || false,
                               can_manage_roles: role.can_manage_roles || false,
                               can_bypass_restrictions: role.can_bypass_restrictions || false,
+                              can_kick_members: role.can_kick_members || false,
+                              can_ban_members: role.can_ban_members || false,
                             });
                             setActiveRoleTab('members');
                           }}

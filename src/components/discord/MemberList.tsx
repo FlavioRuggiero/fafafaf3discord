@@ -1,17 +1,21 @@
 "use client";
 
 import React from "react";
-import { User } from "@/types/discord";
+import { User, ServerPermissions } from "@/types/discord";
 import { Crown, Shield } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
+import * as ContextMenu from "@radix-ui/react-context-menu";
 
 interface MemberListProps {
   users: User[];
   isOpen?: boolean;
   creatorId?: string;
+  serverPermissions?: ServerPermissions;
+  onKickMember?: (id: string) => void;
+  onBanMember?: (id: string) => void;
 }
 
 const statusColors = {
@@ -28,8 +32,8 @@ const statusText = {
   offline: "Offline",
 };
 
-export const MemberList = ({ users, creatorId }: MemberListProps) => {
-  const { adminId, moderatorIds } = useAuth();
+export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, onBanMember }: MemberListProps) => {
+  const { adminId, moderatorIds, user: authUser } = useAuth();
   const creator = users.find(u => u.id === creatorId);
   const otherUsers = users.filter(u => u.id !== creatorId).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -40,60 +44,96 @@ export const MemberList = ({ users, creatorId }: MemberListProps) => {
     const isAdmin = user.id === adminId;
     const isModerator = moderatorIds.includes(user.id);
 
-    return (
-      <ProfilePopover user={user} side="left" align="start">
-        <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
-          <div className="relative mr-3 mt-1.5 flex-shrink-0">
-            {isCreator && (
-              <div className="absolute -top-3.5 -right-1 z-10 text-yellow-400 rotate-[15deg] drop-shadow-md">
-                <Crown size={16} className="fill-yellow-400" />
-              </div>
-            )}
-            <Avatar src={user.avatar} decoration={user.avatar_decoration} className={`w-8 h-8 ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
-            
-            <div className="absolute -bottom-0.5 -right-0.5 group/status z-30">
-              <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
+    const canInteract = !isCreator && user.id !== authUser?.id && (serverPermissions?.can_kick_members || serverPermissions?.can_ban_members);
+
+    const innerContent = (
+      <div className="w-full">
+        <ProfilePopover user={user} side="left" align="start">
+          <div className="flex items-center px-2 py-1.5 hover:bg-[#35373c] rounded cursor-pointer group mb-[2px]">
+            <div className="relative mr-3 mt-1.5 flex-shrink-0">
+              {isCreator && (
+                <div className="absolute -top-3.5 -right-1 z-10 text-yellow-400 rotate-[15deg] drop-shadow-md">
+                  <Crown size={16} className="fill-yellow-400" />
+                </div>
+              )}
+              <Avatar src={user.avatar} decoration={user.avatar_decoration} className={`w-8 h-8 ${user.status === 'offline' ? 'opacity-50 grayscale-[50%]' : ''}`} />
               
-              <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
-                {statusText[user.status]}
-                <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-[#111214]"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 group/status z-30">
+                <div className={`w-3.5 h-3.5 rounded-full border-[3px] border-[#2b2d31] group-hover:border-[#35373c] ${statusColors[user.status]}`} />
+                
+                <div className="absolute hidden group-hover/status:block z-50 left-full ml-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#111214] text-[#dbdee1] text-xs font-semibold rounded-md shadow-lg whitespace-nowrap">
+                  {statusText[user.status]}
+                  <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-[#111214]"></div>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'}`}>
-                {user.name}
-              </span>
-              {isAdmin && (
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <div className="cursor-help flex items-center"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                    admin di discord canary 2
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {!isAdmin && isModerator && (
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <div className="cursor-help flex items-center"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
-                    moderatore ufficiale
-                  </TooltipContent>
-                </Tooltip>
+            
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'}`}>
+                  {user.name}
+                </span>
+                {isAdmin && (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-help flex items-center"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                      admin di discord canary 2
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {!isAdmin && isModerator && (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-help flex items-center"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                      moderatore ufficiale
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+              {user.customStatus && (
+                <span className="text-xs text-[#dbdee1] truncate -mt-0.5">{user.customStatus}</span>
               )}
             </div>
-            {user.customStatus && (
-              <span className="text-xs text-[#dbdee1] truncate -mt-0.5">{user.customStatus}</span>
-            )}
           </div>
-        </div>
-      </ProfilePopover>
+        </ProfilePopover>
+      </div>
     );
+
+    if (canInteract) {
+      return (
+        <ContextMenu.Root>
+          <ContextMenu.Trigger asChild>
+            {innerContent}
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content className="bg-[#111214] border border-[#1e1f22] rounded-md shadow-xl p-1.5 min-w-[160px] z-[99999] animate-in fade-in zoom-in-95 duration-100">
+              {serverPermissions?.can_kick_members && (
+                <ContextMenu.Item 
+                  className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none mb-0.5" 
+                  onClick={() => onKickMember?.(user.id)}
+                >
+                  Espelli {user.name}
+                </ContextMenu.Item>
+              )}
+              {serverPermissions?.can_ban_members && (
+                <ContextMenu.Item 
+                  className="flex items-center px-2 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded cursor-pointer outline-none" 
+                  onClick={() => onBanMember?.(user.id)}
+                >
+                  Banna {user.name}
+                </ContextMenu.Item>
+              )}
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
+      );
+    }
+
+    return innerContent;
   };
 
   return (

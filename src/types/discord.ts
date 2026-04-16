@@ -9,6 +9,8 @@ export type ServerRole = {
   can_manage_server?: boolean;
   can_manage_roles?: boolean;
   can_bypass_restrictions?: boolean;
+  can_kick_members?: boolean;
+  can_ban_members?: boolean;
 };
 
 export type ServerPermissions = {
@@ -19,6 +21,8 @@ export type ServerPermissions = {
   can_manage_server: boolean;
   can_manage_roles: boolean;
   can_bypass_restrictions: boolean;
+  can_kick_members: boolean;
+  can_ban_members: boolean;
 };
 
 export type User = {

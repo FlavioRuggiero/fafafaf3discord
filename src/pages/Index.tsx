@@ -403,6 +403,8 @@ const Index = () => {
     can_manage_server: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_server) ?? false),
     can_manage_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_roles) ?? false),
     can_bypass_restrictions: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_bypass_restrictions) ?? false),
+    can_kick_members: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_kick_members) ?? false),
+    can_ban_members: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_ban_members) ?? false),
   };
 
   // Gestione Supabase Presence
@@ -721,6 +723,13 @@ const Index = () => {
         } else if (payload.eventType === 'DELETE') {
           const deletedUserId = payload.old.user_id;
           setServerProfiles(prev => prev.filter(p => p.id !== deletedUserId));
+          
+          // Se l'utente eliminato è l'utente corrente, riportalo alla home
+          if (deletedUserId === currentUserRef.current?.id) {
+            showError("Sei stato rimosso dal server.");
+            setServers(prev => prev.filter(s => s.id !== activeServerId));
+            setActiveServerId('home');
+          }
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
@@ -889,6 +898,12 @@ const Index = () => {
   const handleJoinServer = async (server: Server) => {
     if (!currentUser) return;
 
+    const { data: isBanned } = await supabase.from('server_bans').select('id').eq('server_id', server.id).eq('user_id', currentUser.id).maybeSingle();
+    if (isBanned) {
+      showError("Sei stato bannato da questo server.");
+      return;
+    }
+
     const maxPosition = servers.length;
     const { error } = await supabase.from('server_members').insert({ 
       server_id: server.id, 
@@ -923,6 +938,12 @@ const Index = () => {
 
   const handleRequestJoinServer = async (server: Server) => {
     if (!currentUser) return;
+
+    const { data: isBanned } = await supabase.from('server_bans').select('id').eq('server_id', server.id).eq('user_id', currentUser.id).maybeSingle();
+    if (isBanned) {
+      showError("Sei stato bannato da questo server.");
+      return;
+    }
 
     const { data: existing } = await supabase
       .from('server_join_requests')
@@ -969,6 +990,24 @@ const Index = () => {
     setAllChannels(allChannels.filter(c => c.server_id !== serverId));
     setActiveServerId('home');
     showSuccess("Sei uscito dal server.");
+  };
+
+  const handleKickMember = async (userId: string) => {
+    if (!activeServerId) return;
+    const { error } = await supabase.from('server_members').delete().eq('server_id', activeServerId).eq('user_id', userId);
+    if (error) showError("Errore durante l'espulsione.");
+    else showSuccess("Utente espulso dal server.");
+  };
+
+  const handleBanMember = async (userId: string) => {
+    if (!activeServerId) return;
+    const { error: banError } = await supabase.from('server_bans').insert({ server_id: activeServerId, user_id: userId, created_by: currentUser?.id });
+    if (banError) {
+      showError("Errore durante il ban.");
+      return;
+    }
+    await supabase.from('server_members').delete().eq('server_id', activeServerId).eq('user_id', userId);
+    showSuccess("Utente bannato dal server.");
   };
 
   const handleOpenDiscover = async () => {
@@ -1319,7 +1358,14 @@ const Index = () => {
               ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
               overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
             `}>
-              <MemberList users={serverMembersList} isOpen={showMembers} creatorId={activeServer?.created_by} />
+              <MemberList 
+                users={serverMembersList} 
+                isOpen={showMembers} 
+                creatorId={activeServer?.created_by} 
+                serverPermissions={serverPermissions}
+                onKickMember={handleKickMember}
+                onBanMember={handleBanMember}
+              />
             </div>
           </>
         ) : activeServerId === 'home' ? (
