@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { User, ServerPermissions } from "@/types/discord";
-import { Crown, Shield } from "lucide-react";
+import { Crown, Shield, Search } from "lucide-react";
 import { ProfilePopover } from "./ProfilePopover";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -34,8 +34,14 @@ const statusText = {
 
 export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, onBanMember }: MemberListProps) => {
   const { adminId, moderatorIds, user: authUser } = useAuth();
-  const creator = users.find(u => u.id === creatorId);
-  const otherUsers = users.filter(u => u.id !== creatorId).sort((a, b) => a.name.localeCompare(b.name));
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const creator = filteredUsers.find(u => u.id === creatorId);
+  const otherUsers = filteredUsers.filter(u => u.id !== creatorId).sort((a, b) => a.name.localeCompare(b.name));
 
   const onlineUsers = otherUsers.filter(u => u.status !== 'offline');
   const offlineUsers = otherUsers.filter(u => u.status === 'offline');
@@ -138,39 +144,57 @@ export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, 
 
   return (
     <div className="w-[240px] h-full bg-[#2b2d31] flex flex-col flex-shrink-0 border-l border-[#1f2023]">
-      <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center justify-end px-4 flex-shrink-0">
+      <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-3 flex-shrink-0">
+        <div className="relative w-full">
+          <input
+            type="text"
+            placeholder="Cerca membri"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#1e1f22] text-[#dbdee1] text-sm rounded px-2 py-1 pl-7 outline-none focus:ring-1 focus:ring-brand placeholder:text-[#949ba4]"
+          />
+          <Search size={14} className="absolute left-2 top-1.5 text-[#949ba4]" />
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 pr-2">
-        {creator && (
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
-              Proprietario — 1
-            </h3>
-            <UserItem user={creator} isCreator={true} />
+        {filteredUsers.length === 0 ? (
+          <div className="text-center text-[#949ba4] text-sm mt-4">
+            Nessun membro trovato.
           </div>
-        )}
+        ) : (
+          <>
+            {creator && (
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
+                  Proprietario — 1
+                </h3>
+                <UserItem user={creator} isCreator={true} />
+              </div>
+            )}
 
-        {onlineUsers.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
-              Disponibili — {onlineUsers.length}
-            </h3>
-            {onlineUsers.map(user => (
-              <UserItem key={user.id} user={user} />
-            ))}
-          </div>
-        )}
+            {onlineUsers.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
+                  Disponibili — {onlineUsers.length}
+                </h3>
+                {onlineUsers.map(user => (
+                  <UserItem key={user.id} user={user} />
+                ))}
+              </div>
+            )}
 
-        {offlineUsers.length > 0 && (
-          <div>
-            <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
-              Offline — {offlineUsers.length}
-            </h3>
-            {offlineUsers.map(user => (
-              <UserItem key={user.id} user={user} />
-            ))}
-          </div>
+            {offlineUsers.length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold text-[#949ba4] uppercase tracking-wider mb-1 px-2">
+                  Offline — {offlineUsers.length}
+                </h3>
+                {offlineUsers.map(user => (
+                  <UserItem key={user.id} user={user} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
