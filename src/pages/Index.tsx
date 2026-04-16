@@ -164,7 +164,8 @@ const Index = () => {
           const audio = new Audio('/jumpscare.mp3');
           audio.volume = 1.0;
           audio.play().catch(e => console.error("Audio play failed", e));
-          setTimeout(() => setJumpscareActive(false), 2500);
+          // Aumentato a 3500ms per compensare il ritardo di 1s dell'animazione
+          setTimeout(() => setJumpscareActive(false), 3500);
         }
       })
       .subscribe();
