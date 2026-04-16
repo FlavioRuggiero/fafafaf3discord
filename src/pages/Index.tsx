@@ -189,16 +189,20 @@ const Index = () => {
                 if (prev.some(d => d.id === newDm.id)) return prev;
                 return [...prev, newDm];
               });
-              playSound('/notifica.mp3');
-              if (activeServerIdRef.current !== 'home') {
-                setUnreadServers(prev => new Set(prev).add('home'));
+              
+              // Suona solo se non stiamo già guardando questo canale
+              if (activeChannelIdRef.current !== newMsg.dm_channel_id) {
+                playSound('/notifica.mp3');
+                if (activeServerIdRef.current !== 'home') {
+                  setUnreadServers(prev => new Set(prev).add('home'));
+                }
               }
             }
           };
           fetchNewDm();
         } else {
-          playSound('/notifica.mp3');
           if (activeChannelIdRef.current !== newMsg.dm_channel_id) {
+            playSound('/notifica.mp3');
             setDmChannels(prev => prev.map(dm => dm.id === newMsg.dm_channel_id ? { ...dm, unread: true } : dm));
             if (activeServerIdRef.current !== 'home') {
               setUnreadServers(prev => new Set(prev).add('home'));
@@ -233,7 +237,7 @@ const Index = () => {
       if (setting === 'all') shouldNotify = true;
       if (setting === 'mentions' && isMentioned) shouldNotify = true;
 
-      if (shouldNotify) {
+      if (shouldNotify && activeChannelIdRef.current !== newMsg.channel_id) {
         playSound('/notifica.mp3');
       }
     };
