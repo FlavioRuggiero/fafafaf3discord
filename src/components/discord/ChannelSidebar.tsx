@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell, Image as ImageIcon, Award } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell, Image as ImageIcon, Award, Music } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -913,6 +913,22 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
             <div className="relative z-10 flex items-center">
               <Gamepad2 size={20} className="mr-3 text-[#0ea5e9]" />
               <span className="font-medium">Minigioco Giornaliero</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => onChannelSelect({ id: 'mysingingcanary', name: 'MySingingCanary', type: 'text', category: '', server_id: null })}
+            className={`relative w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors overflow-hidden group ${activeChannelId === 'mysingingcanary' ? 'text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
+          >
+            {/* Sfondo base */}
+            <div className={`absolute inset-0 transition-colors ${activeChannelId === 'mysingingcanary' ? 'bg-[#404249]' : 'group-hover:bg-[#35373c]'}`}></div>
+            
+            {/* Sfumatura viola da destra */}
+            <div className={`absolute inset-0 bg-gradient-to-l from-[#a855f7]/20 to-transparent transition-opacity duration-300 ${activeChannelId === 'mysingingcanary' ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}`}></div>
+            
+            <div className="relative z-10 flex items-center">
+              <Music size={20} className="mr-3 text-[#a855f7]" />
+              <span className="font-medium">MySingingCanary</span>
             </div>
           </button>
 

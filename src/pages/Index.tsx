@@ -10,6 +10,7 @@ import { InventoryView } from "@/components/discord/InventoryView";
 import { NotificationsView } from "@/components/discord/NotificationsView";
 import { TradeModal } from "@/components/discord/TradeModal";
 import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
+import { MySingingCanary } from "@/components/discord/MySingingCanary";
 import { Progression } from "@/components/discord/Progression";
 import { FriendsArea } from "@/components/discord/FriendsArea";
 import { INITIAL_MESSAGES } from "@/data/mockData";
@@ -1525,6 +1526,8 @@ const Index = () => {
             <Progression currentUser={currentUser} />
           ) : activeChannel?.id === 'daily-minigame' ? (
             <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'mysingingcanary' ? (
+            <MySingingCanary currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'friends' ? (
             <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
           ) : activeChannel?.id === 'notifications' ? (
