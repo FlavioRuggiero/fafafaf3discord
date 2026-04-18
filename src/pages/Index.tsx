@@ -459,7 +459,8 @@ const Index = () => {
       entrance_audio_url: p.entrance_audio_url || null,
       claimed_levels: p.claimed_levels || [],
       standard_chests: p.standard_chests || 0,
-      premium_chests: p.premium_chests || 0
+      premium_chests: p.premium_chests || 0,
+      singing_island: p.singing_island || []
     };
   });
 
@@ -558,7 +559,8 @@ const Index = () => {
             entrance_audio_url: updatedProfile.entrance_audio_url || null,
             claimed_levels: updatedProfile.claimed_levels || [],
             standard_chests: updatedProfile.standard_chests || 0,
-            premium_chests: updatedProfile.premium_chests || 0
+            premium_chests: updatedProfile.premium_chests || 0,
+            singing_island: updatedProfile.singing_island || []
           };
         });
       })
@@ -628,7 +630,8 @@ const Index = () => {
         entrance_audio_url: profile?.entrance_audio_url || null,
         claimed_levels: profile?.claimed_levels || [],
         standard_chests: profile?.standard_chests || 0,
-        premium_chests: profile?.premium_chests || 0
+        premium_chests: profile?.premium_chests || 0,
+        singing_island: profile?.singing_island || []
       };
       
       setCurrentUser(loadedUser);

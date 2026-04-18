@@ -18,6 +18,7 @@ export interface User {
   claimed_levels?: number[];
   standard_chests?: number;
   premium_chests?: number;
+  singing_island?: any[];
 }
 
 export interface ServerRole {
