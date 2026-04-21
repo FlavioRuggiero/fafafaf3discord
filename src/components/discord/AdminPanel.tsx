@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play, Copy, ClipboardPaste, ChevronDown, ChevronUp, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useShop, CustomElement, BaseEffectConfig, CustomAnimationDef, CustomKeyframe } from "@/contexts/ShopContext";
+import { useShop, CustomElement, BaseEffectConfig, CustomAnimationDef, CustomKeyframe, CustomDecoration } from "@/contexts/ShopContext";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 
 interface AdminPanelProps {
@@ -35,6 +35,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [selectedJumpscareTarget, setSelectedJumpscareTarget] = useState<string>('all');
 
   // Stati per Editor Contorni Custom
+  const [editDecorationId, setEditDecorationId] = useState<string | null>(null);
   const [newDecName, setNewDecName] = useState('');
   const [newDecPrice, setNewDecPrice] = useState(100);
   const [newDecBorder, setNewDecBorder] = useState('#5865F2');
@@ -412,13 +413,53 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  const handleEditCustomDecoration = (dec: CustomDecoration) => {
+    setEditDecorationId(dec.id);
+    setNewDecName(dec.name);
+    setNewDecPrice(dec.price);
+    setNewDecBorder(dec.border_color);
+    setNewDecShadow(dec.shadow_color);
+    setTextColorType(dec.text_color_type);
+    setNewDecTextColor(dec.text_color);
+    setNewDecGradStart(dec.text_gradient_start);
+    setNewDecGradEnd(dec.text_gradient_end);
+    setNewDecAnim(dec.animation_type);
+    setBaseEffects(dec.config?.baseEffects || []);
+    setElements(dec.config?.elements || []);
+    setCustomAnimations(dec.config?.customAnimations || []);
+    setNewDecImagePreview(dec.image_url);
+    setNewDecImage(null);
+    
+    // Scroll to top
+    const container = document.getElementById('custom-editor-container');
+    if (container) container.scrollTop = 0;
+  };
+
+  const handleCancelEdit = () => {
+    setEditDecorationId(null);
+    setNewDecName('');
+    setNewDecPrice(100);
+    setNewDecBorder('#5865F2');
+    setNewDecShadow('#5865F2');
+    setTextColorType('gradient');
+    setNewDecTextColor('#ffffff');
+    setNewDecGradStart('#5865F2');
+    setNewDecGradEnd('#00ffff');
+    setNewDecAnim('none');
+    setBaseEffects([]);
+    setElements([]);
+    setCustomAnimations([]);
+    setNewDecImagePreview(null);
+    setNewDecImage(null);
+  };
+
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDecName.trim() || !currentUser) return;
     
     setIsCreatingDec(true);
-    const customId = `custom-${Date.now()}`;
-    let imageUrl = null;
+    const customId = editDecorationId || `custom-${Date.now()}`;
+    let imageUrl = newDecImagePreview;
 
     if (newDecImage) {
       const fileExt = newDecImage.name.split('.').pop();
@@ -436,8 +477,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       customAnimations
     };
 
-    const { error } = await supabase.from('custom_decorations').insert({
-      id: customId,
+    const payload = {
       name: newDecName.trim(),
       price: newDecPrice,
       category: 'Contorni Custom',
@@ -450,24 +490,36 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       text_gradient_end: newDecGradEnd,
       animation_type: newDecAnim,
       config: config
-    });
+    };
 
-    if (error) {
-      showError("Errore durante la creazione. Hai eseguito lo script SQL?");
+    if (editDecorationId) {
+      const { error } = await supabase.from('custom_decorations').update(payload).eq('id', editDecorationId);
+      if (error) {
+        showError("Errore durante l'aggiornamento. Hai eseguito lo script SQL?");
+      } else {
+        showSuccess("Contorno aggiornato con successo!");
+        handleCancelEdit();
+        await refreshCustomDecorations();
+      }
     } else {
-      // Aggiungi automaticamente all'inventario del creatore
-      const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
-      const currentPurchased = profile?.purchased_decorations || [];
-      await supabase.from('profiles').update({ purchased_decorations: [...currentPurchased, customId] }).eq('id', currentUser.id);
+      const { error } = await supabase.from('custom_decorations').insert({
+        id: customId,
+        ...payload,
+        creator_id: currentUser.id
+      });
 
-      showSuccess("Contorno creato e aggiunto al tuo inventario!");
-      setNewDecName('');
-      setNewDecImage(null);
-      setNewDecImagePreview(null);
-      setBaseEffects([]);
-      setElements([]);
-      setCustomAnimations([]);
-      await refreshCustomDecorations();
+      if (error) {
+        showError("Errore durante la creazione. Hai eseguito lo script SQL?");
+      } else {
+        // Aggiungi automaticamente all'inventario del creatore
+        const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
+        const currentPurchased = profile?.purchased_decorations || [];
+        await supabase.from('profiles').update({ purchased_decorations: [...currentPurchased, customId] }).eq('id', currentUser.id);
+
+        showSuccess("Contorno creato e aggiunto al tuo inventario!");
+        handleCancelEdit();
+        await refreshCustomDecorations();
+      }
     }
     setIsCreatingDec(false);
   };
@@ -478,6 +530,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       showError("Errore durante l'eliminazione.");
     } else {
       showSuccess("Contorno eliminato.");
+      if (editDecorationId === id) handleCancelEdit();
       await refreshCustomDecorations();
     }
   };
@@ -745,7 +798,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             top: `${el.y}%`,
             transform: `translate(-50%, -50%)`,
             width: '100%',
-            height: '100%'
+            height: '100%',
+            zIndex: el.zIndex ?? 20
           }}
         >
           <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
@@ -769,7 +823,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
           fontSize: `${el.size}cqw`,
-          zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
+          zIndex: el.zIndex ?? 20
         }}
       >
         {innerContent}
@@ -856,10 +910,20 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           
           {activeTab === 'custom-editor' && (
             <div className="flex flex-col lg:flex-row h-full overflow-hidden">
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                <h3 className="text-white font-bold text-xl flex items-center gap-2">
-                  <Wand2 className="text-brand" /> Crea Contorno Custom
-                </h3>
+              <div id="custom-editor-container" className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-white font-bold text-xl flex items-center gap-2">
+                    <Wand2 className="text-brand" /> {editDecorationId ? 'Modifica Contorno Custom' : 'Crea Contorno Custom'}
+                  </h3>
+                  {editDecorationId && (
+                    <button 
+                      onClick={handleCancelEdit}
+                      className="text-sm text-[#b5bac1] hover:text-white hover:underline transition-colors"
+                    >
+                      Annulla Modifica
+                    </button>
+                  )}
+                </div>
                 
                 <form id="custom-dec-form" onSubmit={handleCreateCustomDecoration} className="space-y-6">
                   {/* Info Base */}
@@ -973,7 +1037,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           onClick={() => fileInputRef.current?.click()}
                           className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
                         >
-                          <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
+                          <Upload size={16} /> {newDecImage || newDecImagePreview ? 'Cambia Immagine' : 'Carica Immagine'}
                         </button>
                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                       </div>
@@ -1184,7 +1248,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
                                     <div>
                                       <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
                                       <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -1229,6 +1293,10 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                             </option>
                                         ))}
                                       </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Z-Index</label>
+                                      <input type="number" value={el.zIndex ?? 20} onChange={e => updateElement(el.id, 'zIndex', parseInt(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                     </div>
                                   </div>
                                 </div>
@@ -1505,7 +1573,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   disabled={isCreatingDec || !newDecName.trim()}
                   className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
                 >
-                  {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
+                  {isCreatingDec ? 'Salvataggio in corso...' : (editDecorationId ? 'Salva Modifiche' : 'Crea Contorno')}
                 </button>
               </div>
             </div>
@@ -1543,14 +1611,24 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         <span className="text-[10px] text-[#949ba4]">{dec.price} DC</span>
                       </div>
                     </div>
-                    <button 
-                      type="button"
-                      onClick={() => handleDeleteCustomDecoration(dec.id)}
-                      className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
-                      title="Elimina"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex gap-1">
+                      <button 
+                        type="button"
+                        onClick={() => handleEditCustomDecoration(dec)}
+                        className="p-1.5 text-brand hover:bg-brand/20 rounded transition-colors"
+                        title="Modifica"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteCustomDecoration(dec.id)}
+                        className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
+                        title="Elimina"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
