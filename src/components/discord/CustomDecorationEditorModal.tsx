@@ -895,7 +895,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               {elements.map(el => {
                 if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
                   const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                  const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-<think>Continuing the previous response exactly where it left off.</think>inner' : 'custom-orbit-3d-inner-rev';
+                  const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
                   return (
                     <div
                       key={el.id}
@@ -937,20 +937,26 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               })}
             </div>
 
-            <span 
-              className="font-bold text-2xl text-center mb-8"
-              style={textColorType === 'solid' ? {
-                color: newDecTextColor,
-                textShadow: `0 0 10px ${newDecTextColor}80`
-              } : {
-                background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
-              }}
+            <div 
+              className="mb-8 text-center"
+              style={textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${newDecGradStart || '#fff'}80)` } : {}}
             >
-              {newDecName || 'Nome Contorno'}
-            </span>
+              <span 
+                className="font-bold text-2xl"
+                style={textColorType === 'solid' ? {
+                  color: newDecTextColor,
+                  textShadow: `0 0 10px ${newDecTextColor}80`
+                } : {
+                  backgroundImage: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  color: 'transparent'
+                }}
+              >
+                {newDecName || 'Nome Contorno'}
+              </span>
+            </div>
 
             <button 
               type="submit"

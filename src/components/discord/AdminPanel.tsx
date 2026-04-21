@@ -1210,20 +1210,26 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   })}
                 </div>
 
-                <span 
-                  className="font-bold text-2xl text-center mb-8"
-                  style={textColorType === 'solid' ? {
-                    color: newDecTextColor,
-                    textShadow: `0 0 10px ${newDecTextColor}80`
-                  } : {
-                    background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    filter: `drop-shadow(0 0 8px ${newDecGradStart || '#fff'}80)`
-                  }}
+                <div 
+                  className="mb-8 text-center"
+                  style={textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${newDecGradStart || '#fff'}80)` } : {}}
                 >
-                  {newDecName || 'Nome Contorno'}
-                </span>
+                  <span 
+                    className="font-bold text-2xl"
+                    style={textColorType === 'solid' ? {
+                      color: newDecTextColor,
+                      textShadow: `0 0 10px ${newDecTextColor}80`
+                    } : {
+                      backgroundImage: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
+                      WebkitBackgroundClip: 'text',
+                      backgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      color: 'transparent'
+                    }}
+                  >
+                    {newDecName || 'Nome Contorno'}
+                  </span>
+                </div>
 
                 <button 
                   type="submit"
@@ -1251,16 +1257,17 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       >
                         {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
                       </div>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col" style={dec.text_color_type === 'gradient' ? { filter: `drop-shadow(0 0 4px ${dec.text_gradient_start}80)` } : {}}>
                         <span className="text-sm font-bold" style={
                           dec.text_color_type === 'solid' ? {
                             color: dec.text_color,
                             textShadow: `0 0 5px ${dec.text_color}80`
                           } : {
-                            background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
+                            backgroundImage: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
                             WebkitBackgroundClip: 'text', 
+                            backgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            filter: `drop-shadow(0 0 4px ${dec.text_gradient_start}80)`
+                            color: 'transparent'
                           }
                         }>
                           {dec.name}

@@ -125,10 +125,11 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
         };
       } else {
         return {
-          background: `linear-gradient(90deg, ${custom.text_gradient_start || '#fff'}, ${custom.text_gradient_end || '#fff'})`,
+          backgroundImage: `linear-gradient(90deg, ${custom.text_gradient_start || '#fff'}, ${custom.text_gradient_end || '#fff'})`,
           WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          filter: `drop-shadow(0 0 8px ${custom.text_gradient_start || '#fff'}80)`
+          color: 'transparent'
         };
       }
     }
