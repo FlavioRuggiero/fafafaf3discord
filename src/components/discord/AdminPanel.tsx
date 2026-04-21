@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play, Copy, ClipboardPaste } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -59,6 +59,28 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   // Stato per il selettore Emoji
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
+
+  // Stati per comprimere gli elementi
+  const [collapsedElements, setCollapsedElements] = useState<Set<string>>(new Set());
+  const [collapsedAnims, setCollapsedAnims] = useState<Set<string>>(new Set());
+
+  const toggleElement = (id: string) => {
+    setCollapsedElements(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAnim = (id: string) => {
+    setCollapsedAnims(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -232,7 +254,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const copyBaseEffect = (id: string) => {
     const effect = baseEffects.find(e => e.id === id);
     if (effect) {
-      setClipboard(prev => ({ ...prev, baseEffect: effect }));
+      setClipboard(prev => ({ ...prev, baseEffect: JSON.parse(JSON.stringify(effect)) }));
       showSuccess("Effetto copiato!");
     }
   };
@@ -245,8 +267,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   };
 
   const addElement = () => {
+    const newId = `el-${Date.now()}`;
     setElements([...elements, {
-      id: `el-${Date.now()}`,
+      id: newId,
       type: 'emoji',
       content: '✨',
       animation: 'float',
@@ -256,6 +279,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       size: 15,
       delay: 0
     }]);
+    setCollapsedElements(prev => {
+      const next = new Set(prev);
+      next.delete(newId);
+      return next;
+    });
   };
 
   const updateElement = (id: string, field: keyof CustomElement, value: any) => {
@@ -269,22 +297,24 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const copyElement = (id: string) => {
     const el = elements.find(e => e.id === id);
     if (el) {
-      setClipboard(prev => ({ ...prev, element: el }));
+      setClipboard(prev => ({ ...prev, element: JSON.parse(JSON.stringify(el)) }));
       showSuccess("Elemento copiato!");
     }
   };
 
   const pasteElement = () => {
     if (clipboard.element) {
-      setElements([...elements, { ...clipboard.element, id: `el-${Date.now()}-${Math.random()}` }]);
+      const newId = `el-${Date.now()}-${Math.random()}`;
+      setElements([...elements, { ...clipboard.element, id: newId }]);
       showSuccess("Elemento incollato!");
     }
   };
 
   // Animazioni Custom
   const addCustomAnimation = () => {
+    const newId = `anim-${Date.now()}`;
     setCustomAnimations([...customAnimations, {
-      id: `anim-${Date.now()}`,
+      id: newId,
       name: `Animazione ${customAnimations.length + 1}`,
       duration: 3,
       timingFunction: 'linear',
@@ -293,6 +323,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         { id: `kf-${Date.now()}-2`, percent: 100, x: 50, y: 50, scale: 1, rotation: 360, opacity: 1, zIndex: 20, positionMode: 'relative' }
       ]
     }]);
+    setCollapsedAnims(prev => {
+      const next = new Set(prev);
+      next.delete(newId);
+      return next;
+    });
   };
 
   const updateCustomAnimation = (id: string, field: keyof CustomAnimationDef, value: any) => {
@@ -307,7 +342,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const copyCustomAnimation = (id: string) => {
     const anim = customAnimations.find(a => a.id === id);
     if (anim) {
-      setClipboard(prev => ({ ...prev, animation: anim }));
+      setClipboard(prev => ({ ...prev, animation: JSON.parse(JSON.stringify(anim)) }));
       showSuccess("Animazione copiata!");
     }
   };
@@ -359,7 +394,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     if (anim) {
       const kf = anim.keyframes.find(k => k.id === kfId);
       if (kf) {
-        setClipboard(prev => ({ ...prev, keyframe: kf }));
+        setClipboard(prev => ({ ...prev, keyframe: JSON.parse(JSON.stringify(kf)) }));
         showSuccess("Keyframe copiato!");
       }
     }
@@ -691,6 +726,13 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
     const contentNode = el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />;
 
+    const innerContent = (
+      <div style={{ rotate: `${el.rotation || 0}deg`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {contentNode}
+        {childrenNodes}
+      </div>
+    );
+
     if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
       const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
       const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
@@ -708,8 +750,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         >
           <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
             <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-              {contentNode}
-              {childrenNodes}
+              {innerContent}
             </div>
           </div>
         </div>
@@ -724,7 +765,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           left: `${el.x}%`,
           top: `${el.y}%`,
           transform: 'translate(-50%, -50%)',
-          rotate: `${el.rotation || 0}deg`,
           animation: getAnimation(el.animation, el.delay, customAnimations),
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
@@ -732,8 +772,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
         }}
       >
-        {contentNode}
-        {childrenNodes}
+        {innerContent}
       </div>
     );
   };
@@ -1083,106 +1122,120 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
                     ) : (
                       <div className="space-y-3">
-                        {elements.map((el, idx) => (
-                          <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                            <div className="absolute top-2 right-2 flex gap-1">
-                              <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
-                                <Copy size={16} />
-                              </button>
-                              <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
-                                <X size={16} />
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 mb-3 pr-12">
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
-                                <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                  <option value="emoji">Emoji</option>
-                                  <option value="image">URL Immagine</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
-                                {el.type === 'emoji' ? (
-                                  <button 
-                                    type="button" 
-                                    onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
-                                    className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
-                                  >
-                                    {el.content || '✨'}
+                        {elements.map((el, idx) => {
+                          const isCollapsed = collapsedElements.has(el.id);
+                          return (
+                            <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                              <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => toggleElement(el.id)}>
+                                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                                  {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                                  Elemento {el.type === 'emoji' ? el.content : 'Immagine'}
+                                </div>
+                                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                  <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors p-1" title="Copia">
+                                    <Copy size={16} />
                                   </button>
-                                ) : (
-                                  <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                              <div>
-                                <div className="flex justify-between items-center mb-1">
-                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
-                                  <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                  <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors p-1" title="Elimina">
+                                    <X size={16} />
+                                  </button>
                                 </div>
-                                <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
-                              <div>
-                                <div className="flex justify-between items-center mb-1">
-                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
-                                  <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                                </div>
-                                <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
-                              </div>
-                            </div>
+                              
+                              {!isCollapsed && (
+                                <div className="pt-2 border-t border-[#3f4147]">
+                                  <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
+                                      <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                        <option value="emoji">Emoji</option>
+                                        <option value="image">URL Immagine</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
+                                      {el.type === 'emoji' ? (
+                                        <button 
+                                          type="button" 
+                                          onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
+                                          className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
+                                        >
+                                          {el.content || '✨'}
+                                        </button>
+                                      ) : (
+                                        <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                      <div className="flex justify-between items-center mb-1">
+                                        <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
+                                        <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                      </div>
+                                      <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between items-center mb-1">
+                                        <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
+                                        <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                      </div>
+                                      <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                                    </div>
+                                  </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
-                                <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                  <option value="none">Nessuna</option>
-                                  <option value="float">Fluttua</option>
-                                  <option value="pulse">Pulsazione</option>
-                                  <option value="spin">Rotazione</option>
-                                  <option value="shake">Tremolio</option>
-                                  <option value="orbit-2d">Orbita 2D</option>
-                                  <option value="orbit-3d">Orbita 3D</option>
-                                  <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
-                                  {customAnimations.map(a => (
-                                    <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
-                                <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
-                                <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione</label>
-                                <input type="number" value={el.rotation || 0} onChange={e => updateElement(el.id, 'rotation', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
-                                <select 
-                                  value={el.parentId || ''} 
-                                  onChange={e => updateElement(el.id, 'parentId', e.target.value || undefined)} 
-                                  className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]"
-                                >
-                                  <option value="">Nessuno (Base)</option>
-                                  {elements
-                                    .filter(other => other.id !== el.id)
-                                    .map(other => (
-                                      <option key={other.id} value={other.id}>
-                                        {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
-                                      </option>
-                                  ))}
-                                </select>
-                              </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
+                                      <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                        <option value="none">Nessuna</option>
+                                        <option value="float">Fluttua</option>
+                                        <option value="pulse">Pulsazione</option>
+                                        <option value="spin">Rotazione</option>
+                                        <option value="shake">Tremolio</option>
+                                        <option value="orbit-2d">Orbita 2D</option>
+                                        <option value="orbit-3d">Orbita 3D</option>
+                                        <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
+                                        {customAnimations.map(a => (
+                                          <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
+                                      <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
+                                      <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione</label>
+                                      <input type="number" value={el.rotation || 0} onChange={e => updateElement(el.id, 'rotation', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
+                                      <select 
+                                        value={el.parentId || ''} 
+                                        onChange={e => updateElement(el.id, 'parentId', e.target.value || undefined)} 
+                                        className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]"
+                                      >
+                                        <option value="">Nessuno (Base)</option>
+                                        {elements
+                                          .filter(other => other.id !== el.id && !isDescendant(other.id, el.id, elements))
+                                          .map(other => (
+                                            <option key={other.id} value={other.id}>
+                                              {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
+                                            </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1208,160 +1261,173 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
                     ) : (
                       <div className="space-y-4">
-                        {customAnimations.map((anim) => (
-                          <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                            <div className="absolute top-2 right-2 flex gap-1">
-                              <button type="button" onClick={() => copyCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
-                                <Copy size={16} />
-                              </button>
-                              <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
-                                <X size={16} />
-                              </button>
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-3 mb-4 pr-12">
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
-                                <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
-                                <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
-                                <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                  <option value="linear">Lineare</option>
-                                  <option value="ease">Morbida (Ease)</option>
-                                  <option value="ease-in-out">Morbida In/Out</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="border-t border-[#3f4147] pt-3">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
-                                <div className="flex gap-2">
-                                  {clipboard.keyframe && (
-                                    <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
-                                      <ClipboardPaste size={10} /> Incolla
-                                    </button>
-                                  )}
-                                  <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
-                                    + Keyframe
+                        {customAnimations.map((anim) => {
+                          const isCollapsed = collapsedAnims.has(anim.id);
+                          return (
+                            <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                              <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => toggleAnim(anim.id)}>
+                                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                                  {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                                  {anim.name}
+                                </div>
+                                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                  <button type="button" onClick={() => copyCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors p-1" title="Copia">
+                                    <Copy size={16} />
+                                  </button>
+                                  <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors p-1" title="Elimina">
+                                    <X size={16} />
                                   </button>
                                 </div>
                               </div>
                               
-                              <div className="space-y-2">
-                                {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
-                                  <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
-                                    <div className="absolute top-1 right-1 flex gap-1">
-                                      <button type="button" onClick={() => copyKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
-                                        <Copy size={12} />
-                                      </button>
-                                      <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
-                                        <X size={12} />
-                                      </button>
+                              {!isCollapsed && (
+                                <div className="pt-2 border-t border-[#3f4147]">
+                                  <div className="grid grid-cols-3 gap-3 mb-4">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
+                                      <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                     </div>
-                                    
-                                    <div className="w-full flex items-center gap-2 mb-2 pr-10">
-                                      <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
-                                      <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
+                                      <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                     </div>
-
-                                    <div className="col-span-full flex gap-3 mb-3 p-2 bg-[#111214] rounded border border-[#3f4147] w-full">
-                                      <div className="flex-1">
-                                        <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Modalità Posizione</label>
-                                        <select 
-                                          value={kf.positionMode || 'relative'} 
-                                          onChange={e => updateKeyframe(anim.id, kf.id, 'positionMode', e.target.value)}
-                                          className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
-                                        >
-                                          <option value="relative">Relativa (Offset)</option>
-                                          <option value="absolute">Assoluta (Globale)</option>
-                                          <option value="target">Segui Elemento</option>
-                                        </select>
-                                      </div>
-                                      {kf.positionMode === 'target' && (
-                                        <div className="flex-1">
-                                          <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Elemento Bersaglio</label>
-                                          <select 
-                                            value={kf.targetId || ''} 
-                                            onChange={e => updateKeyframe(anim.id, kf.id, 'targetId', e.target.value)}
-                                            className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
-                                          >
-                                            <option value="">Seleziona...</option>
-                                            {elements.map(e => (
-                                              <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
-                                      {kf.positionMode !== 'target' && (
-                                        <>
-                                          <div>
-                                            <div className="flex justify-between items-center mb-0.5">
-                                              <label className="text-[9px] text-[#949ba4]">X {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
-                                              <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                            </div>
-                                            <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                          </div>
-                                          <div>
-                                            <div className="flex justify-between items-center mb-0.5">
-                                              <label className="text-[9px] text-[#949ba4]">Y {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
-                                              <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                            </div>
-                                            <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                          </div>
-                                        </>
-                                      )}
-                                      <div>
-                                        <div className="flex justify-between items-center mb-0.5">
-                                          <label className="text-[9px] text-[#949ba4]">Scala</label>
-                                          <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                        </div>
-                                        <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                      </div>
-                                      <div>
-                                        <div className="flex justify-between items-center mb-0.5">
-                                          <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
-                                          <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                        </div>
-                                        <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                      </div>
-                                      <div>
-                                        <div className="flex justify-between items-center mb-0.5">
-                                          <label className="text-[9px] text-[#949ba4]">Opacità</label>
-                                          <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                        </div>
-                                        <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                      </div>
-                                      <div>
-                                        <div className="flex justify-between items-center mb-0.5">
-                                          <label className="text-[9px] text-[#949ba4]">Z-Index</label>
-                                          <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                        </div>
-                                        <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                      </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
+                                      <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                        <option value="linear">Lineare</option>
+                                        <option value="ease">Morbida (Ease)</option>
+                                        <option value="ease-in-out">Morbida In/Out</option>
+                                      </select>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
 
-                            {/* Mini Preview Animazione */}
-                            <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
-                              <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
-                              <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
-                                <span className="text-4xl">✨</span>
-                              </div>
+                                  <div className="border-t border-[#3f4147] pt-3">
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
+                                      <div className="flex gap-2">
+                                        {clipboard.keyframe && (
+                                          <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
+                                            <ClipboardPaste size={10} /> Incolla
+                                          </button>
+                                        )}
+                                        <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                          + Keyframe
+                                        </button>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                      {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
+                                        <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
+                                          <div className="absolute top-1 right-1 flex gap-1">
+                                            <button type="button" onClick={() => copyKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
+                                              <Copy size={12} />
+                                            </button>
+                                            <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                              <X size={12} />
+                                            </button>
+                                          </div>
+                                          
+                                          <div className="w-full flex items-center gap-2 mb-2 pr-10">
+                                            <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
+                                            <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                                          </div>
+
+                                          <div className="col-span-full flex gap-3 mb-3 p-2 bg-[#111214] rounded border border-[#3f4147] w-full">
+                                            <div className="flex-1">
+                                              <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Modalità Posizione</label>
+                                              <select 
+                                                value={kf.positionMode || 'relative'} 
+                                                onChange={e => updateKeyframe(anim.id, kf.id, 'positionMode', e.target.value)}
+                                                className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
+                                              >
+                                                <option value="relative">Relativa (Offset)</option>
+                                                <option value="absolute">Assoluta (Globale)</option>
+                                                <option value="target">Segui Elemento</option>
+                                              </select>
+                                            </div>
+                                            {kf.positionMode === 'target' && (
+                                              <div className="flex-1">
+                                                <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Elemento Bersaglio</label>
+                                                <select 
+                                                  value={kf.targetId || ''} 
+                                                  onChange={e => updateKeyframe(anim.id, kf.id, 'targetId', e.target.value)}
+                                                  className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
+                                                >
+                                                  <option value="">Seleziona...</option>
+                                                  {elements.map(e => (
+                                                    <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
+                                            {kf.positionMode !== 'target' && (
+                                              <>
+                                                <div>
+                                                  <div className="flex justify-between items-center mb-0.5">
+                                                    <label className="text-[9px] text-[#949ba4]">X {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
+                                                    <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                                  </div>
+                                                  <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                                </div>
+                                                <div>
+                                                  <div className="flex justify-between items-center mb-0.5">
+                                                    <label className="text-[9px] text-[#949ba4]">Y {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
+                                                    <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                                  </div>
+                                                  <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                                </div>
+                                              </>
+                                            )}
+                                            <div>
+                                              <div className="flex justify-between items-center mb-0.5">
+                                                <label className="text-[9px] text-[#949ba4]">Scala</label>
+                                                <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                              </div>
+                                              <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                            </div>
+                                            <div>
+                                              <div className="flex justify-between items-center mb-0.5">
+                                                <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
+                                                <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                              </div>
+                                              <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                            </div>
+                                            <div>
+                                              <div className="flex justify-between items-center mb-0.5">
+                                                <label className="text-[9px] text-[#949ba4]">Opacità</label>
+                                                <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                              </div>
+                                              <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                            </div>
+                                            <div>
+                                              <div className="flex justify-between items-center mb-0.5">
+                                                <label className="text-[9px] text-[#949ba4]">Z-Index</label>
+                                                <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                              </div>
+                                              <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Mini Preview Animazione */}
+                                  <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
+                                    <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
+                                    <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
+                                      <span className="text-4xl">✨</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
