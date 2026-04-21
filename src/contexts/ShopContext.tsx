@@ -14,8 +14,7 @@ export type CustomKeyframe = {
 };
 
 export type CustomAnimationDef = {
-  id: string;
-  name: string;
+  id: string;name: string;
   duration: number;
   timingFunction: 'linear' | 'ease' | 'ease-in-out';
   keyframes: CustomKeyframe[];
