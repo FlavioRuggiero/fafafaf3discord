@@ -427,86 +427,65 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     return <span className="w-full h-full flex items-center justify-center" style={{ fontSize: sizeCqw ? `${sizeCqw}cqw` : 'inherit' }}>{icon}</span>;
   };
 
-  const getParticleStyle = (effect: BaseEffectConfig, baseStyle: React.CSSProperties = {}) => {
+  const getEffectStyle = (effect: BaseEffectConfig, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+    const x = effect.x ?? 50;
+    const y = effect.y ?? 50;
+    const rot = effect.rotation ?? 0;
+    const scale = effect.size !== undefined ? effect.size / 100 : 1;
+
+    const transformStyle: React.CSSProperties = {};
+    if (x !== 50 || y !== 50) transformStyle.translate = `${x - 50}% ${y - 50}%`;
+    if (rot !== 0) transformStyle.rotate = `${rot}deg`;
+    if (scale !== 1) transformStyle.scale = `${scale}`;
+
+    let finalStyle = { ...baseStyle, ...transformStyle };
+    
     if (effect.icon && !effect.icon.startsWith('http') && !effect.icon.startsWith('/')) {
-      return { ...baseStyle, background: 'transparent', boxShadow: 'none', borderColor: 'transparent' };
+      finalStyle = { ...finalStyle, background: 'transparent', boxShadow: 'none', borderColor: 'transparent' };
     }
-    return baseStyle;
+    
+    return finalStyle;
   };
 
-  const wrapInnerEffect = (effect: BaseEffectConfig, children: React.ReactNode) => {
-    const x = effect.x ?? 50;
-    const y = effect.y ?? 50;
-    const rot = effect.rotation ?? 0;
-    const scale = effect.size !== undefined ? effect.size / 100 : 1;
-    
-    if (x === 50 && y === 50 && rot === 0 && scale === 1) {
-      return <React.Fragment key={`wrap-inner-${effect.id}`}>{children}</React.Fragment>;
+  const getInnerBgStyle = (effect: BaseEffectConfig, defaultBg: string): React.CSSProperties => {
+    const isEmoji = effect.icon && !effect.icon.startsWith('http') && !effect.icon.startsWith('/');
+    if (isEmoji) {
+      return { background: 'transparent', boxShadow: 'none', borderColor: 'transparent' };
     }
-
-    return (
-      <div 
-        key={`wrap-inner-${effect.id}`}
-        className="absolute inset-0 pointer-events-none"
-        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg) scale(${scale})` }}
-      >
-        {children}
-      </div>
-    );
-  };
-
-  const wrapOuterEffect = (effect: BaseEffectConfig, children: React.ReactNode) => {
-    const x = effect.x ?? 50;
-    const y = effect.y ?? 50;
-    const rot = effect.rotation ?? 0;
-    const scale = effect.size !== undefined ? effect.size / 100 : 1;
-    
-    if (x === 50 && y === 50 && rot === 0 && scale === 1) {
-      return <React.Fragment key={`wrap-outer-${effect.id}`}>{children}</React.Fragment>;
-    }
-
-    return (
-      <div 
-        key={`wrap-outer-${effect.id}`}
-        className="absolute inset-0 pointer-events-none"
-        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg) scale(${scale})` }}
-      >
-        {children}
-      </div>
-    );
+    return { backgroundImage: getBgImage(effect, defaultBg) };
   };
 
   const renderInnerEffects = (effects: BaseEffectConfig[]) => {
     return effects.map(effect => {
       switch(effect.type) {
         case 'scanline':
-          return wrapInnerEffect(effect, <div className="custom-scanline" style={{ color: effect.color1 }}></div>);
+          return <div key={effect.id} className="custom-scanline" style={getEffectStyle(effect, { color: effect.color1 })}></div>;
         case 'radar':
-          return wrapInnerEffect(effect, <div className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>);
+          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' })}></div>;
         case 'twin-rings':
-          return wrapInnerEffect(effect, (
-            <>
-              <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${effect.color1}`, animation: 'spin-slow 4s linear infinite' }}></div>
-              <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${effect.color2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="absolute inset-[-3px] rounded-full" style={getEffectStyle(effect, { border: `2px dashed ${effect.color1}`, animation: 'spin-slow 4s linear infinite' })}></div>
+              <div className="absolute inset-[-6px] rounded-full" style={getEffectStyle(effect, { border: `2px dashed ${effect.color2}`, animation: 'spin-slow 3s linear infinite reverse' })}></div>
+            </React.Fragment>
+          );
         case 'circo':
-          return wrapInnerEffect(effect, <div className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>);
+          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={getEffectStyle(effect, { background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' })}></div>;
         case 'pulse-ring':
-          return wrapInnerEffect(effect, <div className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any}></div>);
+          return <div key={effect.id} className="absolute inset-0 rounded-full" style={getEffectStyle(effect, { border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any)}></div>;
         case 'supernova':
-          return wrapInnerEffect(effect, <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>);
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite', zIndex: 0 })}></div>;
         case 'oceanic':
-          return wrapInnerEffect(effect, <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>);
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 })}></div>;
         case 'serpixel-agitato':
-          return wrapInnerEffect(effect, (
-            <>
-              <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, transparent, ${effect.color2}, transparent)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>
-              <div className="serpixel-scanline" style={{ background: effect.color1, boxShadow: `0 0 15px ${effect.color1}` }}></div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(transparent, ${effect.color1}, transparent, ${effect.color2}, transparent)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 })}></div>
+              <div className="serpixel-scanline" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 15px ${effect.color1}` })}></div>
+            </React.Fragment>
+          );
         case 'ghiacciolo':
-          return wrapInnerEffect(effect, <div className="absolute inset-[-4px] rounded-full" style={{ borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 }}></div>);
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 })}></div>;
         default:
           return null;
       }
@@ -517,96 +496,96 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     return effects.map(effect => {
       switch(effect.type) {
         case 'supernova':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="supernova-star s1" style={getParticleStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
-              <div className="supernova-star s2" style={getParticleStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
-              <div className="supernova-star s3" style={getParticleStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="supernova-star s1" style={getEffectStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
+              <div className="supernova-star s2" style={getEffectStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
+              <div className="supernova-star s3" style={getEffectStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
+            </React.Fragment>
+          );
         case 'esquelito':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="esquelito-skull sk1" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto1.png') })}>{getIconContent(effect, null, 50)}</div>
-              <div className="esquelito-skull sk2" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto2.png') })}>{getIconContent(effect, null, 50)}</div>
-              <div className="esquelito-skull sk3" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/esquelito3.png') })}>{getIconContent(effect, null, 50)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="esquelito-skull sk1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto1.png') })}>{getIconContent(effect, null, 50)}</div>
+              <div className="esquelito-skull sk2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto2.png') })}>{getIconContent(effect, null, 50)}</div>
+              <div className="esquelito-skull sk3" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/esquelito3.png') })}>{getIconContent(effect, null, 50)}</div>
+            </React.Fragment>
+          );
         case 'oceanic':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
-              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
-              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
-              <div className="oceanic-bubble b1" style={getParticleStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
-              <div className="oceanic-bubble b2" style={getParticleStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
-              <div className="oceanic-bubble b3" style={getParticleStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="water-drop-wrapper w1" style={getEffectStyle(effect)}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w2" style={getEffectStyle(effect)}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w3" style={getEffectStyle(effect)}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="oceanic-bubble b1" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
+              <div className="oceanic-bubble b2" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
+              <div className="oceanic-bubble b3" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
+            </React.Fragment>
+          );
         case 'saturn-fire':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
-              <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
-              <div className="fire-particle f1" style={getParticleStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
-              <div className="fire-particle f2" style={getParticleStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
-              <div className="fire-particle f3" style={getParticleStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="saturn-wrapper back" style={getEffectStyle(effect)}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="saturn-wrapper front" style={getEffectStyle(effect)}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="fire-particle f1" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
+              <div className="fire-particle f2" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
+              <div className="fire-particle f3" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
+            </React.Fragment>
+          );
         case 'gustavo-armando':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="gustavo-sprite gustavo-trail t2" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
-              <div className="gustavo-sprite gustavo-trail t1" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
-              <div className="gustavo-sprite gustavo-main" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
-              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="gustavo-sprite gustavo-trail t2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
+              <div className="gustavo-sprite gustavo-trail t1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
+              <div className="gustavo-sprite gustavo-main" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
+              <div className="gustavo-orbit-wrapper o1" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o2" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o3" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o4" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o5" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o6" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o7" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o8" style={getEffectStyle(effect)}><div className="gustavo-orbit-inner" style={getInnerBgStyle(effect, '/adrotto.png')}>{getIconContent(effect, null, 35)}</div></div>
+            </React.Fragment>
+          );
         case 'serpixel-agitato':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
-              <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
-              <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
-              <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
-              <div className="serpixel-venom v1" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-venom v2" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-venom v3" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-venom v4" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-venom v5" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-snake s1" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s2" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s3" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s4" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s5" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s6" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s7" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s8" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="serpixel-diamond-wrapper dw1" style={getEffectStyle(effect)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-diamond-wrapper dw2" style={getEffectStyle(effect)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-diamond-wrapper dw3" style={getEffectStyle(effect)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-diamond-wrapper dw4" style={getEffectStyle(effect)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-venom v1" style={getEffectStyle(effect, { background: effect.color1 })}></div>
+              <div className="serpixel-venom v2" style={getEffectStyle(effect, { background: effect.color1 })}></div>
+              <div className="serpixel-venom v3" style={getEffectStyle(effect, { background: effect.color1 })}></div>
+              <div className="serpixel-venom v4" style={getEffectStyle(effect, { background: effect.color1 })}></div>
+              <div className="serpixel-venom v5" style={getEffectStyle(effect, { background: effect.color1 })}></div>
+              <div className="serpixel-snake s1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s3" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s4" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s5" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s6" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s7" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s8" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+            </React.Fragment>
+          );
         case 'tempesta':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="storm-drop d1" style={getParticleStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
-              <div className="storm-drop d2" style={getParticleStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
-              <div className="storm-drop d3" style={getParticleStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="storm-drop d1" style={getEffectStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
+              <div className="storm-drop d2" style={getEffectStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
+              <div className="storm-drop d3" style={getEffectStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
+            </React.Fragment>
+          );
         case 'ghiacciolo':
-          return wrapOuterEffect(effect, (
-            <>
-              <div className="ice-flake f1" style={getParticleStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
-              <div className="ice-flake f2" style={getParticleStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
-              <div className="ice-flake f3" style={getParticleStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
-            </>
-          ));
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="ice-flake f1" style={getEffectStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
+              <div className="ice-flake f2" style={getEffectStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
+              <div className="ice-flake f3" style={getEffectStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
+            </React.Fragment>
+          );
         default:
           return null;
       }
@@ -628,7 +607,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="bg-[#313338] rounded-lg w-[900px] max-h-[90vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#313338] rounded-lg w-[1100px] max-h-[90vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex-shrink-0 p-4 border-b border-[#1e1f22] flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -699,541 +678,551 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         </div>
 
         {/* Content */}
-        <div className="p-4 flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col">
           
           {activeTab === 'custom-editor' && (
-            <div className="flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2">
-              <div className="bg-[#2b2d31] p-6 rounded-lg border border-[#1e1f22] mb-6">
-                <h3 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
+            <div className="flex flex-col lg:flex-row h-full overflow-hidden">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                <h3 className="text-white font-bold text-xl flex items-center gap-2">
                   <Wand2 className="text-brand" /> Crea Contorno Custom
                 </h3>
                 
-                <form onSubmit={handleCreateCustomDecoration} className="flex flex-col lg:flex-row gap-6">
-                  <div className="flex-1 space-y-6">
-                    
-                    {/* Info Base */}
-                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                      <h4 className="text-white font-bold mb-3 text-sm uppercase">Info Base</h4>
+                <form id="custom-dec-form" onSubmit={handleCreateCustomDecoration} className="space-y-6">
+                  {/* Info Base */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-white font-bold mb-3 text-sm uppercase">Info Base</h4>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome</label>
+                        <input 
+                          type="text" 
+                          value={newDecName}
+                          onChange={e => setNewDecName(e.target.value)}
+                          required
+                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
+                        />
+                      </div>
+                      <div className="w-32">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Prezzo (DC)</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={newDecPrice}
+                          onChange={e => setNewDecPrice(parseInt(e.target.value) || 0)}
+                          required
+                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stile Testo */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Testo</h4>
+                    <div className="flex gap-4 mb-4">
+                      <label className="flex items-center gap-2 text-white cursor-pointer">
+                        <input type="radio" checked={textColorType === 'solid'} onChange={() => setTextColorType('solid')} className="accent-brand" />
+                        Tinta Unita
+                      </label>
+                      <label className="flex items-center gap-2 text-white cursor-pointer">
+                        <input type="radio" checked={textColorType === 'gradient'} onChange={() => setTextColorType('gradient')} className="accent-brand" />
+                        Gradiente
+                      </label>
+                    </div>
+
+                    {textColorType === 'solid' ? (
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Testo</label>
+                        <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecTextColor} onChange={e => setNewDecTextColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecTextColor}</span>
+                        </div>
+                      </div>
+                    ) : (
                       <div className="flex gap-4">
                         <div className="flex-1">
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome</label>
-                          <input 
-                            type="text" 
-                            value={newDecName}
-                            onChange={e => setNewDecName(e.target.value)}
-                            required
-                            className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Prezzo (DC)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={newDecPrice}
-                            onChange={e => setNewDecPrice(parseInt(e.target.value) || 0)}
-                            required
-                            className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stile Testo */}
-                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                      <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Testo</h4>
-                      <div className="flex gap-4 mb-4">
-                        <label className="flex items-center gap-2 text-white cursor-pointer">
-                          <input type="radio" checked={textColorType === 'solid'} onChange={() => setTextColorType('solid')} className="accent-brand" />
-                          Tinta Unita
-                        </label>
-                        <label className="flex items-center gap-2 text-white cursor-pointer">
-                          <input type="radio" checked={textColorType === 'gradient'} onChange={() => setTextColorType('gradient')} className="accent-brand" />
-                          Gradiente
-                        </label>
-                      </div>
-
-                      {textColorType === 'solid' ? (
-                        <div>
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Testo</label>
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Inizio Gradiente</label>
                           <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                            <input type="color" value={newDecTextColor} onChange={e => setNewDecTextColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                            <span className="text-white text-sm uppercase">{newDecTextColor}</span>
+                            <input type="color" value={newDecGradStart} onChange={e => setNewDecGradStart(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                            <span className="text-white text-sm uppercase">{newDecGradStart}</span>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex gap-4">
-                          <div className="flex-1">
-                            <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Inizio Gradiente</label>
-                            <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                              <input type="color" value={newDecGradStart} onChange={e => setNewDecGradStart(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                              <span className="text-white text-sm uppercase">{newDecGradStart}</span>
-                            </div>
-                          </div>
-                          <div className="flex-1">
-                            <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Fine Gradiente</label>
-                            <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                              <input type="color" value={newDecGradEnd} onChange={e => setNewDecGradEnd(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                              <span className="text-white text-sm uppercase">{newDecGradEnd}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Stile Bordo & Sfondo */}
-                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                      <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Bordo & Sfondo</h4>
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
-                          <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                            <input type="color" value={newDecBorder} onChange={e => setNewDecBorder(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                            <span className="text-white text-sm uppercase">{newDecBorder}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Ombra</label>
-                          <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                            <input type="color" value={newDecShadow} onChange={e => setNewDecShadow(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                            <span className="text-white text-sm uppercase">{newDecShadow}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        <div className="flex-1">
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
-                          <select 
-                            value={newDecAnim}
-                            onChange={e => setNewDecAnim(e.target.value)}
-                            className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
-                          >
-                            <option value="none">Nessuna</option>
-                            <option value="spin">Rotazione</option>
-                            <option value="pulse">Pulsazione</option>
-                            <option value="bounce">Rimbalzo</option>
-                          </select>
                         </div>
                         <div className="flex-1">
-                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
-                          <button 
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
-                          </button>
-                          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Fine Gradiente</label>
+                          <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                            <input type="color" value={newDecGradEnd} onChange={e => setNewDecGradEnd(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                            <span className="text-white text-sm uppercase">{newDecGradEnd}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stile Bordo & Sfondo */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Bordo & Sfondo</h4>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
+                        <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecBorder} onChange={e => setNewDecBorder(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecBorder}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Ombra</label>
+                        <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecShadow} onChange={e => setNewDecShadow(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecShadow}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Effetti Base Multipli */}
-                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-white font-bold text-sm uppercase">Effetti Base</h4>
-                        <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                          <Plus size={12} /> Aggiungi Effetto
-                        </button>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
+                        <select 
+                          value={newDecAnim}
+                          onChange={e => setNewDecAnim(e.target.value)}
+                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                        >
+                          <option value="none">Nessuna</option>
+                          <option value="spin">Rotazione</option>
+                          <option value="pulse">Pulsazione</option>
+                          <option value="bounce">Rimbalzo</option>
+                        </select>
                       </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
+                        <button 
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
+                        </button>
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                      </div>
+                    </div>
+                  </div>
 
-                      {baseEffects.length === 0 ? (
-                        <p className="text-xs text-[#949ba4] italic">Nessun effetto base aggiunto.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {baseEffects.map((effect) => (
-                            <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                              <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                                <X size={16} />
-                              </button>
-                              <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
-                                  <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                    <option value="scanline">Scanline</option>
-                                    <option value="radar">Radar</option>
-                                    <option value="twin-rings">Anelli Gemelli</option>
-                                    <option value="circo">Circo</option>
-                                    <option value="pulse-ring">Anello Pulsante</option>
-                                    <option value="supernova">Supernova Cosmica</option>
-                                    <option value="esquelito">Esquelito Explosivo</option>
-                                    <option value="oceanic">Vortice Oceanico</option>
-                                    <option value="saturn-fire">Saturno a Fuoco</option>
-                                    <option value="gustavo-armando">Gustavo Armando</option>
-                                    <option value="serpixel-agitato">Serpixel Agitato</option>
-                                    <option value="tempesta">Tempesta</option>
-                                    <option value="ghiacciolo">Ghiacciolo</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Sostituisci Particelle (Emoji/URL)</label>
-                                  <div className="flex gap-2">
-                                    <button 
-                                      type="button" 
-                                      onClick={() => setEmojiPickerTarget({type: 'base', id: effect.id})} 
-                                      className="bg-[#1e1f22] hover:bg-[#35373c] transition-colors rounded border border-[#3f4147] text-xl flex items-center justify-center w-9 h-9 flex-shrink-0"
-                                    >
-                                      {effect.icon && !effect.icon.startsWith('http') ? effect.icon : '😀'}
-                                    </button>
-                                    <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="URL Immagine" className="flex-1 bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3 mb-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 1</label>
-                                  <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                                    <input type="color" value={effect.color1} onChange={e => updateBaseEffect(effect.id, 'color1', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
-                                    <span className="text-white text-xs uppercase">{effect.color1}</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 2</label>
-                                  <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                                    <input type="color" value={effect.color2} onChange={e => updateBaseEffect(effect.id, 'color2', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
-                                    <span className="text-white text-xs uppercase">{effect.color2}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({effect.x ?? 50}%)</label>
-                                  <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', parseInt(e.target.value))} className="w-full accent-brand" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({effect.y ?? 50}%)</label>
-                                  <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', parseInt(e.target.value))} className="w-full accent-brand" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione ({effect.rotation ?? 0}°)</label>
-                                  <input type="range" min="0" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', parseInt(e.target.value))} className="w-full accent-brand" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione ({effect.size ?? 100}%)</label>
-                                  <input type="range" min="10" max="300" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', parseInt(e.target.value))} className="w-full accent-brand" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                  {/* Effetti Base Multipli */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-white font-bold text-sm uppercase">Effetti Base</h4>
+                      <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                        <Plus size={12} /> Aggiungi Effetto
+                      </button>
                     </div>
 
-                    {/* Elementi Fluttuanti */}
-                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
-                        <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                          <Plus size={12} /> Aggiungi Elemento
-                        </button>
-                      </div>
-
-                      {elements.length === 0 ? (
-                        <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {elements.map((el, idx) => (
-                            <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                              <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                                <X size={16} />
-                              </button>
-                              <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
-                                  <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                    <option value="emoji">Emoji</option>
-                                    <option value="image">URL Immagine</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
-                                  {el.type === 'emoji' ? (
-                                    <button 
-                                      type="button" 
-                                      onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
-                                      className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
-                                    >
-                                      {el.content || '✨'}
-                                    </button>
-                                  ) : (
-                                    <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
-                                  )}
-                                </div>
+                    {baseEffects.length === 0 ? (
+                      <p className="text-xs text-[#949ba4] italic">Nessun effetto base aggiunto.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {baseEffects.map((effect) => (
+                          <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                            <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                              <X size={16} />
+                            </button>
+                            <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
+                                <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="scanline">Scanline</option>
+                                  <option value="radar">Radar</option>
+                                  <option value="twin-rings">Anelli Gemelli</option>
+                                  <option value="circo">Circo</option>
+                                  <option value="pulse-ring">Anello Pulsante</option>
+                                  <option value="supernova">Supernova Cosmica</option>
+                                  <option value="esquelito">Esquelito Explosivo</option>
+                                  <option value="oceanic">Vortice Oceanico</option>
+                                  <option value="saturn-fire">Saturno a Fuoco</option>
+                                  <option value="gustavo-armando">Gustavo Armando</option>
+                                  <option value="serpixel-agitato">Serpixel Agitato</option>
+                                  <option value="tempesta">Tempesta</option>
+                                  <option value="ghiacciolo">Ghiacciolo</option>
+                                </select>
                               </div>
-                              
-                              <div className="grid grid-cols-2 gap-3 mb-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({el.x}%)</label>
-                                  <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full accent-brand" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({el.y}%)</label>
-                                  <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full accent-brand" />
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
-                                  <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                    <option value="none">Nessuna</option>
-                                    <option value="float">Fluttua</option>
-                                    <option value="pulse">Pulsazione</option>
-                                    <option value="spin">Rotazione</option>
-                                    <option value="shake">Tremolio</option>
-                                    <option value="orbit-2d">Orbita 2D</option>
-                                    <option value="orbit-3d">Orbita 3D</option>
-                                    <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
-                                    {customAnimations.map(a => (
-                                      <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
-                                  <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
-                                  <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Animazioni Personalizzate (Timeline) */}
-                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
-                        <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                          <Plus size={12} /> Nuova Animazione
-                        </button>
-                      </div>
-
-                      {customAnimations.length === 0 ? (
-                        <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {customAnimations.map((anim) => (
-                            <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                              <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                                <X size={16} />
-                              </button>
-                              
-                              <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
-                                  <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
-                                  <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
-                                  <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                    <option value="linear">Lineare</option>
-                                    <option value="ease">Morbida (Ease)</option>
-                                    <option value="ease-in-out">Morbida In/Out</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              <div className="border-t border-[#3f4147] pt-3">
-                                <div className="flex justify-between items-center mb-2">
-                                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
-                                  <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
-                                    + Keyframe
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Sostituisci Particelle (Emoji/URL)</label>
+                                <div className="flex gap-2">
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setEmojiPickerTarget({type: 'base', id: effect.id})} 
+                                    className="bg-[#1e1f22] hover:bg-[#35373c] transition-colors rounded border border-[#3f4147] text-xl flex items-center justify-center w-9 h-9 flex-shrink-0"
+                                  >
+                                    {effect.icon && !effect.icon.startsWith('http') ? effect.icon : '😀'}
                                   </button>
+                                  <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="URL Immagine" className="flex-1 bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                 </div>
-                                
-                                <div className="space-y-2">
-                                  {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
-                                    <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
-                                      <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
-                                        <X size={12} />
-                                      </button>
-                                      
-                                      <div className="w-full flex items-center gap-2 mb-1 pr-4">
-                                        <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
-                                        <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 1</label>
+                                <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                                  <input type="color" value={effect.color1} onChange={e => updateBaseEffect(effect.id, 'color1', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                  <span className="text-white text-xs uppercase">{effect.color1}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 2</label>
+                                <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                                  <input type="color" value={effect.color2} onChange={e => updateBaseEffect(effect.id, 'color2', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                  <span className="text-white text-xs uppercase">{effect.color2}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({effect.x ?? 50}%)</label>
+                                <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', parseInt(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({effect.y ?? 50}%)</label>
+                                <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', parseInt(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione ({effect.rotation ?? 0}°)</label>
+                                <input type="range" min="0" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', parseInt(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione ({effect.size ?? 100}%)</label>
+                                <input type="range" min="10" max="150" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', parseInt(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Elementi Fluttuanti */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
+                      <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                        <Plus size={12} /> Aggiungi Elemento
+                      </button>
+                    </div>
+
+                    {elements.length === 0 ? (
+                      <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {elements.map((el, idx) => (
+                          <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                            <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                              <X size={16} />
+                            </button>
+                            <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
+                                <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="emoji">Emoji</option>
+                                  <option value="image">URL Immagine</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
+                                {el.type === 'emoji' ? (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
+                                    className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
+                                  >
+                                    {el.content || '✨'}
+                                  </button>
+                                ) : (
+                                  <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({el.x}%)</label>
+                                <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({el.y}%)</label>
+                                <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full accent-brand" />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
+                                <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="none">Nessuna</option>
+                                  <option value="float">Fluttua</option>
+                                  <option value="pulse">Pulsazione</option>
+                                  <option value="spin">Rotazione</option>
+                                  <option value="shake">Tremolio</option>
+                                  <option value="orbit-2d">Orbita 2D</option>
+                                  <option value="orbit-3d">Orbita 3D</option>
+                                  <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
+                                  {customAnimations.map(a => (
+                                    <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
+                                <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
+                                <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Animazioni Personalizzate (Timeline) */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
+                      <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                        <Plus size={12} /> Nuova Animazione
+                      </button>
+                    </div>
+                    <p className="text-xs text-[#949ba4] mb-4">Crea qui l'animazione, poi assegnala a un Elemento Fluttuante per vederla in azione!</p>
+
+                    {customAnimations.length === 0 ? (
+                      <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {customAnimations.map((anim) => (
+                          <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                            <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                              <X size={16} />
+                            </button>
+                            
+                            <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
+                                <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
+                                <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
+                                <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="linear">Lineare</option>
+                                  <option value="ease">Morbida (Ease)</option>
+                                  <option value="ease-in-out">Morbida In/Out</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-[#3f4147] pt-3">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
+                                <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                  + Keyframe
+                                </button>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
+                                  <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
+                                    <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
+                                      <X size={12} />
+                                    </button>
+                                    
+                                    <div className="w-full flex items-center gap-2 mb-1 pr-4">
+                                      <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
+                                      <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-5 gap-2 w-full">
+                                      <div>
+                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">X ({kf.x}%)</label>
+                                        <input type="range" min="-200" max="200" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
-                                      
-                                      <div className="grid grid-cols-5 gap-2 w-full">
-                                        <div>
-                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">X ({kf.x}%)</label>
-                                          <input type="range" min="-200" max="200" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                        </div>
-                                        <div>
-                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Y ({kf.y}%)</label>
-                                          <input type="range" min="-200" max="200" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                        </div>
-                                        <div>
-                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Scala ({kf.scale}x)</label>
-                                          <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                        </div>
-                                        <div>
-                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Rot. ({kf.rotation}°)</label>
-                                          <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                        </div>
-                                        <div>
-                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Opacità ({kf.opacity})</label>
-                                          <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                        </div>
+                                      <div>
+                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Y ({kf.y}%)</label>
+                                        <input type="range" min="-200" max="200" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Scala ({kf.scale}x)</label>
+                                        <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Rot. ({kf.rotation}°)</label>
+                                        <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Opacità ({kf.opacity})</label>
+                                        <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
 
-                    <button 
-                      type="submit"
-                      disabled={isCreatingDec || !newDecName.trim()}
-                      className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg mt-4 disabled:opacity-50"
-                    >
-                      {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
-                    </button>
-                  </div>
-
-                  {/* Anteprima */}
-                  <div className="w-full lg:w-80 flex flex-col items-center justify-center bg-[#1e1f22] rounded-lg border border-[#3f4147] p-6 sticky top-0">
-                    <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
-                    
-                    <div className="dec-wrapper relative w-32 h-32 mb-8">
-                      {renderCustomAnimationsCSS(customAnimations)}
-                      
-                      {/* Inner Effects (z-0) */}
-                      <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
-                        {renderInnerEffects(baseEffects)}
-                      </div>
-
-                      {/* Avatar & Border (z-10) */}
-                      <div 
-                        className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
-                        style={{
-                          border: `2px solid ${newDecBorder}`,
-                          boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
-                        }}
-                      >
-                        {newDecImagePreview && (
-                          <img 
-                            src={newDecImagePreview} 
-                            className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-                            style={{ 
-                              animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
-                                         newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
-                                         newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-                            }} 
-                          />
-                        )}
-                        <img src={avatarUrl} className="w-full h-full rounded-full object-cover relative z-10" />
-                      </div>
-
-                      {/* Outer Effects (z-20) */}
-                      {renderOuterEffects(baseEffects)}
-
-                      {/* Elements (z-index animated 5 or 25) */}
-                      {elements.map(el => {
-                        if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-                          const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                          const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
-                          return (
-                            <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                              <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
-                                {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                            {/* Mini Preview Animazione */}
+                            <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
+                              <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
+                              <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
+                                <span className="text-4xl">✨</span>
                               </div>
                             </div>
-                          );
-                        }
-                        return (
-                          <div 
-                            key={el.id} 
-                            className={`absolute flex items-center justify-center z-20`}
-                            style={{ 
-                              left: `${el.x}%`,
-                              top: `${el.y}%`,
-                              transform: 'translate(-50%, -50%)',
-                              animation: getAnimation(el.animation, el.delay, customAnimations),
-                              width: `${el.size}cqw`,
-                              height: `${el.size}cqw`,
-                              fontSize: `${el.size}cqw`
-                            }}
-                          >
-                            {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    <span 
-                      className="font-bold text-2xl text-center"
-                      style={textColorType === 'solid' ? {
-                        color: newDecTextColor,
-                        textShadow: `0 0 10px ${newDecTextColor}80`
-                      } : {
-                        background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
-                      }}
-                    >
-                      {newDecName || 'Nome Contorno'}
-                    </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Lista Contorni Custom */}
+                  {customDecorations.length > 0 && (
+                    <div className="bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22]">
+                      <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Contorni Custom Esistenti</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {customDecorations.map(dec => (
+                          <div key={dec.id} className="flex items-center justify-between bg-[#1e1f22] p-3 rounded border border-[#3f4147]">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-8 h-8 rounded-full relative flex items-center justify-center"
+                                style={{ border: `2px solid ${dec.border_color}`, boxShadow: `0 0 5px ${dec.shadow_color}` }}
+                              >
+                                {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold" style={
+                                  dec.text_color_type === 'solid' ? {
+                                    color: dec.text_color,
+                                    textShadow: `0 0 5px ${dec.text_color}80`
+                                  } : {
+                                    background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
+                                    WebkitBackgroundClip: 'text', 
+                                    WebkitTextFillColor: 'transparent' 
+                                  }
+                                }>
+                                  {dec.name}
+                                </span>
+                                <span className="text-[10px] text-[#949ba4]">{dec.price} DC</span>
+                              </div>
+                            </div>
+                            <button 
+                              type="button"
+                              onClick={() => handleDeleteCustomDecoration(dec.id)}
+                              className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
+                              title="Elimina"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </form>
               </div>
 
-              {/* Lista Contorni Custom */}
-              {customDecorations.length > 0 && (
-                <div className="bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22]">
-                  <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Contorni Custom Esistenti</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {customDecorations.map(dec => (
-                      <div key={dec.id} className="flex items-center justify-between bg-[#1e1f22] p-3 rounded border border-[#3f4147]">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-8 h-8 rounded-full relative flex items-center justify-center"
-                            style={{ border: `2px solid ${dec.border_color}`, boxShadow: `0 0 5px ${dec.shadow_color}` }}
-                          >
-                            {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold" style={
-                              dec.text_color_type === 'solid' ? {
-                                color: dec.text_color,
-                                textShadow: `0 0 5px ${dec.text_color}80`
-                              } : {
-                                background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
-                                WebkitBackgroundClip: 'text', 
-                                WebkitTextFillColor: 'transparent' 
-                              }
-                            }>
-                              {dec.name}
-                            </span>
-                            <span className="text-[10px] text-[#949ba4]">{dec.price} DC</span>
+              {/* Anteprima a Destra */}
+              <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
+                <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
+                
+                <div className="dec-wrapper relative w-32 h-32 mb-8">
+                  {renderCustomAnimationsCSS(customAnimations)}
+                  
+                  {/* Inner Effects (z-0) */}
+                  <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
+                    {renderInnerEffects(baseEffects)}
+                  </div>
+
+                  {/* Avatar & Border (z-10) */}
+                  <div 
+                    className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
+                    style={{
+                      border: `2px solid ${newDecBorder}`,
+                      boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
+                    }}
+                  >
+                    {newDecImagePreview && (
+                      <img 
+                        src={newDecImagePreview} 
+                        className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                        style={{ 
+                          animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                     newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                     newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                        }} 
+                      />
+                    )}
+                    <img src={avatarUrl} className="w-full h-full rounded-full object-cover relative z-10" />
+                  </div>
+
+                  {/* Outer Effects (z-20) */}
+                  <div className="absolute inset-0 pointer-events-none z-20">
+                    {renderOuterEffects(baseEffects)}
+                  </div>
+
+                  {/* Elements (z-index animated 5 or 25) */}
+                  {elements.map(el => {
+                    if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+                      const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+                      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
+                      return (
+                        <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                          <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                            {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
                           </div>
                         </div>
-                        <button 
-                          onClick={() => handleDeleteCustomDecoration(dec.id)}
-                          className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
-                          title="Elimina"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      );
+                    }
+                    return (
+                      <div 
+                        key={el.id} 
+                        className={`absolute flex items-center justify-center z-20`}
+                        style={{ 
+                          left: `${el.x}%`,
+                          top: `${el.y}%`,
+                          transform: 'translate(-50%, -50%)',
+                          animation: getAnimation(el.animation, el.delay, customAnimations),
+                          width: `${el.size}cqw`,
+                          height: `${el.size}cqw`,
+                          fontSize: `${el.size}cqw`
+                        }}
+                      >
+                        {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+
+                <span 
+                  className="font-bold text-2xl text-center mb-8"
+                  style={textColorType === 'solid' ? {
+                    color: newDecTextColor,
+                    textShadow: `0 0 10px ${newDecTextColor}80`
+                  } : {
+                    background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
+                  }}
+                >
+                  {newDecName || 'Nome Contorno'}
+                </span>
+
+                <button 
+                  type="submit"
+                  form="custom-dec-form"
+                  disabled={isCreatingDec || !newDecName.trim()}
+                  className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
+                >
+                  {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
+                </button>
+              </div>
             </div>
           )}
 
