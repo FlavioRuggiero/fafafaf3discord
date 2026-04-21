@@ -261,7 +261,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const pasteBaseEffect = () => {
     if (clipboard.baseEffect) {
-      setBaseEffects([...baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.floor(Math.random() * 1000000)}` }]);
+      setBaseEffects([...baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random()}` }]);
       showSuccess("Effetto incollato!");
     }
   };
@@ -277,8 +277,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       y: 50,
       rotation: 0,
       size: 15,
-      delay: 0,
-      zIndex: 20
+      delay: 0
     }]);
     setCollapsedElements(prev => {
       const next = new Set(prev);
@@ -305,7 +304,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const pasteElement = () => {
     if (clipboard.element) {
-      const newId = `el-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+      const newId = `el-${Date.now()}-${Math.random()}`;
       setElements([...elements, { ...clipboard.element, id: newId }]);
       showSuccess("Elemento incollato!");
     }
@@ -350,8 +349,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const pasteCustomAnimation = () => {
     if (clipboard.animation) {
-      const newAnimId = `anim-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.floor(Math.random() * 1000000)}` }));
+      const newAnimId = `anim-${Date.now()}-${Math.random()}`;
+      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
       setCustomAnimations([...customAnimations, { ...clipboard.animation, id: newAnimId, name: `${clipboard.animation.name} (Copia)`, keyframes: newKeyframes }]);
       showSuccess("Animazione incollata!");
     }
@@ -405,7 +404,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     if (clipboard.keyframe) {
       setCustomAnimations(customAnimations.map(a => {
         if (a.id === animId) {
-          return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.floor(Math.random() * 1000000)}` }] };
+          return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random()}` }] };
         }
         return a;
       }));
@@ -746,8 +745,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             top: `${el.y}%`,
             transform: `translate(-50%, -50%)`,
             width: '100%',
-            height: '100%',
-            zIndex: el.zIndex ?? 20
+            height: '100%'
           }}
         >
           <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
@@ -771,7 +769,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
           fontSize: `${el.size}cqw`,
-          zIndex: el.animation.startsWith('custom_anim_') ? undefined : (el.zIndex ?? 20)
+          zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
         }}
       >
         {innerContent}
@@ -858,7 +856,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           
           {activeTab === 'custom-editor' && (
             <div className="flex flex-col lg:flex-row h-full overflow-hidden">
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6<dyad-write path="src/components/discord/AdminPanel.tsx" description="Fix ID animazioni e aggiunta Z-Index agli elementi">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                 <h3 className="text-white font-bold text-xl flex items-center gap-2">
                   <Wand2 className="text-brand" /> Crea Contorno Custom
                 </h3>
@@ -1186,7 +1184,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                     <div>
                                       <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
                                       <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -1214,10 +1212,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     <div>
                                       <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione</label>
                                       <input type="number" value={el.rotation || 0} onChange={e => updateElement(el.id, 'rotation', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Z-Index</label>
-                                      <input type="number" value={el.zIndex ?? 20} onChange={e => updateElement(el.id, 'zIndex', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                     </div>
                                     <div>
                                       <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
