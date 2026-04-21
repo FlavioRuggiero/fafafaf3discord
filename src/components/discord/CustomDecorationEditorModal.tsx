@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Wand2, Upload, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +17,6 @@ interface CustomDecorationEditorModalProps {
 
 export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: CustomDecorationEditorModalProps) => {
   const { refreshCustomDecorations } = useShop();
-  const DRAFT_KEY = `custom_dec_draft_${currentUser.id}`;
   
   const [newDecName, setNewDecName] = useState('');
   const [newDecBorder, setNewDecBorder] = useState('#5865F2');
@@ -34,69 +33,21 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
   const [elements, setElements] = useState<CustomElement[]>([]);
   const [customAnimations, setCustomAnimations] = useState<CustomAnimationDef[]>([]);
   
-  const [newDecImageBase64, setNewDecImageBase64] = useState<string | null>(null);
+  const [newDecImage, setNewDecImage] = useState<File | null>(null);
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
-  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
-
-  // Carica la bozza all'apertura
-  useEffect(() => {
-    if (isOpen && !isDraftLoaded) {
-      const draft = localStorage.getItem(DRAFT_KEY);
-      if (draft) {
-        try {
-          const parsed = JSON.parse(draft);
-          if (parsed.newDecName) setNewDecName(parsed.newDecName);
-          if (parsed.newDecBorder) setNewDecBorder(parsed.newDecBorder);
-          if (parsed.newDecShadow) setNewDecShadow(parsed.newDecShadow);
-          if (parsed.textColorType) setTextColorType(parsed.textColorType);
-          if (parsed.newDecTextColor) setNewDecTextColor(parsed.newDecTextColor);
-          if (parsed.newDecGradStart) setNewDecGradStart(parsed.newDecGradStart);
-          if (parsed.newDecGradEnd) setNewDecGradEnd(parsed.newDecGradEnd);
-          if (parsed.newDecAnim) setNewDecAnim(parsed.newDecAnim);
-          if (parsed.baseEffects) setBaseEffects(parsed.baseEffects);
-          if (parsed.elements) setElements(parsed.elements);
-          if (parsed.customAnimations) setCustomAnimations(parsed.customAnimations);
-          if (parsed.newDecImageBase64) {
-            setNewDecImageBase64(parsed.newDecImageBase64);
-            setNewDecImagePreview(parsed.newDecImageBase64);
-          }
-        } catch (e) {
-          console.error("Errore nel caricamento della bozza", e);
-        }
-      }
-      setIsDraftLoaded(true);
-    }
-  }, [isOpen, currentUser.id, isDraftLoaded, DRAFT_KEY]);
-
-  // Salva la bozza ad ogni modifica
-  useEffect(() => {
-    if (isDraftLoaded) {
-      const draft = {
-        newDecName, newDecBorder, newDecShadow, textColorType,
-        newDecTextColor, newDecGradStart, newDecGradEnd, newDecAnim,
-        baseEffects, elements, customAnimations, newDecImageBase64
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    }
-  }, [newDecName, newDecBorder, newDecShadow, textColorType, newDecTextColor, newDecGradStart, newDecGradEnd, newDecAnim, baseEffects, elements, customAnimations, newDecImageBase64, isDraftLoaded, DRAFT_KEY]);
 
   if (!isOpen) return null;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setNewDecImageBase64(base64String);
-        setNewDecImagePreview(base64String);
-      };
-      reader.readAsDataURL(file);
+      setNewDecImage(file);
+      setNewDecImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -207,19 +158,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     const customId = `custom-${Date.now()}`;
     let imageUrl = null;
 
-    if (newDecImageBase64) {
-      try {
-        const res = await fetch(newDecImageBase64);
-        const blob = await res.blob();
-        const fileExt = blob.type.split('/')[1] || 'png';
-        const filePath = `custom_decorations/${customId}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, blob);
-        if (!uploadError) {
-          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-          imageUrl = data.publicUrl;
-        }
-      } catch (err) {
-        console.error("Errore caricamento immagine", err);
+    if (newDecImage) {
+      const fileExt = newDecImage.name.split('.').pop();
+      const filePath = `custom_decorations/${customId}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, newDecImage);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
       }
     }
 
@@ -262,7 +207,6 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       await supabase.from('profiles').update({ purchased_decorations: currentPurchased }).eq('id', currentUser.id);
 
       showSuccess("Contorno creato e aggiunto al tuo inventario!");
-      localStorage.removeItem(DRAFT_KEY); // Svuota la bozza
       await refreshCustomDecorations();
       onClose();
     }
@@ -576,7 +520,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                       onClick={() => fileInputRef.current?.click()}
                       className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
                     >
-                      <Upload size={16} /> {newDecImageBase64 ? 'Cambia Immagine' : 'Carica Immagine'}
+                      <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
                     </button>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                   </div>

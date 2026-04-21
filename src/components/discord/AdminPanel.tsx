@@ -19,7 +19,6 @@ interface AdminPanelProps {
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const { user: currentUser, adminId } = useAuth();
   const { allItems, customDecorations, refreshCustomDecorations } = useShop();
-  const DRAFT_KEY = `admin_custom_dec_draft_${currentUser?.id}`;
   
   const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests' | 'jumpscare' | 'custom-editor'>('dc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,58 +51,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [elements, setElements] = useState<CustomElement[]>([]);
   const [customAnimations, setCustomAnimations] = useState<CustomAnimationDef[]>([]);
   
-  const [newDecImageBase64, setNewDecImageBase64] = useState<string | null>(null);
+  const [newDecImage, setNewDecImage] = useState<File | null>(null);
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
-  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Stato per il selettore Emoji
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
-
-  // Carica la bozza all'apertura
-  useEffect(() => {
-    if (!isDraftLoaded && currentUser) {
-      const draft = localStorage.getItem(DRAFT_KEY);
-      if (draft) {
-        try {
-          const parsed = JSON.parse(draft);
-          if (parsed.newDecName) setNewDecName(parsed.newDecName);
-          if (parsed.newDecPrice) setNewDecPrice(parsed.newDecPrice);
-          if (parsed.newDecBorder) setNewDecBorder(parsed.newDecBorder);
-          if (parsed.newDecShadow) setNewDecShadow(parsed.newDecShadow);
-          if (parsed.textColorType) setTextColorType(parsed.textColorType);
-          if (parsed.newDecTextColor) setNewDecTextColor(parsed.newDecTextColor);
-          if (parsed.newDecGradStart) setNewDecGradStart(parsed.newDecGradStart);
-          if (parsed.newDecGradEnd) setNewDecGradEnd(parsed.newDecGradEnd);
-          if (parsed.newDecAnim) setNewDecAnim(parsed.newDecAnim);
-          if (parsed.baseEffects) setBaseEffects(parsed.baseEffects);
-          if (parsed.elements) setElements(parsed.elements);
-          if (parsed.customAnimations) setCustomAnimations(parsed.customAnimations);
-          if (parsed.newDecImageBase64) {
-            setNewDecImageBase64(parsed.newDecImageBase64);
-            setNewDecImagePreview(parsed.newDecImageBase64);
-          }
-        } catch (e) {
-          console.error("Errore nel caricamento della bozza", e);
-        }
-      }
-      setIsDraftLoaded(true);
-    }
-  }, [currentUser, isDraftLoaded, DRAFT_KEY]);
-
-  // Salva la bozza ad ogni modifica
-  useEffect(() => {
-    if (isDraftLoaded && currentUser) {
-      const draft = {
-        newDecName, newDecPrice, newDecBorder, newDecShadow, textColorType,
-        newDecTextColor, newDecGradStart, newDecGradEnd, newDecAnim,
-        baseEffects, elements, customAnimations, newDecImageBase64
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    }
-  }, [newDecName, newDecPrice, newDecBorder, newDecShadow, textColorType, newDecTextColor, newDecGradStart, newDecGradEnd, newDecAnim, baseEffects, elements, customAnimations, newDecImageBase64, isDraftLoaded, currentUser, DRAFT_KEY]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -246,13 +201,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setNewDecImageBase64(base64String);
-        setNewDecImagePreview(base64String);
-      };
-      reader.readAsDataURL(file);
+      setNewDecImage(file);
+      setNewDecImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -365,19 +315,13 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     const customId = `custom-${Date.now()}`;
     let imageUrl = null;
 
-    if (newDecImageBase64) {
-      try {
-        const res = await fetch(newDecImageBase64);
-        const blob = await res.blob();
-        const fileExt = blob.type.split('/')[1] || 'png';
-        const filePath = `custom_decorations/${customId}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, blob);
-        if (!uploadError) {
-          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-          imageUrl = data.publicUrl;
-        }
-      } catch (err) {
-        console.error("Errore caricamento immagine", err);
+    if (newDecImage) {
+      const fileExt = newDecImage.name.split('.').pop();
+      const filePath = `custom_decorations/${customId}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, newDecImage);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
       }
     }
 
@@ -412,9 +356,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       await supabase.from('profiles').update({ purchased_decorations: [...currentPurchased, customId] }).eq('id', currentUser.id);
 
       showSuccess("Contorno creato e aggiunto al tuo inventario!");
-      localStorage.removeItem(DRAFT_KEY); // Svuota la bozza
       setNewDecName('');
-      setNewDecImageBase64(null);
+      setNewDecImage(null);
       setNewDecImagePreview(null);
       setBaseEffects([]);
       setElements([]);
@@ -654,7 +597,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     return <style>{css}</style>;
   };
 
-  const avatarUrl = currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
+  const avatarUrl = (currentUser as any)?.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
@@ -850,7 +793,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           onClick={() => fileInputRef.current?.click()}
                           className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
                         >
-                          <Upload size={16} /> {newDecImageBase64 ? 'Cambia Immagine' : 'Carica Immagine'}
+                          <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
                         </button>
                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                       </div>
@@ -1213,7 +1156,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         }} 
                       />
                     )}
-                    <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
+                    <img src={avatarUrl} className="w-full h-full rounded-full object-cover relative z-10" />
                   </div>
 
                   {/* Outer Effects */}
@@ -1225,7 +1168,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   {elements.map(el => {
                     if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
                       const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
+                      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
                       return (
                         <div
                           key={el.id}
@@ -1290,7 +1233,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
                 <button 
                   type="submit"
-                  form="user-custom-dec-form"
+                  form="custom-dec-form"
                   disabled={isCreatingDec || !newDecName.trim()}
                   className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
                 >
@@ -1298,28 +1241,368 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                 </button>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Emoji Picker Modal */}
-          {emojiPickerTarget && (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50" onClick={() => setEmojiPickerTarget(null)}>
-              <div onClick={e => e.stopPropagation()} className="bg-[#2b2d31] rounded-lg shadow-2xl border border-[#1e1f22] overflow-hidden">
-                <EmojiPicker
-                  theme={Theme.DARK}
-                  onEmojiClick={(emojiObj) => {
-                    if (emojiPickerTarget.type === 'base') {
-                      updateBaseEffect(emojiPickerTarget.id, 'icon', emojiObj.emoji);
-                    } else {
-                      updateElement(emojiPickerTarget.id, 'content', emojiObj.emoji);
-                    }
-                    setEmojiPickerTarget(null);
-                  }}
+          {/* Lista Contorni Custom */}
+          {activeTab === 'custom-editor' && customDecorations.length > 0 && (
+            <div className="bg-[#2b2d31] p-4 border-t border-[#1e1f22] flex-shrink-0">
+              <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Contorni Custom Esistenti</h3>
+              <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2">
+                {customDecorations.map(dec => (
+                  <div key={dec.id} className="flex items-center justify-between bg-[#1e1f22] p-3 rounded border border-[#3f4147] min-w-[250px]">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-8 h-8 rounded-full relative flex items-center justify-center"
+                        style={{ border: `2px solid ${dec.border_color}`, boxShadow: `0 0 5px ${dec.shadow_color}` }}
+                      >
+                        {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
+                      </div>
+                      <div className="flex flex-col" style={dec.text_color_type === 'gradient' ? { filter: `drop-shadow(0 0 4px ${dec.text_gradient_start}80)` } : {}}>
+                        <span className="text-sm font-bold" style={
+                          dec.text_color_type === 'solid' ? {
+                            color: dec.text_color,
+                            textShadow: `0 0 5px ${dec.text_color}80`
+                          } : {
+                            backgroundImage: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
+                            WebkitBackgroundClip: 'text', 
+                            backgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            color: 'transparent'
+                          }
+                        }>
+                          {dec.name}
+                        </span>
+                        <span className="text-[10px] text-[#949ba4]">{dec.price} DC</span>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => handleDeleteCustomDecoration(dec.id)}
+                      className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
+                      title="Elimina"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'jumpscare' && (
+            <div className="flex flex-col flex-1 min-h-0 p-4">
+              <div className="flex-shrink-0 bg-[#2b2d31] p-6 rounded-lg border border-[#1e1f22] mb-4 text-center">
+                <Ghost size={48} className="text-[#f23f43] mx-auto mb-4" />
+                <h3 className="text-white font-bold text-xl mb-2">Invia un Jumpscare</h3>
+                <p className="text-[#b5bac1] text-sm mb-6">
+                  Spaventa un utente specifico o tutti gli utenti attualmente online. L'effetto apparirà istantaneamente sui loro schermi.
+                </p>
+                
+                <div className="max-w-sm mx-auto space-y-4">
+                  <div className="text-left">
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona Bersaglio</label>
+                    <select
+                      value={selectedJumpscareTarget}
+                      onChange={(e) => setSelectedJumpscareTarget(e.target.value)}
+                      className="w-full bg-[#1e1f22] text-white rounded p-2.5 focus:outline-none border border-[#3f4147] cursor-pointer"
+                    >
+                      <option value="all">Tutti gli utenti attivi</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.first_name || 'Utente'} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <button 
+                    onClick={handleSendJumpscare}
+                    className="w-full py-3 bg-[#f23f43] hover:bg-[#da373c] text-white font-bold rounded transition-colors shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Ghost size={18} />
+                    Invia Jumpscare Ora
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'chests' && (
+            <div className="flex flex-col flex-1 min-h-0 p-4">
+              <div className="flex-shrink-0 bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22] mb-4">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Settings2 size={18} className="text-brand"/> Parametri Bauli</h3>
+                
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <label className="text-xs font-bold text-[#b5bac1] uppercase">Moltiplicatore Premium (Oggetti Rari)</label>
+                      <span className="text-brand font-bold">{chestSettings.premium_multiplier}x</span>
+                    </div>
+                    <input 
+                      type="range" min="1" max="10" step="0.1" 
+                      value={chestSettings.premium_multiplier}
+                      onChange={e => setChestSettings({...chestSettings, premium_multiplier: parseFloat(e.target.value)})}
+                      className="w-full accent-brand cursor-pointer"
+                    />
+                    <p className="text-[10px] text-[#949ba4] mt-1">Aumenta la probabilità di trovare oggetti rari nel Baule Premium.</p>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <label className="text-xs font-bold text-[#b5bac1] uppercase">Soglia Rarità (Prezzo in DC)</label>
+                      <span className="text-yellow-500 font-bold">{chestSettings.rare_threshold} DC</span>
+                    </div>
+                    <input 
+                      type="range" min="10" max="500" step="10" 
+                      value={chestSettings.rare_threshold}
+                      onChange={e => setChestSettings({...chestSettings, rare_threshold: parseInt(e.target.value)})}
+                      className="w-full accent-yellow-500 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-[#949ba4] mt-1">Gli oggetti che costano almeno questo valore riceveranno il moltiplicatore nel Baule Premium.</p>
+                  </div>
+                  
+                  <button 
+                    onClick={handleSaveChestSettings}
+                    disabled={isSavingChests}
+                    className="w-full py-2.5 bg-[#23a559] hover:bg-[#1a7c43] text-white font-bold rounded transition-colors shadow-lg"
+                  >
+                    {isSavingChests ? 'Salvataggio...' : 'Salva Impostazioni nel Database'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-hidden flex flex-col bg-[#2b2d31] rounded-lg border border-[#1e1f22]">
+                <div className="p-3 border-b border-[#1e1f22] bg-[#1e1f22]">
+                  <h3 className="text-white font-bold flex items-center gap-2 text-sm"><TrendingUp size={16} className="text-blue-400"/> Anteprima Probabilità (Live)</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                  <div className="flex text-[10px] font-bold text-[#949ba4] uppercase px-2 pb-1">
+                    <div className="flex-1">Oggetto</div>
+                    <div className="w-20 text-right">Standard</div>
+                    <div className="w-20 text-right text-yellow-500">Premium</div>
+                  </div>
+                  {allItems.sort((a,b) => b.price - a.price).map(item => {
+                     const stdChance = standardChances.find(c => c.id === item.id)?.chance || 0;
+                     const prmChance = premiumChances.find(c => c.id === item.id)?.chance || 0;
+                     const isRare = item.price >= chestSettings.rare_threshold;
+                     const diff = prmChance - stdChance;
+                     
+                     // Usa il context per lo stile del testo
+                     const { getThemeClass, getThemeStyle } = useShop();
+                     
+                     return (
+                       <div key={item.id} className="flex items-center bg-[#1e1f22] p-2 rounded border border-transparent hover:border-[#3f4147]">
+                         <div className="flex-1 min-w-0 flex items-center gap-2">
+                           <span className={`text-xs font-medium truncate ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>{item.name}</span>
+                           <span className="text-[10px] text-[#949ba4] bg-[#2b2d31] px-1.5 rounded">{item.price} DC</span>
+                           {isRare && <span className="text-[10px] text-yellow-500 bg-yellow-500/10 px-1.5 rounded border border-yellow-500/20">Raro</span>}
+                         </div>
+                         <div className="w-20 text-right text-xs text-[#dbdee1]">{stdChance.toFixed(2)}%</div>
+                         <div className="w-20 text-right text-xs font-bold flex items-center justify-end gap-1">
+                           {isRare && diff > 0 && <span className="text-[9px] text-[#23a559]">(+{diff.toFixed(1)}%)</span>}
+                           <span className="text-yellow-500">{prmChance.toFixed(2)}%</span>
+                         </div>
+                       </div>
+                     )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab !== 'chests' && activeTab !== 'jumpscare' && activeTab !== 'custom-editor' && (
+            <div className="p-4 flex-1 flex flex-col min-h-0">
+              {activeTab === 'cosmetics' && (
+                <div className="flex-shrink-0 mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#1e1f22]">
+                  <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona Cosmetico da gestire</label>
+                  <select
+                    value={selectedCosmeticId}
+                    onChange={(e) => setSelectedCosmeticId(e.target.value)}
+                    className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                  >
+                    {allItems.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} ({item.category}) - {item.price} DC
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex-shrink-0 relative mb-4">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search size={16} className="text-[#949ba4]" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Cerca utente per nome o email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#1e1f22] text-white rounded p-2 pl-10 focus:outline-none placeholder-[#949ba4]"
                 />
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2 min-h-[300px]">
+                {loading ? (
+                  <div className="text-center text-[#949ba4] py-4">Caricamento...</div>
+                ) : users.length === 0 ? (
+                  <div className="text-center text-[#949ba4] py-4">Nessun utente trovato.</div>
+                ) : (
+                  users.map(user => {
+                    const userRole = (user as any).role || 'user';
+                    const isAdmin = user.id === adminId;
+                    const isMod = userRole === 'moderator';
+                    const hasCosmetic = user.purchased_decorations?.includes(selectedCosmeticId) || false;
+                    
+                    const userForCard: User = {
+                      id: user.id,
+                      name: user.first_name || 'Utente',
+                      avatar: user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+                      status: 'online',
+                      bio: user.bio || undefined,
+                      banner_color: user.banner_color || undefined,
+                      banner_url: user.banner_url || undefined,
+                      level: user.level || 1,
+                      digitalcardus: user.digitalcardus ?? 25,
+                      xp: user.xp || 0,
+                      global_role: isAdmin ? 'CREATOR' : isMod ? 'MODERATOR' : 'USER',
+                      avatar_decoration: user.avatar_decoration || null,
+                      purchased_decorations: user.purchased_decorations || []
+                    };
+                    
+                    return (
+                      <div key={user.id} className="bg-[#2b2d31] p-3 rounded flex items-center justify-between border border-transparent hover:border-[#3f4147] transition-colors">
+                        <ProfilePopover user={userForCard} side="right" align="center">
+                          <div className="flex items-center gap-3 cursor-pointer hover:bg-[#35373c] p-1.5 rounded transition-colors flex-1 min-w-0">
+                            <img 
+                              src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} 
+                              alt="avatar" 
+                              className="w-10 h-10 rounded-full bg-[#1e1f22] object-cover flex-shrink-0"
+                            />
+                            <div className="flex flex-col min-w-0">
+                              <div className="text-white font-medium flex items-center gap-1.5 truncate">
+                                <span className="truncate">{user.first_name || 'Utente Sconosciuto'}</span>
+                                {isAdmin && (
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <div className="cursor-help flex items-center"><Shield size={14} className="text-red-500 flex-shrink-0" /></div>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                      admin di discord canary 2
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {!isAdmin && isMod && (
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <div className="cursor-help flex items-center"><Shield size={14} className="text-blue-400 flex-shrink-0" /></div>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-semibold text-xs z-[99999]">
+                                      moderatore ufficiale
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-[#b5bac1] truncate">
+                                {(user as any).email || 'Email non disponibile'}
+                              </div>
+                              <div className="text-xs text-[#949ba4] mt-0.5">
+                                {activeTab === 'dc' && `${user.digitalcardus ?? 0} DC`}
+                                {activeTab === 'mods' && `Ruolo: ${isAdmin ? 'admin' : userRole}`}
+                                {activeTab === 'cosmetics' && (
+                                  <span className={hasCosmetic ? "text-[#23a559]" : "text-[#949ba4]"}>
+                                    {hasCosmetic ? "Possiede l'oggetto" : "Non possiede l'oggetto"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </ProfilePopover>
+
+                        <div className="flex-shrink-0 ml-4">
+                          {activeTab === 'dc' && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                placeholder="Importo"
+                                value={amounts[user.id] || ''}
+                                onChange={(e) => setAmounts(prev => ({ ...prev, [user.id]: e.target.value }))}
+                                className="w-20 bg-[#1e1f22] text-white rounded p-1.5 text-sm focus:outline-none"
+                              />
+                              <button
+                                onClick={() => handleUpdateDC(user.id, user.digitalcardus ?? 0, true)}
+                                className="p-1.5 bg-[#23a559] text-white rounded hover:bg-[#1a7c43] transition-colors"
+                                title="Aggiungi"
+                              >
+                                <Plus size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleUpdateDC(user.id, user.digitalcardus ?? 0, false)}
+                                className="p-1.5 bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                                title="Rimuovi"
+                              >
+                                <Minus size={16} />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {activeTab === 'mods' && (
+                            <button
+                              onClick={() => handleToggleMod(user.id, userRole)}
+                              disabled={isAdmin}
+                              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                                isAdmin 
+                                  ? 'bg-[#1e1f22] text-[#949ba4] cursor-not-allowed'
+                                  : userRole === 'moderator' 
+                                    ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
+                                    : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'
+                              }`}
+                            >
+                              {isAdmin ? 'Admin' : userRole === 'moderator' ? 'Rimuovi Mod' : 'Rendi Mod'}
+                            </button>
+                          )}
+
+                          {activeTab === 'cosmetics' && (
+                            <button
+                              onClick={() => handleToggleCosmetic(user, selectedCosmeticId, hasCosmetic)}
+                              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors w-24 ${
+                                hasCosmetic 
+                                  ? 'bg-[#da373c] text-white hover:bg-[#a12828]' 
+                                  : 'bg-[#23a559] text-white hover:bg-[#1a7c43]'
+                              }`}
+                            >
+                              {hasCosmetic ? 'Rimuovi' : 'Assegna'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Emoji Picker Modal */}
+      {emojiPickerTarget && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50" onClick={() => setEmojiPickerTarget(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#2b2d31] rounded-lg shadow-2xl border border-[#1e1f22] overflow-hidden">
+            <EmojiPicker
+              theme={Theme.DARK}
+              onEmojiClick={(emojiObj) => {
+                if (emojiPickerTarget.type === 'base') {
+                  updateBaseEffect(emojiPickerTarget.id, 'icon', emojiObj.emoji);
+                } else {
+                  updateElement(emojiPickerTarget.id, 'content', emojiObj.emoji);
+                }
+                setEmojiPickerTarget(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );
