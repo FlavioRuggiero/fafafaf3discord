@@ -229,6 +229,114 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  // --- COPY / PASTE LOGIC (SYSTEM CLIPBOARD) ---
+
+  const copyBaseEffect = async (id: string) => {
+    const effect = baseEffects.find(e => e.id === id);
+    if (effect) {
+      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'baseEffect', data: effect }));
+      showSuccess("Effetto copiato negli appunti!");
+    }
+  };
+
+  const pasteBaseEffect = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'baseEffect' && parsed.data) {
+        const newEffect = { ...parsed.data, id: `be-${Date.now()}-${Math.random().toString(36).substring(7)}` };
+        setBaseEffects([...baseEffects, newEffect]);
+        showSuccess("Effetto incollato!");
+      } else {
+        showError("Il testo negli appunti non è un Effetto Base valido.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
+  };
+
+  const copyElement = async (id: string) => {
+    const el = elements.find(e => e.id === id);
+    if (el) {
+      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'element', data: el }));
+      showSuccess("Elemento copiato negli appunti!");
+    }
+  };
+
+  const pasteElement = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'element' && parsed.data) {
+        const newId = `el-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        setElements([...elements, { ...parsed.data, id: newId, parentId: undefined }]);
+        showSuccess("Elemento incollato!");
+      } else {
+        showError("Il testo negli appunti non è un Elemento valido.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
+  };
+
+  const copyCustomAnimation = async (id: string) => {
+    const anim = customAnimations.find(a => a.id === id);
+    if (anim) {
+      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'animation', data: anim }));
+      showSuccess("Animazione copiata negli appunti!");
+    }
+  };
+
+  const pasteCustomAnimation = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'animation' && parsed.data) {
+        const newAnimId = `anim-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const newKeyframes = parsed.data.keyframes.map((kf: any) => ({ ...kf, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}`, targetId: undefined }));
+        setCustomAnimations([...customAnimations, { ...parsed.data, id: newAnimId, name: `${parsed.data.name} (Copia)`, keyframes: newKeyframes }]);
+        showSuccess("Animazione incollata!");
+      } else {
+        showError("Il testo negli appunti non è un'Animazione valida.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
+  };
+
+  const copyKeyframe = async (animId: string, kfId: string) => {
+    const anim = customAnimations.find(a => a.id === animId);
+    if (anim) {
+      const kf = anim.keyframes.find(k => k.id === kfId);
+      if (kf) {
+        await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'keyframe', data: kf }));
+        showSuccess("Keyframe copiato negli appunti!");
+      }
+    }
+  };
+
+  const pasteKeyframe = async (animId: string) => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'keyframe' && parsed.data) {
+        setCustomAnimations(customAnimations.map(a => {
+          if (a.id === animId) {
+            return { ...a, keyframes: [...a.keyframes, { ...parsed.data, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}`, targetId: undefined }] };
+          }
+          return a;
+        }));
+        showSuccess("Keyframe incollato!");
+      } else {
+        showError("Il testo negli appunti non è un Keyframe valido.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
+  };
+
+  // --- END COPY / PASTE LOGIC ---
+
   const addBaseEffect = () => {
     setBaseEffects([...baseEffects, {
       id: `be-${Date.now()}`,
@@ -250,21 +358,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const removeBaseEffect = (id: string) => {
     setBaseEffects(baseEffects.filter(el => el.id !== id));
-  };
-
-  const copyBaseEffect = (id: string) => {
-    const effect = baseEffects.find(e => e.id === id);
-    if (effect) {
-      setClipboard(prev => ({ ...prev, baseEffect: JSON.parse(JSON.stringify(effect)) }));
-      showSuccess("Effetto copiato!");
-    }
-  };
-
-  const pasteBaseEffect = () => {
-    if (clipboard.baseEffect) {
-      setBaseEffects([...baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random()}` }]);
-      showSuccess("Effetto incollato!");
-    }
   };
 
   const addElement = () => {
@@ -295,22 +388,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     setElements(elements.filter(el => el.id !== id));
   };
 
-  const copyElement = (id: string) => {
-    const el = elements.find(e => e.id === id);
-    if (el) {
-      setClipboard(prev => ({ ...prev, element: JSON.parse(JSON.stringify(el)) }));
-      showSuccess("Elemento copiato!");
-    }
-  };
-
-  const pasteElement = () => {
-    if (clipboard.element) {
-      const newId = `el-${Date.now()}-${Math.random()}`;
-      setElements([...elements, { ...clipboard.element, id: newId }]);
-      showSuccess("Elemento incollato!");
-    }
-  };
-
   // Animazioni Custom
   const addCustomAnimation = () => {
     const newId = `anim-${Date.now()}`;
@@ -338,23 +415,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const removeCustomAnimation = (id: string) => {
     setCustomAnimations(customAnimations.filter(a => a.id !== id));
     setElements(elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el));
-  };
-
-  const copyCustomAnimation = (id: string) => {
-    const anim = customAnimations.find(a => a.id === id);
-    if (anim) {
-      setClipboard(prev => ({ ...prev, animation: JSON.parse(JSON.stringify(anim)) }));
-      showSuccess("Animazione copiata!");
-    }
-  };
-
-  const pasteCustomAnimation = () => {
-    if (clipboard.animation) {
-      const newAnimId = `anim-${Date.now()}-${Math.random()}`;
-      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
-      setCustomAnimations([...customAnimations, { ...clipboard.animation, id: newAnimId, name: `${clipboard.animation.name} (Copia)`, keyframes: newKeyframes }]);
-      showSuccess("Animazione incollata!");
-    }
   };
 
   const addKeyframe = (animId: string) => {
@@ -388,29 +448,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       }
       return a;
     }));
-  };
-
-  const copyKeyframe = (animId: string, kfId: string) => {
-    const anim = customAnimations.find(a => a.id === animId);
-    if (anim) {
-      const kf = anim.keyframes.find(k => k.id === kfId);
-      if (kf) {
-        setClipboard(prev => ({ ...prev, keyframe: JSON.parse(JSON.stringify(kf)) }));
-        showSuccess("Keyframe copiato!");
-      }
-    }
-  };
-
-  const pasteKeyframe = (animId: string) => {
-    if (clipboard.keyframe) {
-      setCustomAnimations(customAnimations.map(a => {
-        if (a.id === animId) {
-          return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random()}` }] };
-        }
-        return a;
-      }));
-      showSuccess("Keyframe incollato!");
-    }
   };
 
   const isDescendant = (potentialDescendantId: string, ancestorId: string, allElements: CustomElement[]) => {
@@ -1058,11 +1095,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-white font-bold text-sm uppercase">Effetti Base</h4>
                       <div className="flex gap-2">
-                        {clipboard.baseEffect && (
-                          <button type="button" onClick={pasteBaseEffect} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
-                            <ClipboardPaste size={12} /> Incolla
-                          </button>
-                        )}
+                        <button type="button" onClick={pasteBaseEffect} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                          <ClipboardPaste size={12} /> Incolla
+                        </button>
                         <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
                           <Plus size={12} /> Aggiungi Effetto
                         </button>
@@ -1180,11 +1215,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
                       <div className="flex gap-2">
-                        {clipboard.element && (
-                          <button type="button" onClick={pasteElement} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
-                            <ClipboardPaste size={12} /> Incolla
-                          </button>
-                        )}
+                        <button type="button" onClick={pasteElement} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                          <ClipboardPaste size={12} /> Incolla
+                        </button>
                         <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
                           <Plus size={12} /> Aggiungi Elemento
                         </button>
@@ -1322,11 +1355,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
                       <div className="flex gap-2">
-                        {clipboard.animation && (
-                          <button type="button" onClick={pasteCustomAnimation} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
-                            <ClipboardPaste size={12} /> Incolla
-                          </button>
-                        )}
+                        <button type="button" onClick={pasteCustomAnimation} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                          <ClipboardPaste size={12} /> Incolla
+                        </button>
                         <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
                           <Plus size={12} /> Nuova Animazione
                         </button>
@@ -1382,11 +1413,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     <div className="flex justify-between items-center mb-2">
                                       <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
                                       <div className="flex gap-2">
-                                        {clipboard.keyframe && (
-                                          <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
-                                            <ClipboardPaste size={10} /> Incolla
-                                          </button>
-                                        )}
+                                        <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
+                                          <ClipboardPaste size={10} /> Incolla
+                                        </button>
                                         <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
                                           + Keyframe
                                         </button>
