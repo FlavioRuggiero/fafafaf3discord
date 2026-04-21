@@ -14,7 +14,8 @@ export type CustomKeyframe = {
 };
 
 export type CustomAnimationDef = {
-  id: string;name: string;
+  id: string;
+  name: string;
   duration: number;
   timingFunction: 'linear' | 'ease' | 'ease-in-out';
   keyframes: CustomKeyframe[];
@@ -127,7 +128,7 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
           background: `linear-gradient(90deg, ${custom.text_gradient_start || '#fff'}, ${custom.text_gradient_end || '#fff'})`,
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          textShadow: `0 0 15px ${custom.text_gradient_start || '#fff'}80`
+          filter: `drop-shadow(0 0 8px ${custom.text_gradient_start || '#fff'}80)`
         };
       }
     }

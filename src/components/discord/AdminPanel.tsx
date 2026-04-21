@@ -1219,7 +1219,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
-                    textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
+                    filter: `drop-shadow(0 0 8px ${newDecGradStart || '#fff'}80)`
                   }}
                 >
                   {newDecName || 'Nome Contorno'}
@@ -1259,7 +1259,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           } : {
                             background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
                             WebkitBackgroundClip: 'text', 
-                            WebkitTextFillColor: 'transparent' 
+                            WebkitTextFillColor: 'transparent',
+                            filter: `drop-shadow(0 0 4px ${dec.text_gradient_start}80)`
                           }
                         }>
                           {dec.name}
