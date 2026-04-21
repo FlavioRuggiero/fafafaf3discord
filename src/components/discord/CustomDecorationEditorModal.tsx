@@ -388,7 +388,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
-    return <style>{css}</style>;
+    return <style dangerouslySetInnerHTML={{ __html: css }} />;
   };
 
   const avatarUrl = currentUser.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
@@ -540,426 +540,430 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <p className="text-xs text-[#949ba4] italic">Nessun effetto base aggiunto.</p>
                 ) : (
                   <div className="space-y-3">
-                    {baseEffects.map((effect) => (
-                      <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                          <X size={16} />
-                        </button>
-                        <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
-                            <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="scanline">Scanline</option>
-                              <option value="radar">Radar</option>
-                              <option value="twin-rings">Anelli Gemelli</option>
-                              <option value="circo">Circo</option>
-                              <option value="pulse-ring">Anello Pulsante</option>
-                              <option value="supernova">Supernova Cosmica</option>
-                              <option value="esquelito">Esquelito Explosivo</option>
-                              <option value="oceanic">Vortice Oceanico</option>
-                              <option value="saturn-fire">Saturno a Fuoco</option>
-                              <option value="gustavo-armando">Gustavo Armando</option>
-                              <option value="serpixel-agitato">Serpixel Agitato</option>
-                              <option value="tempesta">Tempesta</option>
-                              <option value="ghiacciolo">Ghiacciolo</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Sostituisci Particelle (Emoji/URL)</label>
-                            <div className="flex gap-2">
-                              <button 
-                                type="button" 
-                                onClick={() => setEmojiPickerTarget({type: 'base', id: effect.id})} 
-                                className="bg-[#1e1f22] hover:bg-[#35373c] transition-colors rounded border border-[#3f4147] text-xl flex items-center justify-center w-9 h-9 flex-shrink-0"
-                              >
-                                {effect.icon && !effect.icon.startsWith('http') ? effect.icon : '😀'}
-                              </button>
-                              <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="URL Immagine" className="flex-1 bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 1</label>
-                            <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                              <input type="color" value={effect.color1} onChange={e => updateBaseEffect(effect.id, 'color1', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
-                              <span className="text-white text-xs uppercase">{effect.color1}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 2</label>
-                            <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                              <input type="color" value={effect.color2} onChange={e => updateBaseEffect(effect.id, 'color2', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
-                              <span className="text-white text-xs uppercase">{effect.color2}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
-                              <input type="number" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
-                              <input type="number" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Rotazione</label>
-                              <input type="number" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="-360" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Dimensione</label>
-                              <input type="number" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="10" max="300" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Z-Index</label>
-                              <input type="number" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="50" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Elementi Fluttuanti */}
-              <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
-                  <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                    <Plus size={12} /> Aggiungi Elemento
-                  </button>
-                </div>
-
-                {elements.length === 0 ? (
-                  <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {elements.map((el, idx) => (
-                      <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                          <X size={16} />
-                        </button>
-                        <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
-                            <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="emoji">Emoji</option>
-                              <option value="image">URL Immagine</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
-                            {el.type === 'emoji' ? (
-                              <button 
-                                type="button" 
-                                onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
-                                className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
-                              >
-                                {el.content || '✨'}
-                              </button>
-                            ) : (
-                              <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
-                              <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
-                              <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
-                            <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="none">Nessuna</option>
-                              <option value="float">Fluttua</option>
-                              <option value="pulse">Pulsazione</option>
-                              <option value="spin">Rotazione</option>
-                              <option value="shake">Tremolio</option>
-                              <option value="orbit-2d">Orbita 2D</option>
-                              <option value="orbit-3d">Orbita 3D</option>
-                              <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
-                              {customAnimations.map(a => (
-                                <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
-                            <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
-                            <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Animazioni Personalizzate (Timeline) */}
-              <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
-                  <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                    <Plus size={12} /> Nuova Animazione
-                  </button>
-                </div>
-                <p className="text-xs text-[#949ba4] mb-4">Crea qui l'animazione, poi assegnala a un Elemento Fluttuante per vederla in azione!</p>
-
-                {customAnimations.length === 0 ? (
-                  <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {customAnimations.map((anim) => (
-                      <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                          <X size={16} />
-                        </button>
-                        
-                        <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
-                            <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
-                            <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
-                            <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="linear">Lineare</option>
-                              <option value="ease">Morbida (Ease)</option>
-                              <option value="ease-in-out">Morbida In/Out</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="border-t border-[#3f4147] pt-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
-                            <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
-                              + Keyframe
+                        {baseEffects.map((effect) => (
+                          <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                            <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                              <X size={16} />
                             </button>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
-                              <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
-                                <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
-                                  <X size={12} />
-                                </button>
-                                
-                                <div className="w-full flex items-center gap-2 mb-1 pr-4">
-                                  <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
-                                  <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
-                                </div>
-                                
-                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">X (%)</label>
-                                      <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="-300" max="300" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Y (%)</label>
-                                      <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="-300" max="300" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Scala</label>
-                                      <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
-                                      <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Opacità</label>
-                                      <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Z-Index</label>
-                                      <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
+                            <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
+                                <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="scanline">Scanline</option>
+                                  <option value="radar">Radar</option>
+                                  <option value="twin-rings">Anelli Gemelli</option>
+                                  <option value="circo">Circo</option>
+                                  <option value="pulse-ring">Anello Pulsante</option>
+                                  <option value="supernova">Supernova Cosmica</option>
+                                  <option value="esquelito">Esquelito Explosivo</option>
+                                  <option value="oceanic">Vortice Oceanico</option>
+                                  <option value="saturn-fire">Saturno a Fuoco</option>
+                                  <option value="gustavo-armando">Gustavo Armando</option>
+                                  <option value="serpixel-agitato">Serpixel Agitato</option>
+                                  <option value="tempesta">Tempesta</option>
+                                  <option value="ghiacciolo">Ghiacciolo</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Sostituisci Particelle (Emoji/URL)</label>
+                                <div className="flex gap-2">
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setEmojiPickerTarget({type: 'base', id: effect.id})} 
+                                    className="bg-[#1e1f22] hover:bg-[#35373c] transition-colors rounded border border-[#3f4147] text-xl flex items-center justify-center w-9 h-9 flex-shrink-0"
+                                  >
+                                    {effect.icon && !effect.icon.startsWith('http') ? effect.icon : '😀'}
+                                  </button>
+                                  <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="URL Immagine" className="flex-1 bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                 </div>
                               </div>
-                            ))}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 1</label>
+                                <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                                  <input type="color" value={effect.color1} onChange={e => updateBaseEffect(effect.id, 'color1', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                  <span className="text-white text-xs uppercase">{effect.color1}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 2</label>
+                                <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                                  <input type="color" value={effect.color2} onChange={e => updateBaseEffect(effect.id, 'color2', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                  <span className="text-white text-xs uppercase">{effect.color2}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
+                                  <input type="number" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
+                                  <input type="number" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Rotazione</label>
+                                  <input type="number" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="-360" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Dimensione</label>
+                                  <input type="number" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="10" max="300" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Z-Index</label>
+                                  <input type="number" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="50" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-
-                        {/* Mini Preview Animazione */}
-                        <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
-                          <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
-                          <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
-                            <span className="text-4xl">✨</span>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
 
-            </form>
-          </div>
-
-          {/* Anteprima a Destra */}
-          <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
-            <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
-            
-            <div className="dec-wrapper relative w-32 h-32 mb-8">
-              {renderCustomAnimationsCSS(customAnimations)}
-              
-              {/* Inner Effects */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {renderInnerEffects(baseEffects)}
-              </div>
-
-              {/* Avatar & Border (z-10) */}
-              <div 
-                className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
-                style={{
-                  border: `2px solid ${newDecBorder}`,
-                  boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
-                }}
-              >
-                {newDecImagePreview && (
-                  <img 
-                    src={newDecImagePreview} 
-                    className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-                    style={{ 
-                      animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
-                                 newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
-                                 newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-                    }} 
-                  />
-                )}
-                <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
-              </div>
-
-              {/* Outer Effects */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {renderOuterEffects(baseEffects)}
-              </div>
-
-              {/* Elements */}
-              {elements.map(el => {
-                if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-                  const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                  const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-<think>Continuing the previous response exactly where it left off.</think>inner' : 'custom-orbit-3d-inner-rev';
-                  return (
-                    <div
-                      key={el.id}
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${el.x}%`,
-                        top: `${el.y}%`,
-                        transform: `translate(-50%, -50%)`,
-                        width: '100%',
-                        height: '100%'
-                      }}
-                    >
-                      <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                        <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-                          {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
-                        </div>
-                      </div>
+                  {/* Elementi Fluttuanti */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
+                      <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                        <Plus size={12} /> Aggiungi Elemento
+                      </button>
                     </div>
-                  );
-                }
-                return (
+
+                    {elements.length === 0 ? (
+                      <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {elements.map((el, idx) => (
+                          <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                            <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                              <X size={16} />
+                            </button>
+                            <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
+                                <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="emoji">Emoji</option>
+                                  <option value="image">URL Immagine</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
+                                {el.type === 'emoji' ? (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
+                                    className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
+                                  >
+                                    {el.content || '✨'}
+                                  </button>
+                                ) : (
+                                  <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
+                                  <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
+                                  <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
+                                <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="none">Nessuna</option>
+                                  <option value="float">Fluttua</option>
+                                  <option value="pulse">Pulsazione</option>
+                                  <option value="spin">Rotazione</option>
+                                  <option value="shake">Tremolio</option>
+                                  <option value="orbit-2d">Orbita 2D</option>
+                                  <option value="orbit-3d">Orbita 3D</option>
+                                  <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
+                                  {customAnimations.map(a => (
+                                    <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
+                                <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
+                                <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Animazioni Personalizzate (Timeline) */}
+                  <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
+                      <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                        <Plus size={12} /> Nuova Animazione
+                      </button>
+                    </div>
+                    <p className="text-xs text-[#949ba4] mb-4">Crea qui l'animazione, poi assegnala a un Elemento Fluttuante per vederla in azione!</p>
+
+                    {customAnimations.length === 0 ? (
+                      <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {customAnimations.map((anim) => (
+                          <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                            <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                              <X size={16} />
+                            </button>
+                            
+                            <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
+                                <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
+                                <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
+                                <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="linear">Lineare</option>
+                                  <option value="ease">Morbida (Ease)</option>
+                                  <option value="ease-in-out">Morbida In/Out</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-[#3f4147] pt-3">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
+                                <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                  + Keyframe
+                                </button>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
+                                  <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
+                                    <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
+                                      <X size={12} />
+                                    </button>
+                                    
+                                    <div className="w-full flex items-center gap-2 mb-1 pr-4">
+                                      <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
+                                      <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">X (%)</label>
+                                          <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-300" max="300" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Y (%)</label>
+                                          <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-300" max="300" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Scala</label>
+                                          <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
+                                          <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Opacità</label>
+                                          <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Z-Index</label>
+                                          <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Mini Preview Animazione */}
+                            <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
+                              <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
+                              <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
+                                <span className="text-4xl">✨</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </form>
+              </div>
+
+              {/* Anteprima a Destra */}
+              <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
+                <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
+                
+                <div className="dec-wrapper relative w-32 h-32 mb-8">
+                  {renderCustomAnimationsCSS(customAnimations)}
+                  
+                  {/* Inner Effects */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    {renderInnerEffects(baseEffects)}
+                  </div>
+
+                  {/* Avatar & Border (z-10) */}
                   <div 
-                    key={el.id} 
-                    className={`absolute flex items-center justify-center`}
-                    style={{ 
-                      left: `${el.x}%`,
-                      top: `${el.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                      animation: getAnimation(el.animation, el.delay, customAnimations),
-                      width: `${el.size}cqw`,
-                      height: `${el.size}cqw`,
-                      fontSize: `${el.size}cqw`,
-                      zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
+                    className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
+                    style={{
+                      border: `2px solid ${newDecBorder}`,
+                      boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
                     }}
                   >
-                    {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+                    {newDecImagePreview && (
+                      <img 
+                        src={newDecImagePreview} 
+                        className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                        style={{ 
+                          animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                     newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                     newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                        }} 
+                      />
+                    )}
+                    <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
                   </div>
-                );
-              })}
+
+                  {/* Outer Effects */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    {renderOuterEffects(baseEffects)}
+                  </div>
+
+                  {/* Elements */}
+                  {elements.map(el => {
+                    if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+                      const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+                      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
+                      return (
+                        <div
+                          key={el.id}
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: `${el.x}%`,
+                            top: `${el.y}%`,
+                            transform: `translate(-50%, -50%)`,
+                            width: '100%',
+                            height: '100%'
+                          }}
+                        >
+                          <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                            <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
+                              {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div 
+                        key={el.id} 
+                        className={`absolute flex items-center justify-center`}
+                        style={{ 
+                          left: `${el.x}%`,
+                          top: `${el.y}%`,
+                          transform: 'translate(-50%, -50%)',
+                          animation: getAnimation(el.animation, el.delay, customAnimations),
+                          width: `${el.size}cqw`,
+                          height: `${el.size}cqw`,
+                          fontSize: `${el.size}cqw`,
+                          zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
+                        }}
+                      >
+                        {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <span 
+                  className="font-bold text-2xl text-center mb-8"
+                  style={textColorType === 'solid' ? {
+                    color: newDecTextColor,
+                    textShadow: `0 0 10px ${newDecTextColor}80`
+                  } : {
+                    backgroundImage: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    color: 'transparent',
+                    textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
+                  }}
+                >
+                  {newDecName || 'Nome Contorno'}
+                </span>
+
+                <button 
+                  type="submit"
+                  form="user-custom-dec-form"
+                  disabled={isCreatingDec || !newDecName.trim()}
+                  className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
+                >
+                  {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
+                </button>
+              </div>
             </div>
-
-            <span 
-              className="font-bold text-2xl text-center mb-8"
-              style={textColorType === 'solid' ? {
-                color: newDecTextColor,
-                textShadow: `0 0 10px ${newDecTextColor}80`
-              } : {
-                background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
-              }}
-            >
-              {newDecName || 'Nome Contorno'}
-            </span>
-
-            <button 
-              type="submit"
-              form="user-custom-dec-form"
-              disabled={isCreatingDec || !newDecName.trim()}
-              className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
-            >
-              {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
-            </button>
           </div>
         </div>
       </div>
