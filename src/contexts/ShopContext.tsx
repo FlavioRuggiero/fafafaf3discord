@@ -102,6 +102,13 @@ export const DEFAULT_DRAFT_DECORATION: DraftDecoration = {
   imagePreview: null
 };
 
+export type ClipboardState = {
+  baseEffect: BaseEffectConfig | null;
+  element: CustomElement | null;
+  animation: CustomAnimationDef | null;
+  keyframe: CustomKeyframe | null;
+};
+
 type ShopContextType = {
   customDecorations: CustomDecoration[];
   allItems: ShopItem[];
@@ -110,6 +117,8 @@ type ShopContextType = {
   getThemeClass: (id: string | null | undefined) => string;
   draftDecoration: DraftDecoration;
   setDraftDecoration: React.Dispatch<React.SetStateAction<DraftDecoration>>;
+  clipboard: ClipboardState;
+  setClipboard: React.Dispatch<React.SetStateAction<ClipboardState>>;
 };
 
 const ShopContext = createContext<ShopContextType | null>(null);
@@ -117,6 +126,12 @@ const ShopContext = createContext<ShopContextType | null>(null);
 export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
   const [customDecorations, setCustomDecorations] = useState<CustomDecoration[]>([]);
   const [draftDecoration, setDraftDecoration] = useState<DraftDecoration>(DEFAULT_DRAFT_DECORATION);
+  const [clipboard, setClipboard] = useState<ClipboardState>({
+    baseEffect: null,
+    element: null,
+    animation: null,
+    keyframe: null
+  });
 
   const refreshCustomDecorations = async () => {
     const { data } = await supabase.from('custom_decorations').select('*');
@@ -174,7 +189,7 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <ShopContext.Provider value={{ customDecorations, allItems, refreshCustomDecorations, getThemeStyle, getThemeClass, draftDecoration, setDraftDecoration }}>
+    <ShopContext.Provider value={{ customDecorations, allItems, refreshCustomDecorations, getThemeStyle, getThemeClass, draftDecoration, setDraftDecoration, clipboard, setClipboard }}>
       {children}
     </ShopContext.Provider>
   );

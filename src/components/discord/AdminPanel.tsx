@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play, Copy, ClipboardPaste } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -18,7 +18,7 @@ interface AdminPanelProps {
 
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const { user: currentUser, adminId } = useAuth();
-  const { allItems, customDecorations, refreshCustomDecorations } = useShop();
+  const { allItems, customDecorations, refreshCustomDecorations, clipboard, setClipboard } = useShop();
   
   const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests' | 'jumpscare' | 'custom-editor'>('dc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -229,6 +229,21 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     setBaseEffects(baseEffects.filter(el => el.id !== id));
   };
 
+  const copyBaseEffect = (id: string) => {
+    const effect = baseEffects.find(e => e.id === id);
+    if (effect) {
+      setClipboard(prev => ({ ...prev, baseEffect: effect }));
+      showSuccess("Effetto copiato!");
+    }
+  };
+
+  const pasteBaseEffect = () => {
+    if (clipboard.baseEffect) {
+      setBaseEffects([...baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random()}` }]);
+      showSuccess("Effetto incollato!");
+    }
+  };
+
   const addElement = () => {
     setElements([...elements, {
       id: `el-${Date.now()}`,
@@ -248,6 +263,21 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const removeElement = (id: string) => {
     setElements(elements.filter(el => el.id !== id));
+  };
+
+  const copyElement = (id: string) => {
+    const el = elements.find(e => e.id === id);
+    if (el) {
+      setClipboard(prev => ({ ...prev, element: el }));
+      showSuccess("Elemento copiato!");
+    }
+  };
+
+  const pasteElement = () => {
+    if (clipboard.element) {
+      setElements([...elements, { ...clipboard.element, id: `el-${Date.now()}-${Math.random()}` }]);
+      showSuccess("Elemento incollato!");
+    }
   };
 
   // Animazioni Custom
@@ -270,8 +300,24 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const removeCustomAnimation = (id: string) => {
     setCustomAnimations(customAnimations.filter(a => a.id !== id));
-    // Resetta gli elementi che usavano questa animazione
     setElements(elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el));
+  };
+
+  const copyCustomAnimation = (id: string) => {
+    const anim = customAnimations.find(a => a.id === id);
+    if (anim) {
+      setClipboard(prev => ({ ...prev, animation: anim }));
+      showSuccess("Animazione copiata!");
+    }
+  };
+
+  const pasteCustomAnimation = () => {
+    if (clipboard.animation) {
+      const newAnimId = `anim-${Date.now()}-${Math.random()}`;
+      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
+      setCustomAnimations([...customAnimations, { ...clipboard.animation, id: newAnimId, name: `${clipboard.animation.name} (Copia)`, keyframes: newKeyframes }]);
+      showSuccess("Animazione incollata!");
+    }
   };
 
   const addKeyframe = (animId: string) => {
@@ -305,6 +351,29 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       }
       return a;
     }));
+  };
+
+  const copyKeyframe = (animId: string, kfId: string) => {
+    const anim = customAnimations.find(a => a.id === animId);
+    if (anim) {
+      const kf = anim.keyframes.find(k => k.id === kfId);
+      if (kf) {
+        setClipboard(prev => ({ ...prev, keyframe: kf }));
+        showSuccess("Keyframe copiato!");
+      }
+    }
+  };
+
+  const pasteKeyframe = (animId: string) => {
+    if (clipboard.keyframe) {
+      setCustomAnimations(customAnimations.map(a => {
+        if (a.id === animId) {
+          return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random()}` }] };
+        }
+        return a;
+      }));
+      showSuccess("Keyframe incollato!");
+    }
   };
 
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
@@ -804,9 +873,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-white font-bold text-sm uppercase">Effetti Base</h4>
-                      <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                        <Plus size={12} /> Aggiungi Effetto
-                      </button>
+                      <div className="flex gap-2">
+                        {clipboard.baseEffect && (
+                          <button type="button" onClick={pasteBaseEffect} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                            <ClipboardPaste size={12} /> Incolla
+                          </button>
+                        )}
+                        <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                          <Plus size={12} /> Aggiungi Effetto
+                        </button>
+                      </div>
                     </div>
 
                     {baseEffects.length === 0 ? (
@@ -815,10 +891,15 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       <div className="space-y-3">
                         {baseEffects.map((effect) => (
                           <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                            <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                              <X size={16} />
-                            </button>
-                            <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                            <div className="absolute top-2 right-2 flex gap-1">
+                              <button type="button" onClick={() => copyBaseEffect(effect.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
+                                <Copy size={16} />
+                              </button>
+                              <button type="button" onClick={() => removeBaseEffect(effect.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                <X size={16} />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-3 pr-12">
                               <div>
                                 <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
                                 <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -914,9 +995,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
-                      <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                        <Plus size={12} /> Aggiungi Elemento
-                      </button>
+                      <div className="flex gap-2">
+                        {clipboard.element && (
+                          <button type="button" onClick={pasteElement} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                            <ClipboardPaste size={12} /> Incolla
+                          </button>
+                        )}
+                        <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                          <Plus size={12} /> Aggiungi Elemento
+                        </button>
+                      </div>
                     </div>
 
                     {elements.length === 0 ? (
@@ -925,10 +1013,15 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       <div className="space-y-3">
                         {elements.map((el, idx) => (
                           <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                            <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                              <X size={16} />
-                            </button>
-                            <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                            <div className="absolute top-2 right-2 flex gap-1">
+                              <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
+                                <Copy size={16} />
+                              </button>
+                              <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                <X size={16} />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-3 pr-12">
                               <div>
                                 <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
                                 <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -1005,9 +1098,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
-                      <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                        <Plus size={12} /> Nuova Animazione
-                      </button>
+                      <div className="flex gap-2">
+                        {clipboard.animation && (
+                          <button type="button" onClick={pasteCustomAnimation} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                            <ClipboardPaste size={12} /> Incolla
+                          </button>
+                        )}
+                        <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                          <Plus size={12} /> Nuova Animazione
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs text-[#949ba4] mb-4">Crea qui l'animazione, poi assegnala a un Elemento Fluttuante per vederla in azione!</p>
 
@@ -1017,11 +1117,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       <div className="space-y-4">
                         {customAnimations.map((anim) => (
                           <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                            <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                              <X size={16} />
-                            </button>
+                            <div className="absolute top-2 right-2 flex gap-1">
+                              <button type="button" onClick={() => copyCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
+                                <Copy size={16} />
+                              </button>
+                              <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                <X size={16} />
+                              </button>
+                            </div>
                             
-                            <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
+                            <div className="grid grid-cols-3 gap-3 mb-4 pr-12">
                               <div>
                                 <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
                                 <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
@@ -1043,19 +1148,31 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             <div className="border-t border-[#3f4147] pt-3">
                               <div className="flex justify-between items-center mb-2">
                                 <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
-                                <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
-                                  + Keyframe
-                                </button>
+                                <div className="flex gap-2">
+                                  {clipboard.keyframe && (
+                                    <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
+                                      <ClipboardPaste size={10} /> Incolla
+                                    </button>
+                                  )}
+                                  <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                    + Keyframe
+                                  </button>
+                                </div>
                               </div>
                               
                               <div className="space-y-2">
                                 {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
                                   <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
-                                    <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
-                                      <X size={12} />
-                                    </button>
+                                    <div className="absolute top-1 right-1 flex gap-1">
+                                      <button type="button" onClick={() => copyKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
+                                        <Copy size={12} />
+                                      </button>
+                                      <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                        <X size={12} />
+                                      </button>
+                                    </div>
                                     
-                                    <div className="w-full flex items-center gap-2 mb-1 pr-4">
+                                    <div className="w-full flex items-center gap-2 mb-1 pr-10">
                                       <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
                                       <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
                                     </div>
@@ -1168,7 +1285,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   {elements.map(el => {
                     if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
                       const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
+                      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
                       return (
                         <div
                           key={el.id}
