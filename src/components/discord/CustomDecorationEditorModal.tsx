@@ -82,7 +82,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         type: 'emoji',
         content: '✨',
         animation: 'float',
-        x: 50, y: 50, size: 15, delay: 0, parentId: undefined
+        x: 50, y: 50, rotation: 0, size: 15, delay: 0, parentId: undefined
       }]
     });
   };
@@ -124,8 +124,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         duration: 3,
         timingFunction: 'linear',
         keyframes: [
-          { id: `kf-${Date.now()}-1`, percent: 0, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20 },
-          { id: `kf-${Date.now()}-2`, percent: 100, x: 50, y: 50, scale: 1, rotation: 360, opacity: 1, zIndex: 20 }
+          { id: `kf-${Date.now()}-1`, percent: 0, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20, positionMode: 'relative' },
+          { id: `kf-${Date.now()}-2`, percent: 100, x: 50, y: 50, scale: 1, rotation: 360, opacity: 1, zIndex: 20, positionMode: 'relative' }
         ]
       }]
     });
@@ -167,7 +167,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         if (a.id === animId) {
           return {
             ...a,
-            keyframes: [...a.keyframes, { id: `kf-${Date.now()}`, percent: 50, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20 }]
+            keyframes: [...a.keyframes, { id: `kf-${Date.now()}`, percent: 50, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20, positionMode: 'relative' }]
           };
         }
         return a;
@@ -462,11 +462,29 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     });
   };
 
-  const renderCustomAnimationsCSS = (animations?: CustomAnimationDef[]) => {
+  const renderCustomAnimationsCSS = (animations?: CustomAnimationDef[], elements?: CustomElement[]) => {
     if (!animations || animations.length === 0) return null;
     const css = animations.map(anim => {
       const keyframes = anim.keyframes.sort((a, b) => a.percent - b.percent).map(kf => {
-        return `${kf.percent}% { transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%)) rotate(${kf.rotation}deg) scale(${kf.scale}); opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
+        let leftTop = '';
+        let transform = '';
+        const mode = kf.positionMode || 'relative';
+
+        if (mode === 'absolute') {
+          leftTop = `left: ${kf.x}%; top: ${kf.y}%;`;
+          transform = `transform: translate(-50%, -50%);`;
+        } else if (mode === 'target' && kf.targetId && elements) {
+          const targetEl = elements.find(e => e.id === kf.targetId);
+          const tx = targetEl ? targetEl.x : 50;
+          const ty = targetEl ? targetEl.y : 50;
+          leftTop = `left: ${tx}%; top: ${ty}%;`;
+          transform = `transform: translate(-50%, -50%);`;
+        } else {
+          // relative
+          transform = `transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%));`;
+        }
+
+        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
@@ -512,6 +530,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
           left: `${el.x}%`,
           top: `${el.y}%`,
           transform: 'translate(-50%, -50%)',
+          rotate: `${el.rotation || 0}deg`,
           animation: getAnimation(el.animation, el.delay, customAnimations),
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
@@ -854,7 +873,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
                             <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -878,6 +897,10 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
                             <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione</label>
+                            <input type="number" value={el.rotation || 0} onChange={e => updateElement(el.id, 'rotation', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
@@ -981,26 +1004,60 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                                   </button>
                                 </div>
                                 
-                                <div className="w-full flex items-center gap-2 mb-1 pr-10">
+                                <div className="w-full flex items-center gap-2 mb-2 pr-10">
                                   <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
                                   <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
                                 </div>
+
+                                <div className="col-span-full flex gap-3 mb-3 p-2 bg-[#111214] rounded border border-[#3f4147] w-full">
+                                  <div className="flex-1">
+                                    <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Modalità Posizione</label>
+                                    <select 
+                                      value={kf.positionMode || 'relative'} 
+                                      onChange={e => updateKeyframe(anim.id, kf.id, 'positionMode', e.target.value)}
+                                      className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
+                                    >
+                                      <option value="relative">Relativa (Offset)</option>
+                                      <option value="absolute">Assoluta (Globale)</option>
+                                      <option value="target">Segui Elemento</option>
+                                    </select>
+                                  </div>
+                                  {kf.positionMode === 'target' && (
+                                    <div className="flex-1">
+                                      <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Elemento Bersaglio</label>
+                                      <select 
+                                        value={kf.targetId || ''} 
+                                        onChange={e => updateKeyframe(anim.id, kf.id, 'targetId', e.target.value)}
+                                        className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
+                                      >
+                                        <option value="">Seleziona...</option>
+                                        {draftDecoration.elements.map(e => (
+                                          <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
                                 
                                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">X (%)</label>
-                                      <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="-300" max="300" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Y (%)</label>
-                                      <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="-300" max="300" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
+                                  {kf.positionMode !== 'target' && (
+                                    <>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">X {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
+                                          <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Y {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
+                                          <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                    </>
+                                  )}
                                   <div>
                                     <div className="flex justify-between items-center mb-0.5">
                                       <label className="text-[9px] text-[#949ba4]">Scala</label>
@@ -1056,7 +1113,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
             <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
             
             <div className="dec-wrapper relative w-32 h-32 mb-8">
-              {renderCustomAnimationsCSS(draftDecoration.customAnimations)}
+              {renderCustomAnimationsCSS(draftDecoration.customAnimations, draftDecoration.elements)}
               
               {/* Inner Effects */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
