@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Upload, Plus, Copy } from "lucide-react";
+import { X, Wand2, Upload, Plus, Copy, ClipboardPaste } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -16,7 +16,7 @@ interface CustomDecorationEditorModalProps {
 }
 
 export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: CustomDecorationEditorModalProps) => {
-  const { refreshCustomDecorations, draftDecoration, setDraftDecoration } = useShop();
+  const { refreshCustomDecorations, draftDecoration, setDraftDecoration, clipboard, setClipboard } = useShop();
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,10 +60,18 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     });
   };
 
-  const duplicateBaseEffect = (id: string) => {
-    const effectToCopy = draftDecoration.baseEffects.find(e => e.id === id);
-    if (effectToCopy) {
-      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...effectToCopy, id: `be-${Date.now()}` }] });
+  const copyBaseEffect = (id: string) => {
+    const effect = draftDecoration.baseEffects.find(e => e.id === id);
+    if (effect) {
+      setClipboard(prev => ({ ...prev, baseEffect: effect }));
+      showSuccess("Effetto copiato!");
+    }
+  };
+
+  const pasteBaseEffect = () => {
+    if (clipboard.baseEffect) {
+      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random()}` }] });
+      showSuccess("Effetto incollato!");
     }
   };
 
@@ -74,7 +82,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         type: 'emoji',
         content: '✨',
         animation: 'float',
-        x: 50, y: 50, size: 15, delay: 0
+        x: 50, y: 50, size: 15, delay: 0, parentId: undefined
       }]
     });
   };
@@ -87,14 +95,24 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const removeElement = (id: string) => {
     updateDraft({
-      elements: draftDecoration.elements.filter(el => el.id !== id)
+      elements: draftDecoration.elements
+        .filter(el => el.id !== id)
+        .map(el => el.parentId === id ? { ...el, parentId: undefined } : el)
     });
   };
 
-  const duplicateElement = (id: string) => {
-    const elToCopy = draftDecoration.elements.find(e => e.id === id);
-    if (elToCopy) {
-      updateDraft({ elements: [...draftDecoration.elements, { ...elToCopy, id: `el-${Date.now()}` }] });
+  const copyElement = (id: string) => {
+    const el = draftDecoration.elements.find(e => e.id === id);
+    if (el) {
+      setClipboard(prev => ({ ...prev, element: el }));
+      showSuccess("Elemento copiato!");
+    }
+  };
+
+  const pasteElement = () => {
+    if (clipboard.element) {
+      updateDraft({ elements: [...draftDecoration.elements, { ...clipboard.element, id: `el-${Date.now()}-${Math.random()}` }] });
+      showSuccess("Elemento incollato!");
     }
   };
 
@@ -126,12 +144,20 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     });
   };
 
-  const duplicateCustomAnimation = (id: string) => {
-    const animToCopy = draftDecoration.customAnimations.find(a => a.id === id);
-    if (animToCopy) {
-      const newAnimId = `anim-${Date.now()}`;
-      const newKeyframes = animToCopy.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
-      updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...animToCopy, id: newAnimId, name: `${animToCopy.name} (Copia)`, keyframes: newKeyframes }] });
+  const copyCustomAnimation = (id: string) => {
+    const anim = draftDecoration.customAnimations.find(a => a.id === id);
+    if (anim) {
+      setClipboard(prev => ({ ...prev, animation: anim }));
+      showSuccess("Animazione copiata!");
+    }
+  };
+
+  const pasteCustomAnimation = () => {
+    if (clipboard.animation) {
+      const newAnimId = `anim-${Date.now()}-${Math.random()}`;
+      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
+      updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...clipboard.animation, id: newAnimId, name: `${clipboard.animation.name} (Copia)`, keyframes: newKeyframes }] });
+      showSuccess("Animazione incollata!");
     }
   };
 
@@ -174,18 +200,38 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     });
   };
 
-  const duplicateKeyframe = (animId: string, kfId: string) => {
-    updateDraft({
-      customAnimations: draftDecoration.customAnimations.map(a => {
-        if (a.id === animId) {
-          const kfToCopy = a.keyframes.find(kf => kf.id === kfId);
-          if (kfToCopy) {
-            return { ...a, keyframes: [...a.keyframes, { ...kfToCopy, id: `kf-${Date.now()}` }] };
+  const copyKeyframe = (animId: string, kfId: string) => {
+    const anim = draftDecoration.customAnimations.find(a => a.id === animId);
+    if (anim) {
+      const kf = anim.keyframes.find(k => k.id === kfId);
+      if (kf) {
+        setClipboard(prev => ({ ...prev, keyframe: kf }));
+        showSuccess("Keyframe copiato!");
+      }
+    }
+  };
+
+  const pasteKeyframe = (animId: string) => {
+    if (clipboard.keyframe) {
+      updateDraft({
+        customAnimations: draftDecoration.customAnimations.map(a => {
+          if (a.id === animId) {
+            return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random()}` }] };
           }
-        }
-        return a;
-      })
-    });
+          return a;
+        })
+      });
+      showSuccess("Keyframe incollato!");
+    }
+  };
+
+  const isDescendant = (potentialDescendantId: string, ancestorId: string, allElements: CustomElement[]) => {
+    let current = allElements.find(e => e.id === potentialDescendantId);
+    while (current && current.parentId) {
+      if (current.parentId === ancestorId) return true;
+      current = allElements.find(e => e.id === current!.parentId);
+    }
+    return false;
   };
 
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
@@ -427,6 +473,58 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     return <style>{css}</style>;
   };
 
+  const renderElementNode = (el: CustomElement, allElements: CustomElement[], customAnimations?: CustomAnimationDef[]) => {
+    const children = allElements.filter(child => child.parentId === el.id);
+    const childrenNodes = children.map(child => renderElementNode(child, allElements, customAnimations));
+
+    const contentNode = el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />;
+
+    if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+      const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
+      return (
+        <div
+          key={el.id}
+          className="absolute pointer-events-none"
+          style={{
+            left: `${el.x}%`,
+            top: `${el.y}%`,
+            transform: `translate(-50%, -50%)`,
+            width: '100%',
+            height: '100%'
+          }}
+        >
+          <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+            <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
+              {contentNode}
+              {childrenNodes}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        key={el.id} 
+        className={`absolute flex items-center justify-center`}
+        style={{ 
+          left: `${el.x}%`,
+          top: `${el.y}%`,
+          transform: 'translate(-50%, -50%)',
+          animation: getAnimation(el.animation, el.delay, customAnimations),
+          width: `${el.size}cqw`,
+          height: `${el.size}cqw`,
+          fontSize: `${el.size}cqw`,
+          zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
+        }}
+      >
+        {contentNode}
+        {childrenNodes}
+      </div>
+    );
+  };
+
   const avatarUrl = currentUser.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
 
   return createPortal(
@@ -567,9 +665,16 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                 <div className="flex justify-between items-center mb-3">
                   <h4 className="text-white font-bold text-sm uppercase">Effetti Base</h4>
-                  <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                    <Plus size={12} /> Aggiungi Effetto
-                  </button>
+                  <div className="flex gap-2">
+                    {clipboard.baseEffect && (
+                      <button type="button" onClick={pasteBaseEffect} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                        <ClipboardPaste size={12} /> Incolla
+                      </button>
+                    )}
+                    <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                      <Plus size={12} /> Aggiungi Effetto
+                    </button>
+                  </div>
                 </div>
 
                 {draftDecoration.baseEffects.length === 0 ? (
@@ -579,7 +684,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                     {draftDecoration.baseEffects.map((effect) => (
                       <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
                         <div className="absolute top-2 right-2 flex gap-1">
-                          <button type="button" onClick={() => duplicateBaseEffect(effect.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                          <button type="button" onClick={() => copyBaseEffect(effect.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
                             <Copy size={16} />
                           </button>
                           <button type="button" onClick={() => removeBaseEffect(effect.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
@@ -682,9 +787,16 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                 <div className="flex justify-between items-center mb-3">
                   <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
-                  <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                    <Plus size={12} /> Aggiungi Elemento
-                  </button>
+                  <div className="flex gap-2">
+                    {clipboard.element && (
+                      <button type="button" onClick={pasteElement} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                        <ClipboardPaste size={12} /> Incolla
+                      </button>
+                    )}
+                    <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                      <Plus size={12} /> Aggiungi Elemento
+                    </button>
+                  </div>
                 </div>
 
                 {draftDecoration.elements.length === 0 ? (
@@ -694,7 +806,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                     {draftDecoration.elements.map((el, idx) => (
                       <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
                         <div className="absolute top-2 right-2 flex gap-1">
-                          <button type="button" onClick={() => duplicateElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                          <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
                             <Copy size={16} />
                           </button>
                           <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
@@ -742,7 +854,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
                             <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -767,6 +879,23 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
                             <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                           </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
+                            <select 
+                              value={el.parentId || ''} 
+                              onChange={e => updateElement(el.id, 'parentId', e.target.value || undefined)} 
+                              className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]"
+                            >
+                              <option value="">Nessuno (Base)</option>
+                              {draftDecoration.elements
+                                .filter(other => other.id !== el.id && !isDescendant(other.id, el.id, draftDecoration.elements))
+                                .map(other => (
+                                  <option key={other.id} value={other.id}>
+                                    {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
+                                  </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -778,9 +907,16 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                 <div className="flex justify-between items-center mb-3">
                   <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
-                  <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
-                    <Plus size={12} /> Nuova Animazione
-                  </button>
+                  <div className="flex gap-2">
+                    {clipboard.animation && (
+                      <button type="button" onClick={pasteCustomAnimation} className="text-xs bg-[#2b2d31] hover:bg-[#35373c] text-white px-2 py-1 rounded flex items-center gap-1 transition-colors border border-[#3f4147]">
+                        <ClipboardPaste size={12} /> Incolla
+                      </button>
+                    )}
+                    <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                      <Plus size={12} /> Nuova Animazione
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-[#949ba4] mb-4">Crea qui l'animazione, poi assegnala a un Elemento Fluttuante per vederla in azione!</p>
 
@@ -791,7 +927,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                     {draftDecoration.customAnimations.map((anim) => (
                       <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
                         <div className="absolute top-2 right-2 flex gap-1">
-                          <button type="button" onClick={() => duplicateCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                          <button type="button" onClick={() => copyCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
                             <Copy size={16} />
                           </button>
                           <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
@@ -821,16 +957,23 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                         <div className="border-t border-[#3f4147] pt-3">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
-                            <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
-                              + Keyframe
-                            </button>
+                            <div className="flex gap-2">
+                              {clipboard.keyframe && (
+                                <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
+                                  <ClipboardPaste size={10} /> Incolla
+                                </button>
+                              )}
+                              <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                + Keyframe
+                              </button>
+                            </div>
                           </div>
                           
                           <div className="space-y-2">
                             {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
                               <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
                                 <div className="absolute top-1 right-1 flex gap-1">
-                                  <button type="button" onClick={() => duplicateKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                                  <button type="button" onClick={() => copyKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
                                     <Copy size={12} />
                                   </button>
                                   <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
@@ -948,49 +1091,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               </div>
 
               {/* Elements */}
-              {draftDecoration.elements.map(el => {
-                if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-                  const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                  const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
-                  return (
-                    <div
-                      key={el.id}
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${el.x}%`,
-                        top: `${el.y}%`,
-                        transform: `translate(-50%, -50%)`,
-                        width: '100%',
-                        height: '100%'
-                      }}
-                    >
-                      <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                        <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-                          {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div 
-                    key={el.id} 
-                    className={`absolute flex items-center justify-center`}
-                    style={{ 
-                      left: `${el.x}%`,
-                      top: `${el.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                      animation: getAnimation(el.animation, el.delay, draftDecoration.customAnimations),
-                      width: `${el.size}cqw`,
-                      height: `${el.size}cqw`,
-                      fontSize: `${el.size}cqw`,
-                      zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
-                    }}
-                  >
-                    {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
-                  </div>
-                );
-              })}
+              {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
             </div>
 
             <div 

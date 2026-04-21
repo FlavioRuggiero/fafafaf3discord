@@ -30,6 +30,7 @@ export type CustomElement = {
   y: number;
   size: number;
   delay: number;
+  parentId?: string;
 };
 
 export type BaseEffectConfig = {
