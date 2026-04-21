@@ -10,7 +10,6 @@ export type CustomKeyframe = {
   scale: number;
   rotation: number;
   opacity: number;
-  zIndex: number;
 };
 
 export type CustomAnimationDef = {
