@@ -16,7 +16,7 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
-  const { adminId } = useAuth();
+  const { user: currentUser, adminId } = useAuth();
   const { allItems, customDecorations, refreshCustomDecorations } = useShop();
   
   const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests' | 'jumpscare' | 'custom-editor'>('dc');
@@ -46,6 +46,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   
   const [newDecAnim, setNewDecAnim] = useState('none');
   const [baseEffect, setBaseEffect] = useState('none');
+  const [effectColor1, setEffectColor1] = useState('#5865F2');
+  const [effectColor2, setEffectColor2] = useState('#f23f43');
   
   const [newDecImage, setNewDecImage] = useState<File | null>(null);
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
@@ -207,7 +209,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       type: 'emoji',
       content: '✨',
       animation: 'float',
-      position: 'top-left',
+      x: 50,
+      y: 50,
       size: 15,
       delay: 0
     }]);
@@ -223,7 +226,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDecName.trim()) return;
+    if (!newDecName.trim() || !currentUser) return;
     
     setIsCreatingDec(true);
     const customId = `custom-${Date.now()}`;
@@ -241,6 +244,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
     const config = {
       baseEffect,
+      effectColor1,
+      effectColor2,
       elements
     };
 
@@ -263,7 +268,12 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     if (error) {
       showError("Errore durante la creazione. Hai eseguito lo script SQL?");
     } else {
-      showSuccess("Contorno creato con successo!");
+      // Aggiungi automaticamente all'inventario del creatore
+      const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
+      const currentPurchased = profile?.purchased_decorations || [];
+      await supabase.from('profiles').update({ purchased_decorations: [...currentPurchased, customId] }).eq('id', currentUser.id);
+
+      showSuccess("Contorno creato e aggiunto al tuo inventario!");
       setNewDecName('');
       setNewDecImage(null);
       setNewDecImagePreview(null);
@@ -301,17 +311,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const premiumChances = calculateChances(true);
 
   // Helper per l'anteprima
-  const getPositionClass = (pos: string) => {
-    switch(pos) {
-      case 'top-left': return 'top-0 left-0 -translate-x-1/4 -translate-y-1/4';
-      case 'top-right': return 'top-0 right-0 translate-x-1/4 -translate-y-1/4';
-      case 'bottom-left': return 'bottom-0 left-0 -translate-x-1/4 translate-y-1/4';
-      case 'bottom-right': return 'bottom-0 right-0 translate-x-1/4 translate-y-1/4';
-      case 'center': return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
-      default: return '';
-    }
-  };
-
   const getAnimation = (anim: string, delay: number) => {
     const delayStr = delay > 0 ? `${delay}s` : '0s';
     switch(anim) {
@@ -540,11 +539,34 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         <select 
                           value={baseEffect}
                           onChange={e => setBaseEffect(e.target.value)}
-                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer mb-3"
                         >
                           <option value="none">Nessuno</option>
                           <option value="scanline">Scanline (Stile Serpixel)</option>
+                          <option value="radar">Radar</option>
+                          <option value="twin-rings">Anelli Gemelli</option>
+                          <option value="circo">Circo</option>
+                          <option value="pulse-ring">Anello Pulsante</option>
                         </select>
+
+                        {baseEffect !== 'none' && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore Effetto 1</label>
+                              <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                                <input type="color" value={effectColor1} onChange={e => setEffectColor1(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                <span className="text-white text-xs uppercase">{effectColor1}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore Effetto 2</label>
+                              <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                                <input type="color" value={effectColor2} onChange={e => setEffectColor2(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                <span className="text-white text-xs uppercase">{effectColor2}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {elements.length > 0 && (
@@ -567,17 +589,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder={el.type === 'emoji' ? '✨' : 'https://...'} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                 <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Posizione</label>
-                                  <select value={el.position} onChange={e => updateElement(el.id, 'position', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                                    <option value="top-left">Alto Sinistra</option>
-                                    <option value="top-right">Alto Destra</option>
-                                    <option value="bottom-left">Basso Sinistra</option>
-                                    <option value="bottom-right">Basso Destra</option>
-                                    <option value="center">Centro</option>
-                                    <option value="orbit">Orbita</option>
-                                  </select>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X (%)</label>
+                                  <input type="number" min="-50" max="150" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y (%)</label>
+                                  <input type="number" min="-50" max="150" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
@@ -638,30 +657,33 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           />
                         )}
                         
-                        {/* Effetto Base */}
-                        {baseEffect === 'scanline' && <div className="custom-scanline"></div>}
+                        {/* Effetti Base */}
+                        {baseEffect === 'scanline' && <div className="custom-scanline" style={{ color: effectColor1 }}></div>}
+                        {baseEffect === 'radar' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effectColor1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>}
+                        {baseEffect === 'twin-rings' && (
+                          <>
+                            <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${effectColor1}`, animation: 'spin-slow 4s linear infinite' }}></div>
+                            <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${effectColor2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
+                          </>
+                        )}
+                        {baseEffect === 'circo' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effectColor1} 0deg 20deg, ${effectColor2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>}
+                        {baseEffect === 'pulse-ring' && <div className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effectColor1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effectColor1 } as any}></div>}
 
-                        {/* Avatar Base */}
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=preview" className="w-full h-full rounded-full object-cover relative z-10" />
+                        {/* Avatar Base (Usa l'avatar dell'utente corrente) */}
+                        <img src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} className="w-full h-full rounded-full object-cover relative z-10" />
                       </div>
 
                       {/* Elementi Fluttuanti */}
                       <div className="absolute inset-0 pointer-events-none z-20">
                         {elements.map(el => {
-                          if (el.position === 'orbit') {
-                            return (
-                              <div key={el.id} className="custom-orbit-container" style={{ animation: `custom-orbit-wrapper 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                                <div className="custom-orbit-element" style={{ animation: `custom-orbit-inner 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
-                                  {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
-                                </div>
-                              </div>
-                            );
-                          }
                           return (
                             <div 
                               key={el.id} 
-                              className={`absolute ${getPositionClass(el.position)} flex items-center justify-center`}
+                              className={`absolute flex items-center justify-center`}
                               style={{ 
+                                left: `${el.x}%`,
+                                top: `${el.y}%`,
+                                transform: 'translate(-50%, -50%)',
                                 animation: getAnimation(el.animation, el.delay),
                                 width: `${el.size}cqw`,
                                 height: `${el.size}cqw`,

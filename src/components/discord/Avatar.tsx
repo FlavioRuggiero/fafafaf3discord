@@ -31,18 +31,6 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
     return <img src={src} alt={alt} className={`rounded-full object-cover ${speakingClass} ${className}`} />;
   }
 
-  // Helper per l'anteprima
-  const getPositionClass = (pos: string) => {
-    switch(pos) {
-      case 'top-left': return 'top-0 left-0 -translate-x-1/4 -translate-y-1/4';
-      case 'top-right': return 'top-0 right-0 translate-x-1/4 -translate-y-1/4';
-      case 'bottom-left': return 'bottom-0 left-0 -translate-x-1/4 translate-y-1/4';
-      case 'bottom-right': return 'bottom-0 right-0 translate-x-1/4 translate-y-1/4';
-      case 'center': return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
-      default: return '';
-    }
-  };
-
   const getAnimation = (anim: string, delay: number) => {
     const delayStr = delay > 0 ? `${delay}s` : '0s';
     switch(anim) {
@@ -78,7 +66,17 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             />
           )}
           
-          {customDec.config?.baseEffect === 'scanline' && <div className="custom-scanline"></div>}
+          {/* Effetti Base */}
+          {customDec.config?.baseEffect === 'scanline' && <div className="custom-scanline" style={{ color: customDec.config.effectColor1 }}></div>}
+          {customDec.config?.baseEffect === 'radar' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${customDec.config.effectColor1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>}
+          {customDec.config?.baseEffect === 'twin-rings' && (
+            <>
+              <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${customDec.config.effectColor1}`, animation: 'spin-slow 4s linear infinite' }}></div>
+              <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${customDec.config.effectColor2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
+            </>
+          )}
+          {customDec.config?.baseEffect === 'circo' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${customDec.config.effectColor1} 0deg 20deg, ${customDec.config.effectColor2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>}
+          {customDec.config?.baseEffect === 'pulse-ring' && <div className="absolute inset-0 rounded-full" style={{ border: `2px solid ${customDec.config.effectColor1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': customDec.config.effectColor1 } as any}></div>}
           
           <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
         </div>
@@ -86,22 +84,14 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         {/* Elementi Fluttuanti */}
         <div className={`absolute inset-0 pointer-events-none z-20 ${clipEffects ? 'overflow-hidden rounded-full' : ''}`}>
           {customDec.config?.elements?.map(el => {
-            if (el.position === 'orbit' && !clipEffects) {
-              return (
-                <div key={el.id} className="custom-orbit-container" style={{ animation: `custom-orbit-wrapper 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                  <div className="custom-orbit-element" style={{ animation: `custom-orbit-inner 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
-                    {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
-                  </div>
-                </div>
-              );
-            }
-            if (el.position === 'orbit' && clipEffects) return null; // Nascondi orbita se clipEffects è attivo
-            
             return (
               <div 
                 key={el.id} 
-                className={`absolute ${getPositionClass(el.position)} flex items-center justify-center`}
+                className={`absolute flex items-center justify-center`}
                 style={{ 
+                  left: `${el.x}%`,
+                  top: `${el.y}%`,
+                  transform: 'translate(-50%, -50%)',
                   animation: getAnimation(el.animation, el.delay),
                   width: `${el.size}cqw`,
                   height: `${el.size}cqw`,

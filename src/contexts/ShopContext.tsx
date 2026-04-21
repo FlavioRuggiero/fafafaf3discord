@@ -7,7 +7,8 @@ export type CustomElement = {
   type: 'emoji' | 'image';
   content: string;
   animation: string;
-  position: string;
+  x: number;
+  y: number;
   size: number;
   delay: number;
 };
@@ -27,6 +28,8 @@ export type CustomDecoration = {
   animation_type: string;
   config: {
     baseEffect?: string;
+    effectColor1?: string;
+    effectColor2?: string;
     elements?: CustomElement[];
   };
 };
