@@ -245,61 +245,87 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
     return <style>{css}</style>;
   };
 
-  const renderElementNode = (el: CustomElement, allElements: CustomElement[], customAnimations?: CustomAnimationDef[]) => {
-    const children = allElements.filter(child => child.parentId === el.id);
-    const childrenNodes = children.map(child => renderElementNode(child, allElements, customAnimations));
-
-    const contentNode = el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />;
-
-    const innerContent = (
-      <div style={{ rotate: `${el.rotation || 0}deg`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {contentNode}
-        {childrenNodes}
-      </div>
-    );
-
-    if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-      const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
-      return (
-        <div
-          key={el.id}
-          className="absolute pointer-events-none"
-          style={{
-            left: `${el.x}%`,
-            top: `${el.y}%`,
-            transform: `translate(-50%, -50%)`,
-            width: '100%',
-            height: '100%'
-          }}
-        >
-          <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-            <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-              {innerContent}
-            </div>
-          </div>
-        </div>
-      );
+  const renderStandaloneElement = (el: CustomElement, allElements: CustomElement[], customAnimations?: CustomAnimationDef[]) => {
+    const chain: CustomElement[] = [el];
+    let curr = el;
+    const visited = new Set<string>([el.id]);
+    while (curr.parentId) {
+      const parent = allElements.find(e => e.id === curr.parentId);
+      if (parent && !visited.has(parent.id)) {
+        chain.unshift(parent);
+        visited.add(parent.id);
+        curr = parent;
+      } else {
+        break;
+      }
     }
 
-    return (
-      <div 
-        key={el.id} 
-        className={`absolute flex items-center justify-center`}
-        style={{ 
-          left: `${el.x}%`,
-          top: `${el.y}%`,
-          transform: 'translate(-50%, -50%)',
-          animation: getAnimation(el.animation, el.delay, customAnimations),
-          width: `${el.size}cqw`,
-          height: `${el.size}cqw`,
-          fontSize: `${el.size}cqw`,
-          zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
-        }}
-      >
-        {innerContent}
-      </div>
-    );
+    let resultNode: React.ReactNode = null;
+
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const nodeEl = chain[i];
+      const isOutermost = i === 0;
+      const isTarget = i === chain.length - 1;
+
+      const contentNode = isTarget ? (
+        nodeEl.type === 'emoji' ? nodeEl.content : <img src={nodeEl.content} className="w-full h-full object-contain" />
+      ) : null;
+
+      const innerContent = (
+        <div style={{ rotate: `${nodeEl.rotation || 0}deg`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {contentNode}
+          {resultNode}
+        </div>
+      );
+
+      const zIndex = isOutermost ? (el.zIndex ?? 20) : undefined;
+
+      if (nodeEl.animation === 'orbit-3d' || nodeEl.animation === 'orbit-3d-reverse') {
+        const wrapperAnim = nodeEl.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+        const innerAnim = nodeEl.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
+        resultNode = (
+          <div
+            key={isTarget ? nodeEl.id : `ghost-${nodeEl.id}-${el.id}`}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${nodeEl.x}%`,
+              top: `${nodeEl.y}%`,
+              transform: `translate(-50%, -50%)`,
+              width: '100%',
+              height: '100%',
+              zIndex: zIndex
+            }}
+          >
+            <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}` }}>
+              <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}`, width: `${nodeEl.size}cqw`, height: `${nodeEl.size}cqw`, fontSize: `${nodeEl.size}cqw` }}>
+                {innerContent}
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        resultNode = (
+          <div 
+            key={isTarget ? nodeEl.id : `ghost-${nodeEl.id}-${el.id}`}
+            className={`absolute flex items-center justify-center pointer-events-none`}
+            style={{ 
+              left: `${nodeEl.x}%`,
+              top: `${nodeEl.y}%`,
+              transform: 'translate(-50%, -50%)',
+              animation: getAnimation(nodeEl.animation, nodeEl.delay, customAnimations),
+              width: `${nodeEl.size}cqw`,
+              height: `${nodeEl.size}cqw`,
+              fontSize: `${nodeEl.size}cqw`,
+              zIndex: zIndex
+            }}
+          >
+            {innerContent}
+          </div>
+        );
+      }
+    }
+
+    return resultNode;
   };
 
   const customDec = customDecorations.find(d => d.id === activeDecoration);
@@ -353,7 +379,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         </div>
 
         {/* Elements */}
-        {customDec.config?.elements?.filter(el => !el.parentId).map(el => renderElementNode(el, customDec.config!.elements!, customDec.config?.customAnimations))}
+        {customDec.config?.elements?.map(el => renderStandaloneElement(el, customDec.config!.elements!, customDec.config?.customAnimations))}
       </div>
     );
   }
