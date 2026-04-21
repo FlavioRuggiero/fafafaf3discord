@@ -508,9 +508,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         case 'oceanic':
           return (
             <React.Fragment key={effect.id}>
-              <div className="water-drop-wrapper w1" style={getEffectStyle(effect, {}, 20)}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
-              <div className="water-drop-wrapper w2" style={getEffectStyle(effect, {}, 20)}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
-              <div className="water-drop-wrapper w3" style={getEffectStyle(effect, {}, 20)}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w1" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w2" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w3" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
               <div className="oceanic-bubble b1" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }, 20)}>{getIconContent(effect, null, 12)}</div>
               <div className="oceanic-bubble b2" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }, 20)}>{getIconContent(effect, null, 12)}</div>
               <div className="oceanic-bubble b3" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }, 20)}>{getIconContent(effect, null, 12)}</div>
@@ -519,8 +519,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         case 'saturn-fire':
           return (
             <React.Fragment key={effect.id}>
-              <div className="saturn-wrapper back" style={getEffectStyle(effect, {}, 5)}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
-              <div className="saturn-wrapper front" style={getEffectStyle(effect, {}, 25)}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="saturn-wrapper back" style={{ ...getEffectStyle(effect), zIndex: (effect.zIndex ?? 20) - 15 }}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="saturn-wrapper front" style={{ ...getEffectStyle(effect), zIndex: (effect.zIndex ?? 20) + 5 }}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
               <div className="fire-particle f1" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }, 20)}>{getIconContent(effect, null, 15)}</div>
               <div className="fire-particle f2" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }, 20)}>{getIconContent(effect, null, 15)}</div>
               <div className="fire-particle f3" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }, 20)}>{getIconContent(effect, null, 15)}</div>
@@ -532,14 +532,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
               <div className="gustavo-sprite gustavo-trail t2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') }, 20)}>{getIconContent(effect, null, 60)}</div>
               <div className="gustavo-sprite gustavo-trail t1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') }, 20)}>{getIconContent(effect, null, 60)}</div>
               <div className="gustavo-sprite gustavo-main" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') }, 20)}>{getIconContent(effect, null, 60)}</div>
-              <div className="gustavo-orbit-wrapper o1" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o2" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o3" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o4" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o5" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o6" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o7" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
-              <div className="gustavo-orbit-wrapper o8" style={getEffectStyle(effect, {}, 20)}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o1" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o2" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o3" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o4" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o5" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o6" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o7" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o8" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
             </React.Fragment>
           );
         case 'serpixel-agitato':
@@ -554,14 +554,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
               <div className="serpixel-venom v3" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
               <div className="serpixel-venom v4" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
               <div className="serpixel-venom v5" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
-              <div className="serpixel-snake s1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s3" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s4" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s5" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s6" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s7" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
-              <div className="serpixel-snake s8" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }, 20)}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s1" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s2" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s3" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s4" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s5" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s6" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s7" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s8" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
             </React.Fragment>
           );
         case 'tempesta':
@@ -869,24 +869,39 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({effect.x ?? 50}%)</label>
-                                <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', parseInt(e.target.value))} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
+                                  <input type="number" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="-300" max="300" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({effect.y ?? 50}%)</label>
-                                <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', parseInt(e.target.value))} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
+                                  <input type="number" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="-300" max="300" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione ({effect.rotation ?? 0}°)</label>
-                                <input type="range" min="0" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', parseInt(e.target.value))} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Rotazione</label>
+                                  <input type="number" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="-360" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione ({effect.size ?? 100}%)</label>
-                                <input type="range" min="10" max="150" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', parseInt(e.target.value))} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Dimensione</label>
+                                  <input type="number" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="10" max="300" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Z-Index ({effect.zIndex ?? 20})</label>
-                                <input type="range" min="0" max="50" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', parseInt(e.target.value))} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Z-Index</label>
+                                  <input type="number" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="50" value={effect.zIndex ?? 20} onChange={e => updateBaseEffect(effect.id, 'zIndex', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                             </div>
                           </div>
@@ -939,12 +954,18 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             
                             <div className="grid grid-cols-2 gap-3 mb-3">
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({el.x}%)</label>
-                                <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
+                                  <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="-300" max="300" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({el.y}%)</label>
-                                <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full accent-brand" />
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
+                                  <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="-300" max="300" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                             </div>
 
@@ -1041,28 +1062,46 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     
                                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
                                       <div>
-                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">X ({kf.x}%)</label>
-                                        <input type="range" min="-200" max="200" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">X (%)</label>
+                                          <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-300" max="300" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                       <div>
-                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Y ({kf.y}%)</label>
-                                        <input type="range" min="-200" max="200" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Y (%)</label>
+                                          <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-300" max="300" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                       <div>
-                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Scala ({kf.scale}x)</label>
-                                        <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Scala</label>
+                                          <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                       <div>
-                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Rot. ({kf.rotation}°)</label>
-                                        <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
+                                          <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                       <div>
-                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Opacità ({kf.opacity})</label>
-                                        <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Opacità</label>
+                                          <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                       <div>
-                                        <label className="block text-[9px] text-[#949ba4] mb-0.5">Z-Index ({kf.zIndex ?? 20})</label>
-                                        <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Z-Index</label>
+                                          <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                       </div>
                                     </div>
                                   </div>
