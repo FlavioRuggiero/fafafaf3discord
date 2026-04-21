@@ -51,7 +51,7 @@ export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, 
   const offlineUsers = otherUsers.filter(u => u.status === 'offline');
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
-    const isAdmin<think>Continuing the `src/components/discord/MemberList.tsx` file exactly where it left off.</think>=== adminId;
+    const isAdmin = user.id === adminId;
     const isModerator = moderatorIds.includes(user.id);
 
     const canInteract = !isCreator && user.id !== authUser?.id && (serverPermissions?.can_kick_members || serverPermissions?.can_ban_members || serverPermissions?.can_assign_roles);
