@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Upload, Plus } from "lucide-react";
+import { X, Wand2, Upload, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -37,9 +37,67 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
+
+  // Carica la bozza all'apertura
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      const draft = localStorage.getItem(`custom_dec_draft_${currentUser.id}`);
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.newDecName !== undefined) setNewDecName(parsed.newDecName);
+          if (parsed.newDecBorder !== undefined) setNewDecBorder(parsed.newDecBorder);
+          if (parsed.newDecShadow !== undefined) setNewDecShadow(parsed.newDecShadow);
+          if (parsed.textColorType !== undefined) setTextColorType(parsed.textColorType);
+          if (parsed.newDecTextColor !== undefined) setNewDecTextColor(parsed.newDecTextColor);
+          if (parsed.newDecGradStart !== undefined) setNewDecGradStart(parsed.newDecGradStart);
+          if (parsed.newDecGradEnd !== undefined) setNewDecGradEnd(parsed.newDecGradEnd);
+          if (parsed.newDecAnim !== undefined) setNewDecAnim(parsed.newDecAnim);
+          if (parsed.baseEffects !== undefined) setBaseEffects(parsed.baseEffects);
+          if (parsed.elements !== undefined) setElements(parsed.elements);
+          if (parsed.customAnimations !== undefined) setCustomAnimations(parsed.customAnimations);
+        } catch (e) {
+          console.error("Errore nel caricamento della bozza", e);
+        }
+      }
+      setIsDraftLoaded(true);
+    }
+  }, [isOpen, currentUser]);
+
+  // Salva la bozza ad ogni modifica
+  useEffect(() => {
+    if (isDraftLoaded && currentUser) {
+      const draft = {
+        newDecName, newDecBorder, newDecShadow, textColorType, newDecTextColor,
+        newDecGradStart, newDecGradEnd, newDecAnim, baseEffects, elements, customAnimations
+      };
+      localStorage.setItem(`custom_dec_draft_${currentUser.id}`, JSON.stringify(draft));
+    }
+  }, [newDecName, newDecBorder, newDecShadow, textColorType, newDecTextColor, newDecGradStart, newDecGradEnd, newDecAnim, baseEffects, elements, customAnimations, isDraftLoaded, currentUser]);
+
+  const handleClearDraft = () => {
+    if (window.confirm("Sei sicuro di voler svuotare la bozza? Perderai tutte le modifiche non salvate.")) {
+      localStorage.removeItem(`custom_dec_draft_${currentUser.id}`);
+      setNewDecName('');
+      setNewDecBorder('#5865F2');
+      setNewDecShadow('#5865F2');
+      setTextColorType('gradient');
+      setNewDecTextColor('#ffffff');
+      setNewDecGradStart('#5865F2');
+      setNewDecGradEnd('#00ffff');
+      setNewDecAnim('none');
+      setBaseEffects([]);
+      setElements([]);
+      setCustomAnimations([]);
+      setNewDecImage(null);
+      setNewDecImagePreview(null);
+      showSuccess("Bozza svuotata.");
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -205,6 +263,9 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       currentPurchased.push(customId);
 
       await supabase.from('profiles').update({ purchased_decorations: currentPurchased }).eq('id', currentUser.id);
+
+      // Pulisci la bozza
+      localStorage.removeItem(`custom_dec_draft_${currentUser.id}`);
 
       showSuccess("Contorno creato e aggiunto al tuo inventario!");
       await refreshCustomDecorations();
@@ -395,13 +456,23 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="bg-[#313338] rounded-lg w-[1100px] max-h-[90vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#313338] rounded-lg w-[95vw] max-w-[1400px] max-h-[90vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex-shrink-0 p-4 border-b border-[#1e1f22] flex justify-between items-center">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Wand2 className="text-brand" />
-            Crea Contorno Personalizzato
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Wand2 className="text-brand" />
+              Crea Contorno Personalizzato
+            </h2>
+            {isDraftLoaded && (
+              <button 
+                onClick={handleClearDraft}
+                className="text-xs bg-[#f23f43]/20 text-[#f23f43] hover:bg-[#f23f43] hover:text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1"
+              >
+                <Trash2 size={14} /> Svuota Bozza
+              </button>
+            )}
+          </div>
           <button onClick={onClose} className="text-[#949ba4] hover:text-[#dbdee1] transition-colors">
             <X size={24} />
           </button>
@@ -853,7 +924,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
           </div>
 
           {/* Anteprima a Destra */}
-          <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
+          <div className="w-full lg:w-[400px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
             <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
             
             <div className="dec-wrapper relative w-32 h-32 mb-8">
