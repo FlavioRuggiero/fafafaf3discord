@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Wand2, Upload, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,10 +13,11 @@ interface CustomDecorationEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User;
+  editDecorationId?: string;
 }
 
-export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: CustomDecorationEditorModalProps) => {
-  const { refreshCustomDecorations, draftDecoration, setDraftDecoration, clipboard, setClipboard } = useShop();
+export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, editDecorationId }: CustomDecorationEditorModalProps) => {
+  const { customDecorations, refreshCustomDecorations, draftDecoration, setDraftDecoration, clipboard, setClipboard } = useShop();
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -25,6 +26,32 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
   // Stati per comprimere gli elementi
   const [collapsedElements, setCollapsedElements] = useState<Set<string>>(new Set());
   const [collapsedAnims, setCollapsedAnims] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (isOpen && editDecorationId) {
+      const dec = customDecorations.find(d => d.id === editDecorationId);
+      if (dec) {
+        setDraftDecoration({
+          name: dec.name,
+          price: dec.price,
+          borderColor: dec.border_color,
+          shadowColor: dec.shadow_color,
+          textColorType: dec.text_color_type,
+          textColor: dec.text_color,
+          gradStart: dec.text_gradient_start,
+          gradEnd: dec.text_gradient_end,
+          anim: dec.animation_type,
+          baseEffects: dec.config?.baseEffects || [],
+          elements: dec.config?.elements || [],
+          customAnimations: dec.config?.customAnimations || [],
+          imageFile: null,
+          imagePreview: dec.image_url
+        });
+      }
+    } else if (isOpen && !editDecorationId) {
+      setDraftDecoration({ ...DEFAULT_DRAFT_DECORATION });
+    }
+  }, [isOpen, editDecorationId, customDecorations, setDraftDecoration]);
 
   if (!isOpen) return null;
 
@@ -275,8 +302,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     if (!draftDecoration.name.trim() || !currentUser) return;
     
     setIsCreatingDec(true);
-    const customId = `custom-${Date.now()}`;
-    let imageUrl = null;
+    const customId = editDecorationId || `custom-${Date.now()}`;
+    let imageUrl = draftDecoration.imagePreview;
 
     if (draftDecoration.imageFile) {
       const fileExt = draftDecoration.imageFile.name.split('.').pop();
@@ -294,10 +321,9 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       customAnimations: draftDecoration.customAnimations
     };
 
-    const { error } = await supabase.from('custom_decorations').insert({
-      id: customId,
+    const payload = {
       name: draftDecoration.name.trim(),
-      price: 750, // Prezzo fisso per gli utenti
+      price: 750,
       category: 'Contorni Custom',
       image_url: imageUrl,
       border_color: draftDecoration.borderColor,
@@ -307,27 +333,41 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       text_gradient_start: draftDecoration.gradStart,
       text_gradient_end: draftDecoration.gradEnd,
       animation_type: draftDecoration.anim,
-      config: config
-    });
+      config: config,
+      creator_id: currentUser.id
+    };
 
-    if (error) {
-      showError("Errore durante la creazione. Assicurati di aver eseguito lo script SQL per i permessi.");
-    } else {
-      const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
-      const currentPurchased = profile?.purchased_decorations || [];
-      
-      const ticketIndex = currentPurchased.indexOf('custom-dec-ticket');
-      if (ticketIndex !== -1) {
-        currentPurchased.splice(ticketIndex, 1);
+    if (editDecorationId) {
+      const { error } = await supabase.from('custom_decorations').update(payload).eq('id', editDecorationId);
+      if (error) {
+        showError("Errore durante l'aggiornamento. Assicurati di aver eseguito lo script SQL per i permessi.");
+      } else {
+        showSuccess("Contorno aggiornato con successo!");
+        setDraftDecoration({ ...DEFAULT_DRAFT_DECORATION });
+        await refreshCustomDecorations();
+        onClose();
       }
-      currentPurchased.push(customId);
+    } else {
+      const { error } = await supabase.from('custom_decorations').insert({ id: customId, ...payload });
+      if (error) {
+        showError("Errore durante la creazione. Assicurati di aver eseguito lo script SQL per i permessi.");
+      } else {
+        const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
+        const currentPurchased = profile?.purchased_decorations || [];
+        
+        const ticketIndex = currentPurchased.indexOf('custom-dec-ticket');
+        if (ticketIndex !== -1) {
+          currentPurchased.splice(ticketIndex, 1);
+        }
+        currentPurchased.push(customId);
 
-      await supabase.from('profiles').update({ purchased_decorations: currentPurchased }).eq('id', currentUser.id);
+        await supabase.from('profiles').update({ purchased_decorations: currentPurchased }).eq('id', currentUser.id);
 
-      showSuccess("Contorno creato e aggiunto al tuo inventario!");
-      setDraftDecoration(DEFAULT_DRAFT_DECORATION); // Resetta la bozza dopo la creazione
-      await refreshCustomDecorations();
-      onClose();
+        showSuccess("Contorno creato e aggiunto al tuo inventario!");
+        setDraftDecoration({ ...DEFAULT_DRAFT_DECORATION });
+        await refreshCustomDecorations();
+        onClose();
+      }
     }
     setIsCreatingDec(false);
   };
@@ -594,7 +634,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         <div className="flex-shrink-0 p-4 border-b border-[#1e1f22] flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Wand2 className="text-brand" />
-            Crea Contorno Personalizzato
+            {editDecorationId ? 'Modifica Contorno Personalizzato' : 'Crea Contorno Personalizzato'}
           </h2>
           <button onClick={onClose} className="text-[#949ba4] hover:text-[#dbdee1] transition-colors">
             <X size={24} />
@@ -714,7 +754,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                       onClick={() => fileInputRef.current?.click()}
                       className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
                     >
-                      <Upload size={16} /> {draftDecoration.imageFile ? 'Cambia Immagine' : 'Carica Immagine'}
+                      <Upload size={16} /> {draftDecoration.imageFile || draftDecoration.imagePreview ? 'Cambia Immagine' : 'Carica Immagine'}
                     </button>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                   </div>
@@ -1250,7 +1290,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
               disabled={isCreatingDec || !draftDecoration.name.trim()}
               className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
             >
-              {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
+              {isCreatingDec ? 'Salvataggio in corso...' : (editDecorationId ? 'Salva Modifiche' : 'Crea Contorno')}
             </button>
           </div>
         </div>

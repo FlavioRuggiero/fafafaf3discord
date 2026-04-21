@@ -63,6 +63,7 @@ export type CustomDecoration = {
   text_gradient_start: string;
   text_gradient_end: string;
   animation_type: string;
+  creator_id?: string;
   config: {
     baseEffect?: string; // Legacy
     effectColor1?: string; // Legacy
@@ -155,6 +156,7 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
       price: cd.price,
       type: 'decoration' as const,
       category: cd.category,
+      creator_id: cd.creator_id
     }))
   ];
 

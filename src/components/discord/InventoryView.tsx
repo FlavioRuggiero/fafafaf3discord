@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { Archive, Menu, Check, Coins, DollarSign, Crown, Wand2 } from 'lucide-react';
+import { Archive, Menu, Check, Coins, DollarSign, Crown, Wand2, Edit2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -19,6 +19,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
   const { allItems, getThemeClass, getThemeStyle } = useShop();
   const [itemToSell, setItemToSell] = useState<any | null>(null);
   const [showCustomEditor, setShowCustomEditor] = useState(false);
+  const [decorationToEdit, setDecorationToEdit] = useState<string | undefined>(undefined);
   
   const handleEquip = async (id: string) => {
     const { error } = await supabase.from('profiles').update({
@@ -120,6 +121,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                   {ownedItems.filter(item => item.category === category).map(item => {
                     const isEquipped = currentUser.avatar_decoration === item.id;
                     const count = currentUser.purchased_decorations?.filter(id => id === item.id).length || 0;
+                    const isCreator = item.creator_id === currentUser.id;
 
                     return (
                       <div key={item.id} className={`bg-[#2b2d31] border ${isEquipped ? 'border-brand' : 'border-[#1e1f22]'} rounded-xl p-6 flex flex-col items-center text-center transition-colors shadow-md relative group`}>
@@ -136,6 +138,20 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           <div className="absolute top-2 right-10 bg-brand text-white text-xs font-bold px-2 py-1 rounded-full shadow-md z-20">
                             x{count}
                           </div>
+                        )}
+
+                        {/* Pulsante Modifica (se creatore) */}
+                        {isCreator && (
+                          <button 
+                            onClick={() => {
+                              setDecorationToEdit(item.id);
+                              setShowCustomEditor(true);
+                            }}
+                            className="absolute top-0 left-0 flex items-center gap-1 bg-[#1e1f22] hover:bg-brand text-brand hover:text-white px-2.5 py-1.5 rounded-tl-xl rounded-br-xl border-b border-r border-[#3f4147] hover:border-brand transition-all shadow-sm z-10 pointer-events-auto"
+                            title="Modifica Contorno"
+                          >
+                            <Edit2 size={14} />
+                          </button>
                         )}
 
                         {/* Pulsante Vendi */}
@@ -204,7 +220,10 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           ) : item.type === 'consumable' ? (
                             <button 
                               onClick={() => {
-                                if (item.id === 'custom-dec-ticket') setShowCustomEditor(true);
+                                if (item.id === 'custom-dec-ticket') {
+                                  setDecorationToEdit(undefined);
+                                  setShowCustomEditor(true);
+                                }
                               }} 
                               className="w-full py-2 rounded bg-brand text-white font-medium hover:bg-brand/80 transition-colors text-sm"
                             >
@@ -275,6 +294,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
           isOpen={showCustomEditor} 
           onClose={() => setShowCustomEditor(false)} 
           currentUser={currentUser} 
+          editDecorationId={decorationToEdit}
         />
       )}
     </div>

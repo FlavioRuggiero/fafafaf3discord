@@ -6,6 +6,7 @@ export type ShopItem = {
   category: string;
   emojis?: string[];
   description?: string;
+  creator_id?: string;
 };
 
 export const SHOP_ITEMS: ShopItem[] = [
