@@ -2,6 +2,16 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
 
+export type CustomElement = {
+  id: string;
+  type: 'emoji' | 'image';
+  content: string;
+  animation: string;
+  position: string;
+  size: number;
+  delay: number;
+};
+
 export type CustomDecoration = {
   id: string;
   name: string;
@@ -10,9 +20,15 @@ export type CustomDecoration = {
   image_url: string | null;
   border_color: string;
   shadow_color: string;
+  text_color_type: 'solid' | 'gradient';
+  text_color: string;
   text_gradient_start: string;
   text_gradient_end: string;
   animation_type: string;
+  config: {
+    baseEffect?: string;
+    elements?: CustomElement[];
+  };
 };
 
 type ShopContextType = {
@@ -63,12 +79,19 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
   const getThemeStyle = (id: string): React.CSSProperties => {
     const custom = customDecorations.find(c => c.id === id);
     if (custom) {
-      return {
-        background: `linear-gradient(90deg, ${custom.text_gradient_start}, ${custom.text_gradient_end})`,
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-        textShadow: `0 0 15px ${custom.text_gradient_start}80`
-      };
+      if (custom.text_color_type === 'solid') {
+        return {
+          color: custom.text_color,
+          textShadow: `0 0 10px ${custom.text_color}80`
+        };
+      } else {
+        return {
+          background: `linear-gradient(90deg, ${custom.text_gradient_start || '#fff'}, ${custom.text_gradient_end || '#fff'})`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          textShadow: `0 0 15px ${custom.text_gradient_start || '#fff'}80`
+        };
+      }
     }
     if (!getThemeClass(id)) {
       return { color: 'white' };

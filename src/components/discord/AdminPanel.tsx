@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2 } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useShop } from "@/contexts/ShopContext";
+import { useShop, CustomElement } from "@/contexts/ShopContext";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -38,11 +38,20 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [newDecPrice, setNewDecPrice] = useState(100);
   const [newDecBorder, setNewDecBorder] = useState('#5865F2');
   const [newDecShadow, setNewDecShadow] = useState('#5865F2');
+  
+  const [textColorType, setTextColorType] = useState<'solid' | 'gradient'>('gradient');
+  const [newDecTextColor, setNewDecTextColor] = useState('#ffffff');
   const [newDecGradStart, setNewDecGradStart] = useState('#5865F2');
   const [newDecGradEnd, setNewDecGradEnd] = useState('#00ffff');
+  
   const [newDecAnim, setNewDecAnim] = useState('none');
+  const [baseEffect, setBaseEffect] = useState('none');
+  
   const [newDecImage, setNewDecImage] = useState<File | null>(null);
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
+  
+  const [elements, setElements] = useState<CustomElement[]>([]);
+  
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +201,26 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  const addElement = () => {
+    setElements([...elements, {
+      id: `el-${Date.now()}`,
+      type: 'emoji',
+      content: '✨',
+      animation: 'float',
+      position: 'top-left',
+      size: 15,
+      delay: 0
+    }]);
+  };
+
+  const updateElement = (id: string, field: keyof CustomElement, value: any) => {
+    setElements(elements.map(el => el.id === id ? { ...el, [field]: value } : el));
+  };
+
+  const removeElement = (id: string) => {
+    setElements(elements.filter(el => el.id !== id));
+  };
+
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDecName.trim()) return;
@@ -210,6 +239,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       }
     }
 
+    const config = {
+      baseEffect,
+      elements
+    };
+
     const { error } = await supabase.from('custom_decorations').insert({
       id: customId,
       name: newDecName.trim(),
@@ -218,9 +252,12 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       image_url: imageUrl,
       border_color: newDecBorder,
       shadow_color: newDecShadow,
+      text_color_type: textColorType,
+      text_color: newDecTextColor,
       text_gradient_start: newDecGradStart,
       text_gradient_end: newDecGradEnd,
-      animation_type: newDecAnim
+      animation_type: newDecAnim,
+      config: config
     });
 
     if (error) {
@@ -230,6 +267,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       setNewDecName('');
       setNewDecImage(null);
       setNewDecImagePreview(null);
+      setElements([]);
       await refreshCustomDecorations();
     }
     setIsCreatingDec(false);
@@ -262,9 +300,32 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const standardChances = calculateChances(false);
   const premiumChances = calculateChances(true);
 
+  // Helper per l'anteprima
+  const getPositionClass = (pos: string) => {
+    switch(pos) {
+      case 'top-left': return 'top-0 left-0 -translate-x-1/4 -translate-y-1/4';
+      case 'top-right': return 'top-0 right-0 translate-x-1/4 -translate-y-1/4';
+      case 'bottom-left': return 'bottom-0 left-0 -translate-x-1/4 translate-y-1/4';
+      case 'bottom-right': return 'bottom-0 right-0 translate-x-1/4 translate-y-1/4';
+      case 'center': return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+      default: return '';
+    }
+  };
+
+  const getAnimation = (anim: string, delay: number) => {
+    const delayStr = delay > 0 ? `${delay}s` : '0s';
+    switch(anim) {
+      case 'float': return `custom-float 3s ease-in-out infinite ${delayStr}`;
+      case 'pulse': return `custom-pulse 2s infinite ${delayStr}`;
+      case 'spin': return `spin-slow 4s linear infinite ${delayStr}`;
+      case 'shake': return `custom-shake 0.5s infinite ${delayStr}`;
+      default: return 'none';
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="bg-[#313338] rounded-lg w-[800px] max-h-[85vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#313338] rounded-lg w-[900px] max-h-[90vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex-shrink-0 p-4 border-b border-[#1e1f22] flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -344,88 +405,203 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   <Wand2 className="text-brand" /> Crea Contorno Custom
                 </h3>
                 
-                <form onSubmit={handleCreateCustomDecoration} className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 space-y-4">
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome</label>
-                        <input 
-                          type="text" 
-                          value={newDecName}
-                          onChange={e => setNewDecName(e.target.value)}
-                          required
-                          className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
-                        />
-                      </div>
-                      <div className="w-32">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Prezzo (DC)</label>
-                        <input 
-                          type="number" 
-                          min="1"
-                          value={newDecPrice}
-                          onChange={e => setNewDecPrice(parseInt(e.target.value) || 0)}
-                          required
-                          className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
-                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                          <input type="color" value={newDecBorder} onChange={e => setNewDecBorder(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                          <span className="text-white text-sm uppercase">{newDecBorder}</span>
+                <form onSubmit={handleCreateCustomDecoration} className="flex flex-col lg:flex-row gap-6">
+                  <div className="flex-1 space-y-6">
+                    
+                    {/* Info Base */}
+                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-white font-bold mb-3 text-sm uppercase">Info Base</h4>
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome</label>
+                          <input 
+                            type="text" 
+                            value={newDecName}
+                            onChange={e => setNewDecName(e.target.value)}
+                            required
+                            className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
+                          />
                         </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Ombra</label>
-                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                          <input type="color" value={newDecShadow} onChange={e => setNewDecShadow(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                          <span className="text-white text-sm uppercase">{newDecShadow}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Gradiente Testo (Inizio)</label>
-                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                          <input type="color" value={newDecGradStart} onChange={e => setNewDecGradStart(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                          <span className="text-white text-sm uppercase">{newDecGradStart}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Gradiente Testo (Fine)</label>
-                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
-                          <input type="color" value={newDecGradEnd} onChange={e => setNewDecGradEnd(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                          <span className="text-white text-sm uppercase">{newDecGradEnd}</span>
+                        <div className="w-32">
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Prezzo (DC)</label>
+                          <input 
+                            type="number" 
+                            min="1"
+                            value={newDecPrice}
+                            onChange={e => setNewDecPrice(parseInt(e.target.value) || 0)}
+                            required
+                            className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
+                          />
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione</label>
+                    {/* Stile Testo */}
+                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Testo</h4>
+                      <div className="flex gap-4 mb-4">
+                        <label className="flex items-center gap-2 text-white cursor-pointer">
+                          <input type="radio" checked={textColorType === 'solid'} onChange={() => setTextColorType('solid')} className="accent-brand" />
+                          Tinta Unita
+                        </label>
+                        <label className="flex items-center gap-2 text-white cursor-pointer">
+                          <input type="radio" checked={textColorType === 'gradient'} onChange={() => setTextColorType('gradient')} className="accent-brand" />
+                          Gradiente
+                        </label>
+                      </div>
+
+                      {textColorType === 'solid' ? (
+                        <div>
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Testo</label>
+                          <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                            <input type="color" value={newDecTextColor} onChange={e => setNewDecTextColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                            <span className="text-white text-sm uppercase">{newDecTextColor}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-4">
+                          <div className="flex-1">
+                            <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Inizio Gradiente</label>
+                            <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                              <input type="color" value={newDecGradStart} onChange={e => setNewDecGradStart(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                              <span className="text-white text-sm uppercase">{newDecGradStart}</span>
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Fine Gradiente</label>
+                            <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                              <input type="color" value={newDecGradEnd} onChange={e => setNewDecGradEnd(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                              <span className="text-white text-sm uppercase">{newDecGradEnd}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Stile Bordo & Sfondo */}
+                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Bordo & Sfondo</h4>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
+                          <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                            <input type="color" value={newDecBorder} onChange={e => setNewDecBorder(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                            <span className="text-white text-sm uppercase">{newDecBorder}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Ombra</label>
+                          <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
+                            <input type="color" value={newDecShadow} onChange={e => setNewDecShadow(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                            <span className="text-white text-sm uppercase">{newDecShadow}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
+                          <select 
+                            value={newDecAnim}
+                            onChange={e => setNewDecAnim(e.target.value)}
+                            className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                          >
+                            <option value="none">Nessuna</option>
+                            <option value="spin">Rotazione</option>
+                            <option value="pulse">Pulsazione</option>
+                            <option value="bounce">Rimbalzo</option>
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
+                          <button 
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
+                          </button>
+                          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Effetti Speciali */}
+                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-white font-bold text-sm uppercase">Effetti & Elementi</h4>
+                        <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                          <Plus size={12} /> Aggiungi Elemento
+                        </button>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Effetto Base</label>
                         <select 
-                          value={newDecAnim}
-                          onChange={e => setNewDecAnim(e.target.value)}
-                          className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                          value={baseEffect}
+                          onChange={e => setBaseEffect(e.target.value)}
+                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
                         >
-                          <option value="none">Nessuna</option>
-                          <option value="spin">Rotazione</option>
-                          <option value="pulse">Pulsazione</option>
-                          <option value="bounce">Rimbalzo</option>
+                          <option value="none">Nessuno</option>
+                          <option value="scanline">Scanline (Stile Serpixel)</option>
                         </select>
                       </div>
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine (Opzionale)</label>
-                        <button 
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full bg-[#1e1f22] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
-                        </button>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
-                      </div>
+
+                      {elements.length > 0 && (
+                        <div className="space-y-3">
+                          {elements.map((el, idx) => (
+                            <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                              <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                                <X size={16} />
+                              </button>
+                              <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
+                                  <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                    <option value="emoji">Emoji</option>
+                                    <option value="image">URL Immagine</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
+                                  <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder={el.type === 'emoji' ? '✨' : 'https://...'} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Posizione</label>
+                                  <select value={el.position} onChange={e => updateElement(el.id, 'position', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                    <option value="top-left">Alto Sinistra</option>
+                                    <option value="top-right">Alto Destra</option>
+                                    <option value="bottom-left">Basso Sinistra</option>
+                                    <option value="bottom-right">Basso Destra</option>
+                                    <option value="center">Centro</option>
+                                    <option value="orbit">Orbita</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
+                                  <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                    <option value="none">Nessuna</option>
+                                    <option value="float">Fluttua</option>
+                                    <option value="pulse">Pulsazione</option>
+                                    <option value="spin">Rotazione</option>
+                                    <option value="shake">Tremolio</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
+                                  <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
+                                  <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <button 
@@ -438,35 +614,77 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                   </div>
 
                   {/* Anteprima */}
-                  <div className="w-full md:w-64 flex flex-col items-center justify-center bg-[#1e1f22] rounded-lg border border-[#3f4147] p-6">
-                    <h3 className="text-[#b5bac1] font-bold mb-6 uppercase text-xs tracking-wider">Anteprima Live</h3>
-                    <div 
-                      className="relative rounded-full flex items-center justify-center w-24 h-24 mb-6"
-                      style={{
-                        border: `2px solid ${newDecBorder}`,
-                        boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
-                      }}
-                    >
-                      {newDecImagePreview && (
-                        <img 
-                          src={newDecImagePreview} 
-                          className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-                          style={{ 
-                            animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
-                                       newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
-                                       newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-                          }} 
-                        />
-                      )}
-                      <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=preview" className="w-full h-full rounded-full object-cover relative z-10" />
+                  <div className="w-full lg:w-80 flex flex-col items-center justify-center bg-[#1e1f22] rounded-lg border border-[#3f4147] p-6 sticky top-0">
+                    <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
+                    
+                    <div className="dec-wrapper relative w-32 h-32 mb-8">
+                      <div 
+                        className="relative rounded-full flex items-center justify-center w-full h-full z-10"
+                        style={{
+                          border: `2px solid ${newDecBorder}`,
+                          boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
+                        }}
+                      >
+                        {/* Sfondo Animato */}
+                        {newDecImagePreview && (
+                          <img 
+                            src={newDecImagePreview} 
+                            className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                            style={{ 
+                              animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                         newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                         newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                            }} 
+                          />
+                        )}
+                        
+                        {/* Effetto Base */}
+                        {baseEffect === 'scanline' && <div className="custom-scanline"></div>}
+
+                        {/* Avatar Base */}
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=preview" className="w-full h-full rounded-full object-cover relative z-10" />
+                      </div>
+
+                      {/* Elementi Fluttuanti */}
+                      <div className="absolute inset-0 pointer-events-none z-20">
+                        {elements.map(el => {
+                          if (el.position === 'orbit') {
+                            return (
+                              <div key={el.id} className="custom-orbit-container" style={{ animation: `custom-orbit-wrapper 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                                <div className="custom-orbit-element" style={{ animation: `custom-orbit-inner 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                                  {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div 
+                              key={el.id} 
+                              className={`absolute ${getPositionClass(el.position)} flex items-center justify-center`}
+                              style={{ 
+                                animation: getAnimation(el.animation, el.delay),
+                                width: `${el.size}cqw`,
+                                height: `${el.size}cqw`,
+                                fontSize: `${el.size}cqw`
+                              }}
+                            >
+                              {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
+
                     <span 
-                      className="font-bold text-xl text-center"
-                      style={{
-                        background: `linear-gradient(90deg, ${newDecGradStart}, ${newDecGradEnd})`,
+                      className="font-bold text-2xl text-center"
+                      style={textColorType === 'solid' ? {
+                        color: newDecTextColor,
+                        textShadow: `0 0 10px ${newDecTextColor}80`
+                      } : {
+                        background: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        textShadow: `0 0 15px ${newDecGradStart}80`
+                        textShadow: `0 0 15px ${newDecGradStart || '#fff'}80`
                       }}
                     >
                       {newDecName || 'Nome Contorno'}
@@ -490,7 +708,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-bold" style={{ background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            <span className="text-sm font-bold" style={
+                              dec.text_color_type === 'solid' ? {
+                                color: dec.text_color,
+                                textShadow: `0 0 5px ${dec.text_color}80`
+                              } : {
+                                background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, 
+                                WebkitBackgroundClip: 'text', 
+                                WebkitTextFillColor: 'transparent' 
+                              }
+                            }>
                               {dec.name}
                             </span>
                             <span className="text-[10px] text-[#949ba4]">{dec.price} DC</span>

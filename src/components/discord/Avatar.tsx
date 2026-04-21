@@ -31,29 +31,88 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
     return <img src={src} alt={alt} className={`rounded-full object-cover ${speakingClass} ${className}`} />;
   }
 
+  // Helper per l'anteprima
+  const getPositionClass = (pos: string) => {
+    switch(pos) {
+      case 'top-left': return 'top-0 left-0 -translate-x-1/4 -translate-y-1/4';
+      case 'top-right': return 'top-0 right-0 translate-x-1/4 -translate-y-1/4';
+      case 'bottom-left': return 'bottom-0 left-0 -translate-x-1/4 translate-y-1/4';
+      case 'bottom-right': return 'bottom-0 right-0 translate-x-1/4 translate-y-1/4';
+      case 'center': return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+      default: return '';
+    }
+  };
+
+  const getAnimation = (anim: string, delay: number) => {
+    const delayStr = delay > 0 ? `${delay}s` : '0s';
+    switch(anim) {
+      case 'float': return `custom-float 3s ease-in-out infinite ${delayStr}`;
+      case 'pulse': return `custom-pulse 2s infinite ${delayStr}`;
+      case 'spin': return `spin-slow 4s linear infinite ${delayStr}`;
+      case 'shake': return `custom-shake 0.5s infinite ${delayStr}`;
+      default: return 'none';
+    }
+  };
+
   // Controllo se è una decorazione custom
   const customDec = customDecorations.find(d => d.id === activeDecoration);
   if (customDec) {
     return (
-      <div 
-        className={`relative rounded-full flex items-center justify-center ${speakingClass} ${className}`}
-        style={{
-          border: `2px solid ${customDec.border_color}`,
-          boxShadow: `0 0 10px ${customDec.shadow_color}, inset 0 0 10px ${customDec.shadow_color}`,
-        }}
-      >
-        {customDec.image_url && (
-          <img 
-            src={customDec.image_url} 
-            className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-            style={{ 
-              animation: customDec.animation_type === 'spin' ? 'spin-slow 4s linear infinite' : 
-                         customDec.animation_type === 'pulse' ? 'custom-pulse 2s infinite' : 
-                         customDec.animation_type === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-            }} 
-          />
-        )}
-        <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
+      <div className={`relative rounded-full flex items-center justify-center dec-wrapper ${speakingClass} ${className}`}>
+        <div 
+          className="relative rounded-full flex items-center justify-center w-full h-full z-10"
+          style={{
+            border: `2px solid ${customDec.border_color}`,
+            boxShadow: `0 0 10px ${customDec.shadow_color}, inset 0 0 10px ${customDec.shadow_color}`,
+          }}
+        >
+          {customDec.image_url && (
+            <img 
+              src={customDec.image_url} 
+              className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+              style={{ 
+                animation: customDec.animation_type === 'spin' ? 'spin-slow 4s linear infinite' : 
+                           customDec.animation_type === 'pulse' ? 'custom-pulse 2s infinite' : 
+                           customDec.animation_type === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+              }} 
+            />
+          )}
+          
+          {customDec.config?.baseEffect === 'scanline' && <div className="custom-scanline"></div>}
+          
+          <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
+        </div>
+
+        {/* Elementi Fluttuanti */}
+        <div className={`absolute inset-0 pointer-events-none z-20 ${clipEffects ? 'overflow-hidden rounded-full' : ''}`}>
+          {customDec.config?.elements?.map(el => {
+            if (el.position === 'orbit' && !clipEffects) {
+              return (
+                <div key={el.id} className="custom-orbit-container" style={{ animation: `custom-orbit-wrapper 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                  <div className="custom-orbit-element" style={{ animation: `custom-orbit-inner 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                    {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                  </div>
+                </div>
+              );
+            }
+            if (el.position === 'orbit' && clipEffects) return null; // Nascondi orbita se clipEffects è attivo
+            
+            return (
+              <div 
+                key={el.id} 
+                className={`absolute ${getPositionClass(el.position)} flex items-center justify-center`}
+                style={{ 
+                  animation: getAnimation(el.animation, el.delay),
+                  width: `${el.size}cqw`,
+                  height: `${el.size}cqw`,
+                  fontSize: `${el.size}cqw`
+                }}
+              >
+                {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
