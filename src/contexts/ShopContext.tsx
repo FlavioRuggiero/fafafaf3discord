@@ -19,6 +19,9 @@ export type BaseEffectConfig = {
   color1: string;
   color2: string;
   icon: string;
+  x?: number;
+  y?: number;
+  rotation?: number;
 };
 
 export type CustomDecoration = {

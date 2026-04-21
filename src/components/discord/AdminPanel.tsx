@@ -212,11 +212,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       type: 'scanline',
       color1: '#5865F2',
       color2: '#f23f43',
-      icon: ''
+      icon: '',
+      x: 50,
+      y: 50,
+      rotation: 0
     }]);
   };
 
-  const updateBaseEffect = (id: string, field: keyof BaseEffectConfig, value: string) => {
+  const updateBaseEffect = (id: string, field: keyof BaseEffectConfig, value: any) => {
     setBaseEffects(baseEffects.map(el => el.id === id ? { ...el, [field]: value } : el));
   };
 
@@ -343,37 +346,89 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  const getBgImage = (effect: BaseEffectConfig, defaultUrl: string) => {
+    if (!effect.icon) return `url('${defaultUrl}')`;
+    if (effect.icon.startsWith('http') || effect.icon.startsWith('/')) return `url('${effect.icon}')`;
+    return 'none';
+  };
+
+  const getIconContent = (effect: BaseEffectConfig, defaultIcon: string | null = null) => {
+    if (!effect.icon) return defaultIcon;
+    if (effect.icon.startsWith('http') || effect.icon.startsWith('/')) return null;
+    return <span className="w-full h-full flex items-center justify-center object-contain">{effect.icon}</span>;
+  };
+
+  const wrapInnerEffect = (effect: BaseEffectConfig, children: React.ReactNode) => {
+    const x = effect.x ?? 50;
+    const y = effect.y ?? 50;
+    const rot = effect.rotation ?? 0;
+    
+    if (x === 50 && y === 50 && rot === 0) {
+      return <React.Fragment key={`wrap-inner-${effect.id}`}>{children}</React.Fragment>;
+    }
+
+    return (
+      <div 
+        key={`wrap-inner-${effect.id}`}
+        className="absolute inset-0 pointer-events-none"
+        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg)` }}
+      >
+        {children}
+      </div>
+    );
+  };
+
+  const wrapOuterEffect = (effect: BaseEffectConfig, children: React.ReactNode) => {
+    const x = effect.x ?? 50;
+    const y = effect.y ?? 50;
+    const rot = effect.rotation ?? 0;
+    
+    if (x === 50 && y === 50 && rot === 0) {
+      return <React.Fragment key={`wrap-outer-${effect.id}`}>{children}</React.Fragment>;
+    }
+
+    return (
+      <div 
+        key={`wrap-outer-${effect.id}`}
+        className="absolute inset-0 pointer-events-none"
+        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg)` }}
+      >
+        {children}
+      </div>
+    );
+  };
+
   const renderInnerEffects = (effects: BaseEffectConfig[]) => {
     return effects.map(effect => {
       switch(effect.type) {
         case 'scanline':
-          return <div key={effect.id} className="custom-scanline" style={{ color: effect.color1 }}></div>;
+          return wrapInnerEffect(effect, <div className="custom-scanline" style={{ color: effect.color1 }}></div>);
         case 'radar':
-          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>;
+          return wrapInnerEffect(effect, <div className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>);
         case 'twin-rings':
-          return (
-            <React.Fragment key={effect.id}>
+          return wrapInnerEffect(effect, (
+            <>
               <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${effect.color1}`, animation: 'spin-slow 4s linear infinite' }}></div>
               <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${effect.color2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
-            </React.Fragment>
-          );
+            </>
+          ));
         case 'circo':
-          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>;
+          return wrapInnerEffect(effect, <div className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>);
         case 'pulse-ring':
-          return <div key={effect.id} className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any}></div>;
+          return wrapInnerEffect(effect, <div className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any}></div>);
         case 'supernova':
-          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>;
+          return wrapInnerEffect(effect, <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>);
         case 'oceanic':
-          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>;
+          return wrapInnerEffect(effect, <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>);
         case 'serpixel-agitato':
-          return (
-            <React.Fragment key={effect.id}>
+          return wrapInnerEffect(effect, (
+            <>
               <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, transparent, ${effect.color2}, transparent)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>
               <div className="serpixel-scanline" style={{ background: effect.color1, boxShadow: `0 0 15px ${effect.color1}` }}></div>
-            </React.Fragment>
-          );
+            </>
+          ));
         case 'ghiacciolo':
-          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 }}></div>;
+          return wrapInnerEffect(effect, <div className="absolute inset-[-4px] rounded-full" style={{ borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 }}></div>);
         default:
           return null;
       }
@@ -382,67 +437,63 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   const renderOuterEffects = (effects: BaseEffectConfig[]) => {
     return effects.map(effect => {
-      const isUrl = (str: string) => str.startsWith('http') || str.startsWith('/');
-      const iconContent = effect.icon ? (!isUrl(effect.icon) ? effect.icon : null) : null;
-      const bgImage = effect.icon && isUrl(effect.icon) ? `url(${effect.icon})` : undefined;
-
       switch(effect.type) {
         case 'supernova':
-          return (
-            <React.Fragment key={effect.id}>
-              <div className="supernova-star s1" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
-              <div className="supernova-star s2" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
-              <div className="supernova-star s3" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
-            </React.Fragment>
-          );
+          return wrapOuterEffect(effect, (
+            <>
+              <div className="supernova-star s1" style={{ background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }}>{getIconContent(effect)}</div>
+              <div className="supernova-star s2" style={{ background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }}>{getIconContent(effect)}</div>
+              <div className="supernova-star s3" style={{ background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }}>{getIconContent(effect)}</div>
+            </>
+          ));
         case 'esquelito':
-          return (
-            <React.Fragment key={effect.id}>
-              <div className="esquelito-skull sk1" style={{ backgroundImage: bgImage || "url('/esqueleto1.png')" }}>{iconContent}</div>
-              <div className="esquelito-skull sk2" style={{ backgroundImage: bgImage || "url('/esqueleto2.png')" }}>{iconContent}</div>
-              <div className="esquelito-skull sk3" style={{ backgroundImage: bgImage || "url('/esquelito3.png')" }}>{iconContent}</div>
-            </React.Fragment>
-          );
+          return wrapOuterEffect(effect, (
+            <>
+              <div className="esquelito-skull sk1" style={{ backgroundImage: getBgImage(effect, '/esqueleto1.png') }}>{getIconContent(effect)}</div>
+              <div className="esquelito-skull sk2" style={{ backgroundImage: getBgImage(effect, '/esqueleto2.png') }}>{getIconContent(effect)}</div>
+              <div className="esquelito-skull sk3" style={{ backgroundImage: getBgImage(effect, '/esquelito3.png') }}>{getIconContent(effect)}</div>
+            </>
+          ));
         case 'oceanic':
-          return (
-            <React.Fragment key={effect.id}>
-              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
-              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
-              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+          return wrapOuterEffect(effect, (
+            <>
+              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{getIconContent(effect, '💧')}</div></div>
+              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{getIconContent(effect, '💧')}</div></div>
+              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{getIconContent(effect, '💧')}</div></div>
               <div className="oceanic-bubble b1" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
               <div className="oceanic-bubble b2" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
               <div className="oceanic-bubble b3" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
-            </React.Fragment>
-          );
+            </>
+          ));
         case 'saturn-fire':
-          return (
-            <React.Fragment key={effect.id}>
+          return wrapOuterEffect(effect, (
+            <>
               <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
               <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
-              <div className="fire-particle f1" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
-              <div className="fire-particle f2" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
-              <div className="fire-particle f3" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
-            </React.Fragment>
-          );
+              <div className="fire-particle f1" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{getIconContent(effect)}</div>
+              <div className="fire-particle f2" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{getIconContent(effect)}</div>
+              <div className="fire-particle f3" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{getIconContent(effect)}</div>
+            </>
+          ));
         case 'gustavo-armando':
-          return (
-            <React.Fragment key={effect.id}>
-              <div className="gustavo-sprite gustavo-trail t2" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
-              <div className="gustavo-sprite gustavo-trail t1" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
-              <div className="gustavo-sprite gustavo-main" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
-              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
-            </React.Fragment>
-          );
+          return wrapOuterEffect(effect, (
+            <>
+              <div className="gustavo-sprite gustavo-trail t2" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div>
+              <div className="gustavo-sprite gustavo-trail t1" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div>
+              <div className="gustavo-sprite gustavo-main" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div>
+              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+            </>
+          ));
         case 'serpixel-agitato':
-          return (
-            <React.Fragment key={effect.id}>
+          return wrapOuterEffect(effect, (
+            <>
               <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
               <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
               <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
@@ -452,32 +503,32 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
               <div className="serpixel-venom v3" style={{ background: effect.color1 }}></div>
               <div className="serpixel-venom v4" style={{ background: effect.color1 }}></div>
               <div className="serpixel-venom v5" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-snake s1" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s2" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s3" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s4" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s5" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s6" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s7" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-              <div className="serpixel-snake s8" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
-            </React.Fragment>
-          );
+              <div className="serpixel-snake s1" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s2" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s3" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s4" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s5" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s6" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s7" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s8" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+            </>
+          ));
         case 'tempesta':
-          return (
-            <React.Fragment key={effect.id}>
-              <div className="storm-drop d1" style={{ background: effect.color1 }}>{iconContent}</div>
-              <div className="storm-drop d2" style={{ background: effect.color1 }}>{iconContent}</div>
-              <div className="storm-drop d3" style={{ background: effect.color1 }}>{iconContent}</div>
-            </React.Fragment>
-          );
+          return wrapOuterEffect(effect, (
+            <>
+              <div className="storm-drop d1" style={{ background: effect.color1 }}>{getIconContent(effect)}</div>
+              <div className="storm-drop d2" style={{ background: effect.color1 }}>{getIconContent(effect)}</div>
+              <div className="storm-drop d3" style={{ background: effect.color1 }}>{getIconContent(effect)}</div>
+            </>
+          ));
         case 'ghiacciolo':
-          return (
-            <React.Fragment key={effect.id}>
-              <div className="ice-flake f1" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
-              <div className="ice-flake f2" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
-              <div className="ice-flake f3" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
-            </React.Fragment>
-          );
+          return wrapOuterEffect(effect, (
+            <>
+              <div className="ice-flake f1" style={{ color: effect.color1 }}>{getIconContent(effect, '❄️')}</div>
+              <div className="ice-flake f2" style={{ color: effect.color1 }}>{getIconContent(effect, '❄️')}</div>
+              <div className="ice-flake f3" style={{ color: effect.color1 }}>{getIconContent(effect, '❄️')}</div>
+            </>
+          ));
         default:
           return null;
       }
@@ -740,7 +791,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   </div>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-3 mb-3">
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 1</label>
                                   <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
@@ -754,6 +805,20 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     <input type="color" value={effect.color2} onChange={e => updateBaseEffect(effect.id, 'color2', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
                                     <span className="text-white text-xs uppercase">{effect.color2}</span>
                                   </div>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({effect.x ?? 50}%)</label>
+                                  <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', parseInt(e.target.value))} className="w-full accent-brand" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({effect.y ?? 50}%)</label>
+                                  <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', parseInt(e.target.value))} className="w-full accent-brand" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione ({effect.rotation ?? 0}°)</label>
+                                  <input type="range" min="0" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', parseInt(e.target.value))} className="w-full accent-brand" />
                                 </div>
                               </div>
                             </div>
@@ -807,11 +872,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                               <div className="grid grid-cols-2 gap-3 mb-3">
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({el.x}%)</label>
-                                  <input type="range" min="-50" max="150" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full accent-brand" />
+                                  <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full accent-brand" />
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({el.y}%)</label>
-                                  <input type="range" min="-50" max="150" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full accent-brand" />
+                                  <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full accent-brand" />
                                 </div>
                               </div>
 
