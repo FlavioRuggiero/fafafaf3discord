@@ -13,6 +13,14 @@ export type CustomElement = {
   delay: number;
 };
 
+export type BaseEffectConfig = {
+  id: string;
+  type: string;
+  color1: string;
+  color2: string;
+  icon: string;
+};
+
 export type CustomDecoration = {
   id: string;
   name: string;
@@ -27,9 +35,10 @@ export type CustomDecoration = {
   text_gradient_end: string;
   animation_type: string;
   config: {
-    baseEffect?: string;
-    effectColor1?: string;
-    effectColor2?: string;
+    baseEffect?: string; // Legacy
+    effectColor1?: string; // Legacy
+    effectColor2?: string; // Legacy
+    baseEffects?: BaseEffectConfig[]; // Nuovo sistema
     elements?: CustomElement[];
   };
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useShop } from '@/contexts/ShopContext';
+import { useShop, BaseEffectConfig } from '@/contexts/ShopContext';
 
 interface AvatarProps {
   src: string;
@@ -38,13 +38,167 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
       case 'pulse': return `custom-pulse 2s infinite ${delayStr}`;
       case 'spin': return `spin-slow 4s linear infinite ${delayStr}`;
       case 'shake': return `custom-shake 0.5s infinite ${delayStr}`;
+      case 'orbit-2d': return `custom-orbit-2d 4s linear infinite ${delayStr}`;
       default: return 'none';
     }
+  };
+
+  const renderInnerEffects = (effects: BaseEffectConfig[]) => {
+    return effects.map(effect => {
+      switch(effect.type) {
+        case 'scanline':
+          return <div key={effect.id} className="custom-scanline" style={{ color: effect.color1 }}></div>;
+        case 'radar':
+          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>;
+        case 'twin-rings':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${effect.color1}`, animation: 'spin-slow 4s linear infinite' }}></div>
+              <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${effect.color2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
+            </React.Fragment>
+          );
+        case 'circo':
+          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>;
+        case 'pulse-ring':
+          return <div key={effect.id} className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any}></div>;
+        case 'supernova':
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>;
+        case 'oceanic':
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>;
+        case 'serpixel-agitato':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, transparent, ${effect.color2}, transparent)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>
+              <div className="serpixel-scanline" style={{ background: effect.color1, boxShadow: `0 0 15px ${effect.color1}` }}></div>
+            </React.Fragment>
+          );
+        case 'ghiacciolo':
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 }}></div>;
+        default:
+          return null;
+      }
+    });
+  };
+
+  const renderOuterEffects = (effects: BaseEffectConfig[]) => {
+    return effects.map(effect => {
+      const isUrl = (str: string) => str.startsWith('http') || str.startsWith('/');
+      const iconContent = effect.icon ? (!isUrl(effect.icon) ? effect.icon : null) : null;
+      const bgImage = effect.icon && isUrl(effect.icon) ? `url(${effect.icon})` : undefined;
+
+      switch(effect.type) {
+        case 'supernova':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="supernova-star s1" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
+              <div className="supernova-star s2" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
+              <div className="supernova-star s3" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'esquelito':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="esquelito-skull sk1" style={{ backgroundImage: bgImage || "url('/esqueleto1.png')" }}>{iconContent}</div>
+              <div className="esquelito-skull sk2" style={{ backgroundImage: bgImage || "url('/esqueleto2.png')" }}>{iconContent}</div>
+              <div className="esquelito-skull sk3" style={{ backgroundImage: bgImage || "url('/esquelito3.png')" }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'oceanic':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+              <div className="oceanic-bubble b1" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+              <div className="oceanic-bubble b2" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+              <div className="oceanic-bubble b3" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+            </React.Fragment>
+          );
+        case 'saturn-fire':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="fire-particle f1" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
+              <div className="fire-particle f2" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
+              <div className="fire-particle f3" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'gustavo-armando':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="gustavo-sprite gustavo-trail t2" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
+              <div className="gustavo-sprite gustavo-trail t1" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
+              <div className="gustavo-sprite gustavo-main" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
+              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+            </React.Fragment>
+          );
+        case 'serpixel-agitato':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-venom v1" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v2" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v3" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v4" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v5" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-snake s1" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s2" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s3" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s4" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s5" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s6" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s7" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s8" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'tempesta':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="storm-drop d1" style={{ background: effect.color1 }}>{iconContent}</div>
+              <div className="storm-drop d2" style={{ background: effect.color1 }}>{iconContent}</div>
+              <div className="storm-drop d3" style={{ background: effect.color1 }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'ghiacciolo':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="ice-flake f1" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
+              <div className="ice-flake f2" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
+              <div className="ice-flake f3" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
+            </React.Fragment>
+          );
+        default:
+          return null;
+      }
+    });
   };
 
   // Controllo se è una decorazione custom
   const customDec = customDecorations.find(d => d.id === activeDecoration);
   if (customDec) {
+    // Normalizza gli effetti base per retrocompatibilità
+    const effectsToRender = customDec.config?.baseEffects || [];
+    if (customDec.config?.baseEffect && customDec.config.baseEffect !== 'none' && effectsToRender.length === 0) {
+      effectsToRender.push({
+        id: 'legacy',
+        type: customDec.config.baseEffect,
+        color1: customDec.config.effectColor1 || '#5865F2',
+        color2: customDec.config.effectColor2 || '#f23f43',
+        icon: ''
+      });
+    }
+
     return (
       <div className={`relative rounded-full flex items-center justify-center dec-wrapper ${speakingClass} ${className}`}>
         <div 
@@ -66,24 +220,28 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             />
           )}
           
-          {/* Effetti Base */}
-          {customDec.config?.baseEffect === 'scanline' && <div className="custom-scanline" style={{ color: customDec.config.effectColor1 }}></div>}
-          {customDec.config?.baseEffect === 'radar' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${customDec.config.effectColor1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>}
-          {customDec.config?.baseEffect === 'twin-rings' && (
-            <>
-              <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${customDec.config.effectColor1}`, animation: 'spin-slow 4s linear infinite' }}></div>
-              <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${customDec.config.effectColor2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
-            </>
-          )}
-          {customDec.config?.baseEffect === 'circo' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${customDec.config.effectColor1} 0deg 20deg, ${customDec.config.effectColor2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>}
-          {customDec.config?.baseEffect === 'pulse-ring' && <div className="absolute inset-0 rounded-full" style={{ border: `2px solid ${customDec.config.effectColor1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': customDec.config.effectColor1 } as any}></div>}
+          {/* Effetti Base (Dietro l'avatar) */}
+          {renderInnerEffects(effectsToRender)}
           
           <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
         </div>
 
-        {/* Elementi Fluttuanti */}
+        {/* Effetti Base (Davanti all'avatar) e Elementi Fluttuanti */}
         <div className={`absolute inset-0 pointer-events-none z-20 ${clipEffects ? 'overflow-hidden rounded-full' : ''}`}>
+          {renderOuterEffects(effectsToRender)}
+
           {customDec.config?.elements?.map(el => {
+            if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+              const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+              const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
+              return (
+                <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                  <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                    {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                  </div>
+                </div>
+              );
+            }
             return (
               <div 
                 key={el.id} 

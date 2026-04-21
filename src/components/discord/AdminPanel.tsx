@@ -9,7 +9,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useShop, CustomElement } from "@/contexts/ShopContext";
+import { useShop, CustomElement, BaseEffectConfig } from "@/contexts/ShopContext";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -45,9 +45,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [newDecGradEnd, setNewDecGradEnd] = useState('#00ffff');
   
   const [newDecAnim, setNewDecAnim] = useState('none');
-  const [baseEffect, setBaseEffect] = useState('none');
-  const [effectColor1, setEffectColor1] = useState('#5865F2');
-  const [effectColor2, setEffectColor2] = useState('#f23f43');
+  
+  // Nuovo stato per gli effetti base multipli
+  const [baseEffects, setBaseEffects] = useState<BaseEffectConfig[]>([]);
   
   const [newDecImage, setNewDecImage] = useState<File | null>(null);
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
@@ -203,6 +203,24 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  const addBaseEffect = () => {
+    setBaseEffects([...baseEffects, {
+      id: `be-${Date.now()}`,
+      type: 'scanline',
+      color1: '#5865F2',
+      color2: '#f23f43',
+      icon: ''
+    }]);
+  };
+
+  const updateBaseEffect = (id: string, field: keyof BaseEffectConfig, value: string) => {
+    setBaseEffects(baseEffects.map(el => el.id === id ? { ...el, [field]: value } : el));
+  };
+
+  const removeBaseEffect = (id: string) => {
+    setBaseEffects(baseEffects.filter(el => el.id !== id));
+  };
+
   const addElement = () => {
     setElements([...elements, {
       id: `el-${Date.now()}`,
@@ -243,9 +261,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
 
     const config = {
-      baseEffect,
-      effectColor1,
-      effectColor2,
+      baseEffects,
       elements
     };
 
@@ -277,6 +293,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       setNewDecName('');
       setNewDecImage(null);
       setNewDecImagePreview(null);
+      setBaseEffects([]);
       setElements([]);
       await refreshCustomDecorations();
     }
@@ -322,6 +339,149 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       default: return 'none';
     }
   };
+
+  const renderInnerEffects = (effects: BaseEffectConfig[]) => {
+    return effects.map(effect => {
+      switch(effect.type) {
+        case 'scanline':
+          return <div key={effect.id} className="custom-scanline" style={{ color: effect.color1 }}></div>;
+        case 'radar':
+          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>;
+        case 'twin-rings':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${effect.color1}`, animation: 'spin-slow 4s linear infinite' }}></div>
+              <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${effect.color2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
+            </React.Fragment>
+          );
+        case 'circo':
+          return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>;
+        case 'pulse-ring':
+          return <div key={effect.id} className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any}></div>;
+        case 'supernova':
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>;
+        case 'oceanic':
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>;
+        case 'serpixel-agitato':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="absolute inset-[-4px] rounded-full" style={{ background: `conic-gradient(transparent, ${effect.color1}, transparent, ${effect.color2}, transparent)`, animation: 'spin-slow 2s linear infinite', zIndex: 0 }}></div>
+              <div className="serpixel-scanline" style={{ background: effect.color1, boxShadow: `0 0 15px ${effect.color1}` }}></div>
+            </React.Fragment>
+          );
+        case 'ghiacciolo':
+          return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={{ borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 }}></div>;
+        default:
+          return null;
+      }
+    });
+  };
+
+  const renderOuterEffects = (effects: BaseEffectConfig[]) => {
+    return effects.map(effect => {
+      const isUrl = (str: string) => str.startsWith('http') || str.startsWith('/');
+      const iconContent = effect.icon ? (!isUrl(effect.icon) ? effect.icon : null) : null;
+      const bgImage = effect.icon && isUrl(effect.icon) ? `url(${effect.icon})` : undefined;
+
+      switch(effect.type) {
+        case 'supernova':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="supernova-star s1" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
+              <div className="supernova-star s2" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
+              <div className="supernova-star s3" style={{ background: effect.color2, backgroundImage: bgImage, backgroundSize: 'contain' }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'esquelito':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="esquelito-skull sk1" style={{ backgroundImage: bgImage || "url('/esqueleto1.png')" }}>{iconContent}</div>
+              <div className="esquelito-skull sk2" style={{ backgroundImage: bgImage || "url('/esqueleto2.png')" }}>{iconContent}</div>
+              <div className="esquelito-skull sk3" style={{ backgroundImage: bgImage || "url('/esquelito3.png')" }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'oceanic':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{effect.icon || '💧'}</div></div>
+              <div className="oceanic-bubble b1" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+              <div className="oceanic-bubble b2" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+              <div className="oceanic-bubble b3" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+            </React.Fragment>
+          );
+        case 'saturn-fire':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+              <div className="fire-particle f1" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
+              <div className="fire-particle f2" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
+              <div className="fire-particle f3" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'gustavo-armando':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="gustavo-sprite gustavo-trail t2" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
+              <div className="gustavo-sprite gustavo-trail t1" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
+              <div className="gustavo-sprite gustavo-main" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div>
+              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={{ backgroundImage: bgImage || "url('/adrotto.png')" }}>{iconContent}</div></div>
+            </React.Fragment>
+          );
+        case 'serpixel-agitato':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-venom v1" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v2" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v3" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v4" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-venom v5" style={{ background: effect.color1 }}></div>
+              <div className="serpixel-snake s1" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s2" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s3" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s4" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s5" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s6" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s7" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+              <div className="serpixel-snake s8" style={{ backgroundImage: bgImage || "url('/serpe1.png')" }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'tempesta':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="storm-drop d1" style={{ background: effect.color1 }}>{iconContent}</div>
+              <div className="storm-drop d2" style={{ background: effect.color1 }}>{iconContent}</div>
+              <div className="storm-drop d3" style={{ background: effect.color1 }}>{iconContent}</div>
+            </React.Fragment>
+          );
+        case 'ghiacciolo':
+          return (
+            <React.Fragment key={effect.id}>
+              <div className="ice-flake f1" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
+              <div className="ice-flake f2" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
+              <div className="ice-flake f3" style={{ color: effect.color1 }}>{effect.icon || '❄️'}</div>
+            </React.Fragment>
+          );
+        default:
+          return null;
+      }
+    });
+  };
+
+  const avatarUrl = (currentUser as any)?.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
@@ -526,59 +686,82 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       </div>
                     </div>
 
-                    {/* Effetti Speciali */}
+                    {/* Effetti Base Multipli */}
                     <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                       <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-white font-bold text-sm uppercase">Effetti & Elementi</h4>
+                        <h4 className="text-white font-bold text-sm uppercase">Effetti Base</h4>
+                        <button type="button" onClick={addBaseEffect} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                          <Plus size={12} /> Aggiungi Effetto
+                        </button>
+                      </div>
+
+                      {baseEffects.length === 0 ? (
+                        <p className="text-xs text-[#949ba4] italic">Nessun effetto base aggiunto.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {baseEffects.map((effect) => (
+                            <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                              <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                                <X size={16} />
+                              </button>
+                              <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
+                                  <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                    <option value="scanline">Scanline</option>
+                                    <option value="radar">Radar</option>
+                                    <option value="twin-rings">Anelli Gemelli</option>
+                                    <option value="circo">Circo</option>
+                                    <option value="pulse-ring">Anello Pulsante</option>
+                                    <option value="supernova">Supernova Cosmica</option>
+                                    <option value="esquelito">Esquelito Explosivo</option>
+                                    <option value="oceanic">Vortice Oceanico</option>
+                                    <option value="saturn-fire">Saturno a Fuoco</option>
+                                    <option value="gustavo-armando">Gustavo Armando</option>
+                                    <option value="serpixel-agitato">Serpixel Agitato</option>
+                                    <option value="tempesta">Tempesta</option>
+                                    <option value="ghiacciolo">Ghiacciolo</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Icona/Emoji/URL (Opzionale)</label>
+                                  <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="Es. ❄️ o URL" className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 1</label>
+                                  <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                                    <input type="color" value={effect.color1} onChange={e => updateBaseEffect(effect.id, 'color1', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                    <span className="text-white text-xs uppercase">{effect.color1}</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore 2</label>
+                                  <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                                    <input type="color" value={effect.color2} onChange={e => updateBaseEffect(effect.id, 'color2', e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
+                                    <span className="text-white text-xs uppercase">{effect.color2}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Elementi Fluttuanti */}
+                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-white font-bold text-sm uppercase">Elementi Fluttuanti</h4>
                         <button type="button" onClick={addElement} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
                           <Plus size={12} /> Aggiungi Elemento
                         </button>
                       </div>
 
-                      <div className="mb-4">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Effetto Base</label>
-                        <select 
-                          value={baseEffect}
-                          onChange={e => setBaseEffect(e.target.value)}
-                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer mb-3"
-                        >
-                          <option value="none">Nessuno</option>
-                          <option value="scanline">Scanline (Stile Serpixel)</option>
-                          <option value="radar">Radar</option>
-                          <option value="twin-rings">Anelli Gemelli</option>
-                          <option value="circo">Circo</option>
-                          <option value="pulse-ring">Anello Pulsante</option>
-                          <option value="supernova">Supernova Cosmica</option>
-                          <option value="esquelito">Esquelito Explosivo</option>
-                          <option value="oceanic">Vortice Oceanico</option>
-                          <option value="saturn-fire">Saturno a Fuoco</option>
-                          <option value="gustavo-armando">Gustavo Armando</option>
-                          <option value="serpixel-agitato">Serpixel Agitato</option>
-                          <option value="tempesta">Tempesta</option>
-                          <option value="ghiacciolo">Ghiacciolo</option>
-                        </select>
-
-                        {baseEffect !== 'none' && !['supernova', 'esquelito', 'oceanic', 'gustavo-armando', 'serpixel-agitato', 'tempesta', 'ghiacciolo'].includes(baseEffect) && (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore Effetto 1</label>
-                              <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                                <input type="color" value={effectColor1} onChange={e => setEffectColor1(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
-                                <span className="text-white text-xs uppercase">{effectColor1}</span>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore Effetto 2</label>
-                              <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                                <input type="color" value={effectColor2} onChange={e => setEffectColor2(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
-                                <span className="text-white text-xs uppercase">{effectColor2}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {elements.length > 0 && (
+                      {elements.length === 0 ? (
+                        <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
+                      ) : (
                         <div className="space-y-3">
                           {elements.map((el, idx) => (
                             <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
@@ -669,110 +852,17 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           />
                         )}
                         
-                        {/* Effetti Base */}
-                        {baseEffect === 'scanline' && <div className="custom-scanline" style={{ color: effectColor1 }}></div>}
-                        {baseEffect === 'radar' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `conic-gradient(from 0deg, transparent 70%, ${effectColor1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }}></div>}
-                        {baseEffect === 'twin-rings' && (
-                          <>
-                            <div className="absolute inset-[-3px] rounded-full" style={{ border: `2px dashed ${effectColor1}`, animation: 'spin-slow 4s linear infinite' }}></div>
-                            <div className="absolute inset-[-6px] rounded-full" style={{ border: `2px dashed ${effectColor2}`, animation: 'spin-slow 3s linear infinite reverse' }}></div>
-                          </>
-                        )}
-                        {baseEffect === 'circo' && <div className="absolute inset-[-3px] rounded-full" style={{ background: `repeating-conic-gradient(${effectColor1} 0deg 20deg, ${effectColor2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }}></div>}
-                        {baseEffect === 'pulse-ring' && <div className="absolute inset-0 rounded-full" style={{ border: `2px solid ${effectColor1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effectColor1 } as any}></div>}
+                        {/* Effetti Base (Dietro l'avatar) */}
+                        {renderInnerEffects(baseEffects)}
 
                         {/* Avatar Base (Usa l'avatar dell'utente corrente) */}
-                        <img src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} className="w-full h-full rounded-full object-cover relative z-10" />
+                        <img src={avatarUrl} className="w-full h-full rounded-full object-cover relative z-10" />
                       </div>
 
-                      {/* Effetti Base Premium (Dietro o Davanti) */}
+                      {/* Effetti Base (Davanti all'avatar) e Elementi Fluttuanti */}
                       <div className="absolute inset-0 pointer-events-none z-20">
-                        {baseEffect === 'oceanic' && (
-                          <>
-                            <div className="water-drop-wrapper w1"><div className="water-drop-inner">💧</div></div>
-                            <div className="water-drop-wrapper w2"><div className="water-drop-inner">💧</div></div>
-                            <div className="water-drop-wrapper w3"><div className="water-drop-inner">💧</div></div>
-                            <div className="oceanic-bubble b1"></div>
-                            <div className="oceanic-bubble b2"></div>
-                            <div className="oceanic-bubble b3"></div>
-                          </>
-                        )}
-                        {baseEffect === 'saturn-fire' && (
-                          <>
-                            <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effectColor1, borderBottomColor: effectColor2 }}></div></div>
-                            <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effectColor1, borderBottomColor: effectColor2 }}></div></div>
-                            <div className="fire-particle f1"></div>
-                            <div className="fire-particle f2"></div>
-                            <div className="fire-particle f3"></div>
-                          </>
-                        )}
-                        {baseEffect === 'supernova' && (
-                          <>
-                            <div className="supernova-star s1"></div>
-                            <div className="supernova-star s2"></div>
-                            <div className="supernova-star s3"></div>
-                          </>
-                        )}
-                        {baseEffect === 'esquelito' && (
-                          <>
-                            <div className="esquelito-skull sk1"></div>
-                            <div className="esquelito-skull sk2"></div>
-                            <div className="esquelito-skull sk3"></div>
-                          </>
-                        )}
-                        {baseEffect === 'gustavo-armando' && (
-                          <>
-                            <div className="gustavo-sprite gustavo-trail t2"></div>
-                            <div className="gustavo-sprite gustavo-trail t1"></div>
-                            <div className="gustavo-sprite gustavo-main"></div>
-                            <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner"></div></div>
-                            <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner"></div></div>
-                          </>
-                        )}
-                        {baseEffect === 'serpixel-agitato' && (
-                          <>
-                            <div className="serpixel-scanline"></div>
-                            <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond"></div></div>
-                            <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond"></div></div>
-                            <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond"></div></div>
-                            <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond"></div></div>
-                            <div className="serpixel-venom v1"></div>
-                            <div className="serpixel-venom v2"></div>
-                            <div className="serpixel-venom v3"></div>
-                            <div className="serpixel-venom v4"></div>
-                            <div className="serpixel-venom v5"></div>
-                            <div className="serpixel-snake s1"></div>
-                            <div className="serpixel-snake s2"></div>
-                            <div className="serpixel-snake s3"></div>
-                            <div className="serpixel-snake s4"></div>
-                            <div className="serpixel-snake s5"></div>
-                            <div className="serpixel-snake s6"></div>
-                            <div className="serpixel-snake s7"></div>
-                            <div className="serpixel-snake s8"></div>
-                          </>
-                        )}
-                        {baseEffect === 'tempesta' && (
-                          <>
-                            <div className="storm-drop d1"></div>
-                            <div className="storm-drop d2"></div>
-                            <div className="storm-drop d3"></div>
-                          </>
-                        )}
-                        {baseEffect === 'ghiacciolo' && (
-                          <>
-                            <div className="ice-flake f1">❄️</div>
-                            <div className="ice-flake f2">❄️</div>
-                            <div className="ice-flake f3">❄️</div>
-                          </>
-                        )}
+                        {renderOuterEffects(baseEffects)}
 
-                        {/* Elementi Fluttuanti Custom */}
                         {elements.map(el => {
                           if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
                             const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
