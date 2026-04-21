@@ -25,6 +25,7 @@ export type CustomAnimationDef = {
 
 export type CustomElement = {
   id: string;
+  name?: string;
   type: 'emoji' | 'image';
   content: string;
   animation: string;
