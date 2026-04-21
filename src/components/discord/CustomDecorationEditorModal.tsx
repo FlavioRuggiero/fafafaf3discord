@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Upload, Plus } from "lucide-react";
+import { X, Wand2, Upload, Plus, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -60,6 +60,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     });
   };
 
+  const duplicateBaseEffect = (id: string) => {
+    const effectToCopy = draftDecoration.baseEffects.find(e => e.id === id);
+    if (effectToCopy) {
+      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...effectToCopy, id: `be-${Date.now()}` }] });
+    }
+  };
+
   const addElement = () => {
     updateDraft({
       elements: [...draftDecoration.elements, {
@@ -82,6 +89,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     updateDraft({
       elements: draftDecoration.elements.filter(el => el.id !== id)
     });
+  };
+
+  const duplicateElement = (id: string) => {
+    const elToCopy = draftDecoration.elements.find(e => e.id === id);
+    if (elToCopy) {
+      updateDraft({ elements: [...draftDecoration.elements, { ...elToCopy, id: `el-${Date.now()}` }] });
+    }
   };
 
   const addCustomAnimation = () => {
@@ -110,6 +124,15 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       customAnimations: draftDecoration.customAnimations.filter(a => a.id !== id),
       elements: draftDecoration.elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el)
     });
+  };
+
+  const duplicateCustomAnimation = (id: string) => {
+    const animToCopy = draftDecoration.customAnimations.find(a => a.id === id);
+    if (animToCopy) {
+      const newAnimId = `anim-${Date.now()}`;
+      const newKeyframes = animToCopy.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
+      updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...animToCopy, id: newAnimId, name: `${animToCopy.name} (Copia)`, keyframes: newKeyframes }] });
+    }
   };
 
   const addKeyframe = (animId: string) => {
@@ -145,6 +168,20 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       customAnimations: draftDecoration.customAnimations.map(a => {
         if (a.id === animId) {
           return { ...a, keyframes: a.keyframes.filter(kf => kf.id !== kfId) };
+        }
+        return a;
+      })
+    });
+  };
+
+  const duplicateKeyframe = (animId: string, kfId: string) => {
+    updateDraft({
+      customAnimations: draftDecoration.customAnimations.map(a => {
+        if (a.id === animId) {
+          const kfToCopy = a.keyframes.find(kf => kf.id === kfId);
+          if (kfToCopy) {
+            return { ...a, keyframes: [...a.keyframes, { ...kfToCopy, id: `kf-${Date.now()}` }] };
+          }
         }
         return a;
       })
@@ -192,7 +229,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     });
 
     if (error) {
-      showError("Errore durante la creazione.");
+      showError("Errore durante la creazione. Assicurati di aver eseguito lo script SQL per i permessi.");
     } else {
       const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
       const currentPurchased = profile?.purchased_decorations || [];
@@ -541,10 +578,15 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div className="space-y-3">
                     {draftDecoration.baseEffects.map((effect) => (
                       <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                          <X size={16} />
-                        </button>
-                        <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <button type="button" onClick={() => duplicateBaseEffect(effect.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                            <Copy size={16} />
+                          </button>
+                          <button type="button" onClick={() => removeBaseEffect(effect.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-3 pr-12">
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo Effetto</label>
                             <select value={effect.type} onChange={e => updateBaseEffect(effect.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -651,10 +693,15 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div className="space-y-3">
                     {draftDecoration.elements.map((el, idx) => (
                       <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                          <X size={16} />
-                        </button>
-                        <div className="grid grid-cols-2 gap-3 mb-3 pr-6">
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <button type="button" onClick={() => duplicateElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                            <Copy size={16} />
+                          </button>
+                          <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-3 pr-12">
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
                             <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -743,11 +790,16 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div className="space-y-4">
                     {draftDecoration.customAnimations.map((anim) => (
                       <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
-                          <X size={16} />
-                        </button>
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <button type="button" onClick={() => duplicateCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                            <Copy size={16} />
+                          </button>
+                          <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                            <X size={16} />
+                          </button>
+                        </div>
                         
-                        <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
+                        <div className="grid grid-cols-3 gap-3 mb-4 pr-12">
                           <div>
                             <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
                             <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
@@ -777,11 +829,16 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                           <div className="space-y-2">
                             {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
                               <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
-                                <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
-                                  <X size={12} />
-                                </button>
+                                <div className="absolute top-1 right-1 flex gap-1">
+                                  <button type="button" onClick={() => duplicateKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Duplica">
+                                    <Copy size={12} />
+                                  </button>
+                                  <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                    <X size={12} />
+                                  </button>
+                                </div>
                                 
-                                <div className="w-full flex items-center gap-2 mb-1 pr-4">
+                                <div className="w-full flex items-center gap-2 mb-1 pr-10">
                                   <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
                                   <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
                                 </div>
