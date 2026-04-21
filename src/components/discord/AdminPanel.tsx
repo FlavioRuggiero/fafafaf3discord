@@ -873,14 +873,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
                                   <input type="number" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
                                 </div>
-                                <input type="range" min="-300" max="300" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
+                                <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
                                 <div className="flex justify-between items-center mb-1">
                                   <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
                                   <input type="number" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
                                 </div>
-                                <input type="range" min="-300" max="300" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                                <input type="range" min="0" max="100" value={effect.y ?? 50} onChange={e => updateBaseEffect(effect.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
                                 <div className="flex justify-between items-center mb-1">
@@ -958,14 +958,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
                                   <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
                                 </div>
-                                <input type="range" min="-300" max="300" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
+                                <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                               <div>
                                 <div className="flex justify-between items-center mb-1">
                                   <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
                                   <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
                                 </div>
-                                <input type="range" min="-300" max="300" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                                <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
                               </div>
                             </div>
 

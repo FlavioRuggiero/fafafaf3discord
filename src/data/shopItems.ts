@@ -2,7 +2,7 @@ export type ShopItem = {
   id: string;
   name: string;
   price: number;
-  type: 'decoration' | 'emoji_pack' | 'privilege';
+  type: 'decoration' | 'emoji_pack' | 'privilege' | 'consumable';
   category: string;
   emojis?: string[];
   description?: string;
@@ -73,6 +73,16 @@ export const SHOP_ITEMS: ShopItem[] = [
     type: 'privilege', 
     category: 'Privilegi',
     description: 'Permette di registrare o caricare un audio (max 2s) che verrà riprodotto quando entri in un canale vocale.'
+  },
+
+  // Oggetti Speciali (Consumabili)
+  {
+    id: 'custom-dec-ticket',
+    name: 'Contorno personalizzato',
+    price: 750,
+    type: 'consumable',
+    category: 'Speciali',
+    description: 'Questo oggetto ti permette di creare un tuo contorno personalizzato.'
   },
 
   // Pacchetti Emoji

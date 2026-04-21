@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X, Crown } from 'lucide-react';
+import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X, Crown, Wand2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -128,7 +128,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       return;
     }
 
-    if (currentUser.purchased_decorations?.includes(item.id)) {
+    if (currentUser.purchased_decorations?.includes(item.id) && item.type !== 'consumable') {
       showError("Hai già acquistato questo oggetto!");
       return;
     }
@@ -189,6 +189,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     }
 
     const isOwned = currentUser.purchased_decorations?.includes(selectedItem.id);
+    const isConsumable = selectedItem.type === 'consumable';
+    
     let refund = 0;
     let newBalance = currentUser.digitalcardus;
     let newStandard = standardChests;
@@ -202,7 +204,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       newBalance -= cost;
     }
 
-    if (isOwned) {
+    if (isOwned && !isConsumable) {
       refund = Math.ceil(selectedItem.price / 3);
       newBalance += refund;
     } else {
@@ -223,7 +225,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     }
 
     setTimeout(() => {
-      if (isOwned) {
+      if (isOwned && !isConsumable) {
         playSound('/pullclone.mp3');
       } else if (selectedItem.price >= 200) {
         playSound('/pullrare.mp3');
@@ -232,7 +234,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
       }
       
       setChestReward(selectedItem);
-      setChestRefund(isOwned ? refund : null);
+      setChestRefund(isOwned && !isConsumable ? refund : null);
       setOpeningChestType(null);
     }, 1500);
   };
@@ -343,6 +345,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {activeItems.map((item, index) => {
                 const isOwned = currentUser.purchased_decorations?.includes(item.id);
+                const isConsumable = item.type === 'consumable';
                 const isDiscounted = index === discountedIndex;
                 const actualPrice = isDiscounted ? Math.ceil(item.price * 0.8) : item.price;
 
@@ -366,6 +369,17 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                         <TooltipTrigger asChild>
                           <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)] mx-auto cursor-help">
                             <Crown size={40} className="text-yellow-500" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-sm max-w-xs text-center z-[99999]">
+                          {item.description}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : item.type === 'consumable' ? (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-brand shadow-[0_0_15px_rgba(88,101,242,0.3)] mx-auto cursor-help">
+                            <Wand2 size={40} className="text-brand" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-sm max-w-xs text-center z-[99999]">
@@ -399,7 +413,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                     <h3 className={`font-bold mb-4 text-sm ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>{item.name}</h3>
 
                     <div className="mt-auto w-full">
-                      {isOwned ? (
+                      {isOwned && !isConsumable ? (
                         <button disabled className="w-full py-2 rounded bg-[#4f545c] text-white font-medium opacity-50 cursor-not-allowed text-sm">
                           Posseduto
                         </button>
@@ -541,6 +555,10 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
               {chestReward.type === 'privilege' ? (
                 <div className="w-32 h-32 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]">
                   <Crown size={64} className="text-yellow-500" />
+                </div>
+              ) : chestReward.type === 'consumable' ? (
+                <div className="w-32 h-32 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-brand shadow-[0_0_20px_rgba(88,101,242,0.4)]">
+                  <Wand2 size={64} className="text-brand" />
                 </div>
               ) : chestReward.type === 'emoji_pack' ? (
                 <div className="w-32 h-32 grid grid-cols-2 gap-2 p-3 bg-[#1e1f22] rounded-xl border-2 border-brand shadow-[0_0_20px_rgba(88,101,242,0.3)]">
