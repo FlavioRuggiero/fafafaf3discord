@@ -68,18 +68,55 @@ export type CustomDecoration = {
   };
 };
 
+export type DraftDecoration = {
+  name: string;
+  price: number;
+  borderColor: string;
+  shadowColor: string;
+  textColorType: 'solid' | 'gradient';
+  textColor: string;
+  gradStart: string;
+  gradEnd: string;
+  anim: string;
+  baseEffects: BaseEffectConfig[];
+  elements: CustomElement[];
+  customAnimations: CustomAnimationDef[];
+  imageFile: File | null;
+  imagePreview: string | null;
+};
+
+export const DEFAULT_DRAFT_DECORATION: DraftDecoration = {
+  name: '',
+  price: 100,
+  borderColor: '#5865F2',
+  shadowColor: '#5865F2',
+  textColorType: 'gradient',
+  textColor: '#ffffff',
+  gradStart: '#5865F2',
+  gradEnd: '#00ffff',
+  anim: 'none',
+  baseEffects: [],
+  elements: [],
+  customAnimations: [],
+  imageFile: null,
+  imagePreview: null
+};
+
 type ShopContextType = {
   customDecorations: CustomDecoration[];
   allItems: ShopItem[];
   refreshCustomDecorations: () => Promise<void>;
   getThemeStyle: (id: string | null | undefined) => React.CSSProperties;
   getThemeClass: (id: string | null | undefined) => string;
+  draftDecoration: DraftDecoration;
+  setDraftDecoration: React.Dispatch<React.SetStateAction<DraftDecoration>>;
 };
 
 const ShopContext = createContext<ShopContextType | null>(null);
 
 export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
   const [customDecorations, setCustomDecorations] = useState<CustomDecoration[]>([]);
+  const [draftDecoration, setDraftDecoration] = useState<DraftDecoration>(DEFAULT_DRAFT_DECORATION);
 
   const refreshCustomDecorations = async () => {
     const { data } = await supabase.from('custom_decorations').select('*');
@@ -129,7 +166,7 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          color: 'transparent'
+          filter: `drop-shadow(0 0 8px ${custom.text_gradient_start || '#fff'}80)`
         };
       }
     }
@@ -137,7 +174,7 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <ShopContext.Provider value={{ customDecorations, allItems, refreshCustomDecorations, getThemeStyle, getThemeClass }}>
+    <ShopContext.Provider value={{ customDecorations, allItems, refreshCustomDecorations, getThemeStyle, getThemeClass, draftDecoration, setDraftDecoration }}>
       {children}
     </ShopContext.Provider>
   );

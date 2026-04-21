@@ -6,7 +6,7 @@ import { X, Wand2, Upload, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
-import { useShop, CustomElement, BaseEffectConfig, CustomAnimationDef, CustomKeyframe } from "@/contexts/ShopContext";
+import { useShop, CustomElement, BaseEffectConfig, CustomAnimationDef, CustomKeyframe, DraftDecoration, DEFAULT_DRAFT_DECORATION } from "@/contexts/ShopContext";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 
 interface CustomDecorationEditorModalProps {
@@ -16,152 +16,153 @@ interface CustomDecorationEditorModalProps {
 }
 
 export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: CustomDecorationEditorModalProps) => {
-  const { refreshCustomDecorations } = useShop();
-  
-  const [newDecName, setNewDecName] = useState('');
-  const [newDecBorder, setNewDecBorder] = useState('#5865F2');
-  const [newDecShadow, setNewDecShadow] = useState('#5865F2');
-  
-  const [textColorType, setTextColorType] = useState<'solid' | 'gradient'>('gradient');
-  const [newDecTextColor, setNewDecTextColor] = useState('#ffffff');
-  const [newDecGradStart, setNewDecGradStart] = useState('#5865F2');
-  const [newDecGradEnd, setNewDecGradEnd] = useState('#00ffff');
-  
-  const [newDecAnim, setNewDecAnim] = useState('none');
-  
-  const [baseEffects, setBaseEffects] = useState<BaseEffectConfig[]>([]);
-  const [elements, setElements] = useState<CustomElement[]>([]);
-  const [customAnimations, setCustomAnimations] = useState<CustomAnimationDef[]>([]);
-  
-  const [newDecImage, setNewDecImage] = useState<File | null>(null);
-  const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
+  const { refreshCustomDecorations, draftDecoration, setDraftDecoration } = useShop();
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
 
   if (!isOpen) return null;
 
+  const updateDraft = (updates: Partial<DraftDecoration>) => {
+    setDraftDecoration(prev => ({ ...prev, ...updates }));
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setNewDecImage(file);
-      setNewDecImagePreview(URL.createObjectURL(file));
+      updateDraft({ imageFile: file, imagePreview: URL.createObjectURL(file) });
     }
   };
 
   const addBaseEffect = () => {
-    setBaseEffects([...baseEffects, {
-      id: `be-${Date.now()}`,
-      type: 'scanline',
-      color1: '#5865F2',
-      color2: '#f23f43',
-      icon: '',
-      x: 50,
-      y: 50,
-      rotation: 0,
-      size: 100,
-      zIndex: 20
-    }]);
+    updateDraft({
+      baseEffects: [...draftDecoration.baseEffects, {
+        id: `be-${Date.now()}`,
+        type: 'scanline',
+        color1: '#5865F2',
+        color2: '#f23f43',
+        icon: '',
+        x: 50, y: 50, rotation: 0, size: 100, zIndex: 20
+      }]
+    });
   };
 
   const updateBaseEffect = (id: string, field: keyof BaseEffectConfig, value: any) => {
-    setBaseEffects(baseEffects.map(el => el.id === id ? { ...el, [field]: value } : el));
+    updateDraft({
+      baseEffects: draftDecoration.baseEffects.map(el => el.id === id ? { ...el, [field]: value } : el)
+    });
   };
 
   const removeBaseEffect = (id: string) => {
-    setBaseEffects(baseEffects.filter(el => el.id !== id));
+    updateDraft({
+      baseEffects: draftDecoration.baseEffects.filter(el => el.id !== id)
+    });
   };
 
   const addElement = () => {
-    setElements([...elements, {
-      id: `el-${Date.now()}`,
-      type: 'emoji',
-      content: '✨',
-      animation: 'float',
-      x: 50,
-      y: 50,
-      size: 15,
-      delay: 0
-    }]);
+    updateDraft({
+      elements: [...draftDecoration.elements, {
+        id: `el-${Date.now()}`,
+        type: 'emoji',
+        content: '✨',
+        animation: 'float',
+        x: 50, y: 50, size: 15, delay: 0
+      }]
+    });
   };
 
   const updateElement = (id: string, field: keyof CustomElement, value: any) => {
-    setElements(elements.map(el => el.id === id ? { ...el, [field]: value } : el));
+    updateDraft({
+      elements: draftDecoration.elements.map(el => el.id === id ? { ...el, [field]: value } : el)
+    });
   };
 
   const removeElement = (id: string) => {
-    setElements(elements.filter(el => el.id !== id));
+    updateDraft({
+      elements: draftDecoration.elements.filter(el => el.id !== id)
+    });
   };
 
   const addCustomAnimation = () => {
-    setCustomAnimations([...customAnimations, {
-      id: `anim-${Date.now()}`,
-      name: `Animazione ${customAnimations.length + 1}`,
-      duration: 3,
-      timingFunction: 'linear',
-      keyframes: [
-        { id: `kf-${Date.now()}-1`, percent: 0, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20 },
-        { id: `kf-${Date.now()}-2`, percent: 100, x: 50, y: 50, scale: 1, rotation: 360, opacity: 1, zIndex: 20 }
-      ]
-    }]);
+    updateDraft({
+      customAnimations: [...draftDecoration.customAnimations, {
+        id: `anim-${Date.now()}`,
+        name: `Animazione ${draftDecoration.customAnimations.length + 1}`,
+        duration: 3,
+        timingFunction: 'linear',
+        keyframes: [
+          { id: `kf-${Date.now()}-1`, percent: 0, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20 },
+          { id: `kf-${Date.now()}-2`, percent: 100, x: 50, y: 50, scale: 1, rotation: 360, opacity: 1, zIndex: 20 }
+        ]
+      }]
+    });
   };
 
   const updateCustomAnimation = (id: string, field: keyof CustomAnimationDef, value: any) => {
-    setCustomAnimations(customAnimations.map(a => a.id === id ? { ...a, [field]: value } : a));
+    updateDraft({
+      customAnimations: draftDecoration.customAnimations.map(a => a.id === id ? { ...a, [field]: value } : a)
+    });
   };
 
   const removeCustomAnimation = (id: string) => {
-    setCustomAnimations(customAnimations.filter(a => a.id !== id));
-    setElements(elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el));
+    updateDraft({
+      customAnimations: draftDecoration.customAnimations.filter(a => a.id !== id),
+      elements: draftDecoration.elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el)
+    });
   };
 
   const addKeyframe = (animId: string) => {
-    setCustomAnimations(customAnimations.map(a => {
-      if (a.id === animId) {
-        return {
-          ...a,
-          keyframes: [...a.keyframes, { id: `kf-${Date.now()}`, percent: 50, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20 }]
-        };
-      }
-      return a;
-    }));
+    updateDraft({
+      customAnimations: draftDecoration.customAnimations.map(a => {
+        if (a.id === animId) {
+          return {
+            ...a,
+            keyframes: [...a.keyframes, { id: `kf-${Date.now()}`, percent: 50, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1, zIndex: 20 }]
+          };
+        }
+        return a;
+      })
+    });
   };
 
   const updateKeyframe = (animId: string, kfId: string, field: keyof CustomKeyframe, value: any) => {
-    setCustomAnimations(customAnimations.map(a => {
-      if (a.id === animId) {
-        return {
-          ...a,
-          keyframes: a.keyframes.map(kf => kf.id === kfId ? { ...kf, [field]: value } : kf)
-        };
-      }
-      return a;
-    }));
+    updateDraft({
+      customAnimations: draftDecoration.customAnimations.map(a => {
+        if (a.id === animId) {
+          return {
+            ...a,
+            keyframes: a.keyframes.map(kf => kf.id === kfId ? { ...kf, [field]: value } : kf)
+          };
+        }
+        return a;
+      })
+    });
   };
 
   const removeKeyframe = (animId: string, kfId: string) => {
-    setCustomAnimations(customAnimations.map(a => {
-      if (a.id === animId) {
-        return { ...a, keyframes: a.keyframes.filter(kf => kf.id !== kfId) };
-      }
-      return a;
-    }));
+    updateDraft({
+      customAnimations: draftDecoration.customAnimations.map(a => {
+        if (a.id === animId) {
+          return { ...a, keyframes: a.keyframes.filter(kf => kf.id !== kfId) };
+        }
+        return a;
+      })
+    });
   };
 
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDecName.trim() || !currentUser) return;
+    if (!draftDecoration.name.trim() || !currentUser) return;
     
     setIsCreatingDec(true);
     const customId = `custom-${Date.now()}`;
     let imageUrl = null;
 
-    if (newDecImage) {
-      const fileExt = newDecImage.name.split('.').pop();
+    if (draftDecoration.imageFile) {
+      const fileExt = draftDecoration.imageFile.name.split('.').pop();
       const filePath = `custom_decorations/${customId}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, newDecImage);
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, draftDecoration.imageFile);
       if (!uploadError) {
         const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
         imageUrl = data.publicUrl;
@@ -169,32 +170,30 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
     }
 
     const config = {
-      baseEffects,
-      elements,
-      customAnimations
+      baseEffects: draftDecoration.baseEffects,
+      elements: draftDecoration.elements,
+      customAnimations: draftDecoration.customAnimations
     };
 
-    // Inserisci il contorno nel database globale
     const { error } = await supabase.from('custom_decorations').insert({
       id: customId,
-      name: newDecName.trim(),
-      price: 750, // Prezzo fisso
+      name: draftDecoration.name.trim(),
+      price: 750, // Prezzo fisso per gli utenti
       category: 'Contorni Custom',
       image_url: imageUrl,
-      border_color: newDecBorder,
-      shadow_color: newDecShadow,
-      text_color_type: textColorType,
-      text_color: newDecTextColor,
-      text_gradient_start: newDecGradStart,
-      text_gradient_end: newDecGradEnd,
-      animation_type: newDecAnim,
+      border_color: draftDecoration.borderColor,
+      shadow_color: draftDecoration.shadowColor,
+      text_color_type: draftDecoration.textColorType,
+      text_color: draftDecoration.textColor,
+      text_gradient_start: draftDecoration.gradStart,
+      text_gradient_end: draftDecoration.gradEnd,
+      animation_type: draftDecoration.anim,
       config: config
     });
 
     if (error) {
       showError("Errore durante la creazione.");
     } else {
-      // Rimuovi un ticket e aggiungi il nuovo contorno
       const { data: profile } = await supabase.from('profiles').select('purchased_decorations').eq('id', currentUser.id).single();
       const currentPurchased = profile?.purchased_decorations || [];
       
@@ -207,13 +206,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       await supabase.from('profiles').update({ purchased_decorations: currentPurchased }).eq('id', currentUser.id);
 
       showSuccess("Contorno creato e aggiunto al tuo inventario!");
+      setDraftDecoration(DEFAULT_DRAFT_DECORATION); // Resetta la bozza dopo la creazione
       await refreshCustomDecorations();
       onClose();
     }
     setIsCreatingDec(false);
   };
 
-  // Helper per l'anteprima
   const getAnimation = (anim: string, delay: number, customAnims?: CustomAnimationDef[]) => {
     const delayStr = delay > 0 ? `${delay}s` : '0s';
     if (anim.startsWith('custom_anim_')) {
@@ -419,8 +418,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                     <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome</label>
                     <input 
                       type="text" 
-                      value={newDecName}
-                      onChange={e => setNewDecName(e.target.value)}
+                      value={draftDecoration.name}
+                      onChange={e => updateDraft({ name: e.target.value })}
                       required
                       className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
                     />
@@ -442,21 +441,21 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                 <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Testo</h4>
                 <div className="flex gap-4 mb-4">
                   <label className="flex items-center gap-2 text-white cursor-pointer">
-                    <input type="radio" checked={textColorType === 'solid'} onChange={() => setTextColorType('solid')} className="accent-brand" />
+                    <input type="radio" checked={draftDecoration.textColorType === 'solid'} onChange={() => updateDraft({ textColorType: 'solid' })} className="accent-brand" />
                     Tinta Unita
                   </label>
                   <label className="flex items-center gap-2 text-white cursor-pointer">
-                    <input type="radio" checked={textColorType === 'gradient'} onChange={() => setTextColorType('gradient')} className="accent-brand" />
+                    <input type="radio" checked={draftDecoration.textColorType === 'gradient'} onChange={() => updateDraft({ textColorType: 'gradient' })} className="accent-brand" />
                     Gradiente
                   </label>
                 </div>
 
-                {textColorType === 'solid' ? (
+                {draftDecoration.textColorType === 'solid' ? (
                   <div>
                     <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Testo</label>
                     <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                      <input type="color" value={newDecTextColor} onChange={e => setNewDecTextColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                      <span className="text-white text-sm uppercase">{newDecTextColor}</span>
+                      <input type="color" value={draftDecoration.textColor} onChange={e => updateDraft({ textColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                      <span className="text-white text-sm uppercase">{draftDecoration.textColor}</span>
                     </div>
                   </div>
                 ) : (
@@ -464,15 +463,15 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                     <div className="flex-1">
                       <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Inizio Gradiente</label>
                       <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                        <input type="color" value={newDecGradStart} onChange={e => setNewDecGradStart(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                        <span className="text-white text-sm uppercase">{newDecGradStart}</span>
+                        <input type="color" value={draftDecoration.gradStart} onChange={e => updateDraft({ gradStart: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                        <span className="text-white text-sm uppercase">{draftDecoration.gradStart}</span>
                       </div>
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Fine Gradiente</label>
                       <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                        <input type="color" value={newDecGradEnd} onChange={e => setNewDecGradEnd(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                        <span className="text-white text-sm uppercase">{newDecGradEnd}</span>
+                        <input type="color" value={draftDecoration.gradEnd} onChange={e => updateDraft({ gradEnd: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                        <span className="text-white text-sm uppercase">{draftDecoration.gradEnd}</span>
                       </div>
                     </div>
                   </div>
@@ -486,15 +485,15 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div>
                     <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
                     <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                      <input type="color" value={newDecBorder} onChange={e => setNewDecBorder(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                      <span className="text-white text-sm uppercase">{newDecBorder}</span>
+                      <input type="color" value={draftDecoration.borderColor} onChange={e => updateDraft({ borderColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                      <span className="text-white text-sm uppercase">{draftDecoration.borderColor}</span>
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Ombra</label>
                     <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
-                      <input type="color" value={newDecShadow} onChange={e => setNewDecShadow(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
-                      <span className="text-white text-sm uppercase">{newDecShadow}</span>
+                      <input type="color" value={draftDecoration.shadowColor} onChange={e => updateDraft({ shadowColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                      <span className="text-white text-sm uppercase">{draftDecoration.shadowColor}</span>
                     </div>
                   </div>
                 </div>
@@ -503,8 +502,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div className="flex-1">
                     <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
                     <select 
-                      value={newDecAnim}
-                      onChange={e => setNewDecAnim(e.target.value)}
+                      value={draftDecoration.anim}
+                      onChange={e => updateDraft({ anim: e.target.value })}
                       className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
                     >
                       <option value="none">Nessuna</option>
@@ -520,7 +519,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                       onClick={() => fileInputRef.current?.click()}
                       className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
                     >
-                      <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
+                      <Upload size={16} /> {draftDecoration.imageFile ? 'Cambia Immagine' : 'Carica Immagine'}
                     </button>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                   </div>
@@ -536,11 +535,11 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   </button>
                 </div>
 
-                {baseEffects.length === 0 ? (
+                {draftDecoration.baseEffects.length === 0 ? (
                   <p className="text-xs text-[#949ba4] italic">Nessun effetto base aggiunto.</p>
                 ) : (
                   <div className="space-y-3">
-                    {baseEffects.map((effect) => (
+                    {draftDecoration.baseEffects.map((effect) => (
                       <div key={effect.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
                         <button type="button" onClick={() => removeBaseEffect(effect.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
                           <X size={16} />
@@ -646,11 +645,11 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   </button>
                 </div>
 
-                {elements.length === 0 ? (
+                {draftDecoration.elements.length === 0 ? (
                   <p className="text-xs text-[#949ba4] italic">Nessun elemento fluttuante aggiunto.</p>
                 ) : (
                   <div className="space-y-3">
-                    {elements.map((el, idx) => (
+                    {draftDecoration.elements.map((el, idx) => (
                       <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
                         <button type="button" onClick={() => removeElement(el.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
                           <X size={16} />
@@ -708,7 +707,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                               <option value="orbit-2d">Orbita 2D</option>
                               <option value="orbit-3d">Orbita 3D</option>
                               <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
-                              {customAnimations.map(a => (
+                              {draftDecoration.customAnimations.map(a => (
                                 <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
                               ))}
                             </select>
@@ -738,11 +737,11 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                 </div>
                 <p className="text-xs text-[#949ba4] mb-4">Crea qui l'animazione, poi assegnala a un Elemento Fluttuante per vederla in azione!</p>
 
-                {customAnimations.length === 0 ? (
+                {draftDecoration.customAnimations.length === 0 ? (
                   <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
                 ) : (
                   <div className="space-y-4">
-                    {customAnimations.map((anim) => (
+                    {draftDecoration.customAnimations.map((anim) => (
                       <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
                         <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
                           <X size={16} />
@@ -857,29 +856,29 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
             <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
             
             <div className="dec-wrapper relative w-32 h-32 mb-8">
-              {renderCustomAnimationsCSS(customAnimations)}
+              {renderCustomAnimationsCSS(draftDecoration.customAnimations)}
               
               {/* Inner Effects */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {renderInnerEffects(baseEffects)}
+                {renderInnerEffects(draftDecoration.baseEffects)}
               </div>
 
               {/* Avatar & Border (z-10) */}
               <div 
                 className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
                 style={{
-                  border: `2px solid ${newDecBorder}`,
-                  boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
+                  border: `2px solid ${draftDecoration.borderColor}`,
+                  boxShadow: `0 0 10px ${draftDecoration.shadowColor}, inset 0 0 10px ${draftDecoration.shadowColor}`,
                 }}
               >
-                {newDecImagePreview && (
+                {draftDecoration.imagePreview && (
                   <img 
-                    src={newDecImagePreview} 
+                    src={draftDecoration.imagePreview} 
                     className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
                     style={{ 
-                      animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
-                                 newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
-                                 newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                      animation: draftDecoration.anim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                 draftDecoration.anim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                 draftDecoration.anim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
                     }} 
                   />
                 )}
@@ -888,11 +887,11 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
               {/* Outer Effects */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {renderOuterEffects(baseEffects)}
+                {renderOuterEffects(draftDecoration.baseEffects)}
               </div>
 
               {/* Elements */}
-              {elements.map(el => {
+              {draftDecoration.elements.map(el => {
                 if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
                   const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
                   const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
@@ -924,7 +923,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                       left: `${el.x}%`,
                       top: `${el.y}%`,
                       transform: 'translate(-50%, -50%)',
-                      animation: getAnimation(el.animation, el.delay, customAnimations),
+                      animation: getAnimation(el.animation, el.delay, draftDecoration.customAnimations),
                       width: `${el.size}cqw`,
                       height: `${el.size}cqw`,
                       fontSize: `${el.size}cqw`,
@@ -939,29 +938,29 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
             <div 
               className="mb-8 text-center"
-              style={textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${newDecGradStart || '#fff'}80)` } : {}}
+              style={draftDecoration.textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${draftDecoration.gradStart || '#fff'}80)` } : {}}
             >
               <span 
                 className="font-bold text-2xl"
-                style={textColorType === 'solid' ? {
-                  color: newDecTextColor,
-                  textShadow: `0 0 10px ${newDecTextColor}80`
+                style={draftDecoration.textColorType === 'solid' ? {
+                  color: draftDecoration.textColor,
+                  textShadow: `0 0 10px ${draftDecoration.textColor}80`
                 } : {
-                  backgroundImage: `linear-gradient(90deg, ${newDecGradStart || '#fff'}, ${newDecGradEnd || '#fff'})`,
+                  backgroundImage: `linear-gradient(90deg, ${draftDecoration.gradStart || '#fff'}, ${draftDecoration.gradEnd || '#fff'})`,
                   WebkitBackgroundClip: 'text',
                   backgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   color: 'transparent'
                 }}
               >
-                {newDecName || 'Nome Contorno'}
+                {draftDecoration.name || 'Nome Contorno'}
               </span>
             </div>
 
             <button 
               type="submit"
               form="user-custom-dec-form"
-              disabled={isCreatingDec || !newDecName.trim()}
+              disabled={isCreatingDec || !draftDecoration.name.trim()}
               className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
             >
               {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
