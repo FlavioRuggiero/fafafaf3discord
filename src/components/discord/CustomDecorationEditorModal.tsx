@@ -92,7 +92,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const pasteBaseEffect = () => {
     if (clipboard.baseEffect) {
-      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random()}` }] });
+      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random().toString(36).substring(7)}` }] });
       showSuccess("Effetto incollato!");
     }
   };
@@ -105,7 +105,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         type: 'emoji',
         content: '✨',
         animation: 'float',
-        x: 50, y: 50, rotation: 0, size: 15, delay: 0, parentId: undefined
+        x: 50, y: 50, rotation: 0, size: 15, delay: 0, parentId: undefined, zIndex: 20
       }]
     });
     // Espandi automaticamente il nuovo elemento
@@ -140,7 +140,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const pasteElement = () => {
     if (clipboard.element) {
-      const newId = `el-${Date.now()}-${Math.random()}`;
+      const newId = `el-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       updateDraft({ elements: [...draftDecoration.elements, { ...clipboard.element, id: newId }] });
       showSuccess("Elemento incollato!");
     }
@@ -190,8 +190,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const pasteCustomAnimation = () => {
     if (clipboard.animation) {
-      const newAnimId = `anim-${Date.now()}-${Math.random()}`;
-      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
+      const newAnimId = `anim-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}` }));
       updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...clipboard.animation, id: newAnimId, name: `${clipboard.animation.name} (Copia)`, keyframes: newKeyframes }] });
       showSuccess("Animazione incollata!");
     }
@@ -252,7 +252,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       updateDraft({
         customAnimations: draftDecoration.customAnimations.map(a => {
           if (a.id === animId) {
-            return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random()}` }] };
+            return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}` }] };
           }
           return a;
         })
@@ -552,7 +552,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
             top: `${el.y}%`,
             transform: `translate(-50%, -50%)`,
             width: '100%',
-            height: '100%'
+            height: '100%',
+            zIndex: el.zIndex ?? 20
           }}
         >
           <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
@@ -576,7 +577,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
           fontSize: `${el.size}cqw`,
-          zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
+          zIndex: el.zIndex ?? 20
         }}
       >
         {innerContent}
@@ -924,7 +925,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
                                   <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -969,6 +970,10 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                                         </option>
                                     ))}
                                   </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Z-Index</label>
+                                  <input type="number" value={el.zIndex ?? 20} onChange={e => updateElement(el.id, 'zIndex', parseInt(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
                                 </div>
                               </div>
                             </div>
