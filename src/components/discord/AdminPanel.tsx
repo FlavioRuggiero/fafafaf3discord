@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2, Type, Image as ImageIcon, SmilePlus, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useShop, CustomElement, BaseEffectConfig } from "@/contexts/ShopContext";
+import { useShop, CustomElement, BaseEffectConfig, CustomAnimationDef, CustomKeyframe } from "@/contexts/ShopContext";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 
 interface AdminPanelProps {
@@ -48,11 +48,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [newDecAnim, setNewDecAnim] = useState('none');
   
   const [baseEffects, setBaseEffects] = useState<BaseEffectConfig[]>([]);
+  const [elements, setElements] = useState<CustomElement[]>([]);
+  const [customAnimations, setCustomAnimations] = useState<CustomAnimationDef[]>([]);
   
   const [newDecImage, setNewDecImage] = useState<File | null>(null);
   const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
-  
-  const [elements, setElements] = useState<CustomElement[]>([]);
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,7 +215,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       icon: '',
       x: 50,
       y: 50,
-      rotation: 0
+      rotation: 0,
+      size: 100
     }]);
   };
 
@@ -248,6 +249,63 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     setElements(elements.filter(el => el.id !== id));
   };
 
+  // Animazioni Custom
+  const addCustomAnimation = () => {
+    setCustomAnimations([...customAnimations, {
+      id: `anim-${Date.now()}`,
+      name: `Animazione ${customAnimations.length + 1}`,
+      duration: 3,
+      timingFunction: 'linear',
+      keyframes: [
+        { id: `kf-${Date.now()}-1`, percent: 0, x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+        { id: `kf-${Date.now()}-2`, percent: 100, x: 0, y: 0, scale: 1, rotation: 360, opacity: 1 }
+      ]
+    }]);
+  };
+
+  const updateCustomAnimation = (id: string, field: keyof CustomAnimationDef, value: any) => {
+    setCustomAnimations(customAnimations.map(a => a.id === id ? { ...a, [field]: value } : a));
+  };
+
+  const removeCustomAnimation = (id: string) => {
+    setCustomAnimations(customAnimations.filter(a => a.id !== id));
+    // Resetta gli elementi che usavano questa animazione
+    setElements(elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el));
+  };
+
+  const addKeyframe = (animId: string) => {
+    setCustomAnimations(customAnimations.map(a => {
+      if (a.id === animId) {
+        return {
+          ...a,
+          keyframes: [...a.keyframes, { id: `kf-${Date.now()}`, percent: 50, x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }]
+        };
+      }
+      return a;
+    }));
+  };
+
+  const updateKeyframe = (animId: string, kfId: string, field: keyof CustomKeyframe, value: any) => {
+    setCustomAnimations(customAnimations.map(a => {
+      if (a.id === animId) {
+        return {
+          ...a,
+          keyframes: a.keyframes.map(kf => kf.id === kfId ? { ...kf, [field]: value } : kf)
+        };
+      }
+      return a;
+    }));
+  };
+
+  const removeKeyframe = (animId: string, kfId: string) => {
+    setCustomAnimations(customAnimations.map(a => {
+      if (a.id === animId) {
+        return { ...a, keyframes: a.keyframes.filter(kf => kf.id !== kfId) };
+      }
+      return a;
+    }));
+  };
+
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDecName.trim() || !currentUser) return;
@@ -268,7 +326,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
     const config = {
       baseEffects,
-      elements
+      elements,
+      customAnimations
     };
 
     const { error } = await supabase.from('custom_decorations').insert({
@@ -301,6 +360,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       setNewDecImagePreview(null);
       setBaseEffects([]);
       setElements([]);
+      setCustomAnimations([]);
       await refreshCustomDecorations();
     }
     setIsCreatingDec(false);
@@ -334,8 +394,16 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const premiumChances = calculateChances(true);
 
   // Helper per l'anteprima
-  const getAnimation = (anim: string, delay: number) => {
+  const getAnimation = (anim: string, delay: number, customAnims?: CustomAnimationDef[]) => {
     const delayStr = delay > 0 ? `${delay}s` : '0s';
+    
+    if (anim.startsWith('custom_anim_')) {
+      const customAnim = customAnims?.find(a => `custom_anim_${a.id}` === anim);
+      if (customAnim) {
+        return `custom_anim_${customAnim.id} ${customAnim.duration}s ${customAnim.timingFunction} infinite ${delayStr}`;
+      }
+    }
+
     switch(anim) {
       case 'float': return `custom-float 3s ease-in-out infinite ${delayStr}`;
       case 'pulse': return `custom-pulse 2s infinite ${delayStr}`;
@@ -352,18 +420,27 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     return 'none';
   };
 
-  const getIconContent = (effect: BaseEffectConfig, defaultIcon: string | null = null) => {
-    if (!effect.icon) return defaultIcon;
-    if (effect.icon.startsWith('http') || effect.icon.startsWith('/')) return null;
-    return <span className="w-full h-full flex items-center justify-center object-contain">{effect.icon}</span>;
+  const getIconContent = (effect: BaseEffectConfig, defaultIcon: string | null = null, sizeCqw?: number) => {
+    const icon = effect.icon || defaultIcon;
+    if (!icon) return null;
+    if (icon.startsWith('http') || icon.startsWith('/')) return null;
+    return <span className="w-full h-full flex items-center justify-center" style={{ fontSize: sizeCqw ? `${sizeCqw}cqw` : 'inherit' }}>{icon}</span>;
+  };
+
+  const getParticleStyle = (effect: BaseEffectConfig, baseStyle: React.CSSProperties = {}) => {
+    if (effect.icon && !effect.icon.startsWith('http') && !effect.icon.startsWith('/')) {
+      return { ...baseStyle, background: 'transparent', boxShadow: 'none', borderColor: 'transparent' };
+    }
+    return baseStyle;
   };
 
   const wrapInnerEffect = (effect: BaseEffectConfig, children: React.ReactNode) => {
     const x = effect.x ?? 50;
     const y = effect.y ?? 50;
     const rot = effect.rotation ?? 0;
+    const scale = effect.size !== undefined ? effect.size / 100 : 1;
     
-    if (x === 50 && y === 50 && rot === 0) {
+    if (x === 50 && y === 50 && rot === 0 && scale === 1) {
       return <React.Fragment key={`wrap-inner-${effect.id}`}>{children}</React.Fragment>;
     }
 
@@ -371,7 +448,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       <div 
         key={`wrap-inner-${effect.id}`}
         className="absolute inset-0 pointer-events-none"
-        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg)` }}
+        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg) scale(${scale})` }}
       >
         {children}
       </div>
@@ -382,8 +459,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     const x = effect.x ?? 50;
     const y = effect.y ?? 50;
     const rot = effect.rotation ?? 0;
+    const scale = effect.size !== undefined ? effect.size / 100 : 1;
     
-    if (x === 50 && y === 50 && rot === 0) {
+    if (x === 50 && y === 50 && rot === 0 && scale === 1) {
       return <React.Fragment key={`wrap-outer-${effect.id}`}>{children}</React.Fragment>;
     }
 
@@ -391,7 +469,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       <div 
         key={`wrap-outer-${effect.id}`}
         className="absolute inset-0 pointer-events-none"
-        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg)` }}
+        style={{ transform: `translate(${x - 50}%, ${y - 50}%) rotate(${rot}deg) scale(${scale})` }}
       >
         {children}
       </div>
@@ -441,28 +519,28 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         case 'supernova':
           return wrapOuterEffect(effect, (
             <>
-              <div className="supernova-star s1" style={{ background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }}>{getIconContent(effect)}</div>
-              <div className="supernova-star s2" style={{ background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }}>{getIconContent(effect)}</div>
-              <div className="supernova-star s3" style={{ background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }}>{getIconContent(effect)}</div>
+              <div className="supernova-star s1" style={getParticleStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
+              <div className="supernova-star s2" style={getParticleStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
+              <div className="supernova-star s3" style={getParticleStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' })}>{getIconContent(effect, null, 12)}</div>
             </>
           ));
         case 'esquelito':
           return wrapOuterEffect(effect, (
             <>
-              <div className="esquelito-skull sk1" style={{ backgroundImage: getBgImage(effect, '/esqueleto1.png') }}>{getIconContent(effect)}</div>
-              <div className="esquelito-skull sk2" style={{ backgroundImage: getBgImage(effect, '/esqueleto2.png') }}>{getIconContent(effect)}</div>
-              <div className="esquelito-skull sk3" style={{ backgroundImage: getBgImage(effect, '/esquelito3.png') }}>{getIconContent(effect)}</div>
+              <div className="esquelito-skull sk1" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto1.png') })}>{getIconContent(effect, null, 50)}</div>
+              <div className="esquelito-skull sk2" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto2.png') })}>{getIconContent(effect, null, 50)}</div>
+              <div className="esquelito-skull sk3" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/esquelito3.png') })}>{getIconContent(effect, null, 50)}</div>
             </>
           ));
         case 'oceanic':
           return wrapOuterEffect(effect, (
             <>
-              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{getIconContent(effect, '💧')}</div></div>
-              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{getIconContent(effect, '💧')}</div></div>
-              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{getIconContent(effect, '💧')}</div></div>
-              <div className="oceanic-bubble b1" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
-              <div className="oceanic-bubble b2" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
-              <div className="oceanic-bubble b3" style={{ background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }}></div>
+              <div className="water-drop-wrapper w1"><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w2"><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="water-drop-wrapper w3"><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+              <div className="oceanic-bubble b1" style={getParticleStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
+              <div className="oceanic-bubble b2" style={getParticleStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
+              <div className="oceanic-bubble b3" style={getParticleStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` })}>{getIconContent(effect, null, 12)}</div>
             </>
           ));
         case 'saturn-fire':
@@ -470,69 +548,80 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             <>
               <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
               <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
-              <div className="fire-particle f1" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{getIconContent(effect)}</div>
-              <div className="fire-particle f2" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{getIconContent(effect)}</div>
-              <div className="fire-particle f3" style={{ background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }}>{getIconContent(effect)}</div>
+              <div className="fire-particle f1" style={getParticleStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
+              <div className="fire-particle f2" style={getParticleStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
+              <div className="fire-particle f3" style={getParticleStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` })}>{getIconContent(effect, null, 15)}</div>
             </>
           ));
         case 'gustavo-armando':
           return wrapOuterEffect(effect, (
             <>
-              <div className="gustavo-sprite gustavo-trail t2" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div>
-              <div className="gustavo-sprite gustavo-trail t1" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div>
-              <div className="gustavo-sprite gustavo-main" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div>
-              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
-              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect)}</div></div>
+              <div className="gustavo-sprite gustavo-trail t2" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
+              <div className="gustavo-sprite gustavo-trail t1" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
+              <div className="gustavo-sprite gustavo-main" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 60)}</div>
+              <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
+              <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') })}>{getIconContent(effect, null, 35)}</div></div>
             </>
           ));
         case 'serpixel-agitato':
           return wrapOuterEffect(effect, (
             <>
-              <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
-              <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
-              <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
-              <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond" style={{ background: effect.color2 }}></div></div>
+              <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
+              <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond" style={getParticleStyle(effect, { background: effect.color2 })}>{getIconContent(effect, null, 10)}</div></div>
               <div className="serpixel-venom v1" style={{ background: effect.color1 }}></div>
               <div className="serpixel-venom v2" style={{ background: effect.color1 }}></div>
               <div className="serpixel-venom v3" style={{ background: effect.color1 }}></div>
               <div className="serpixel-venom v4" style={{ background: effect.color1 }}></div>
               <div className="serpixel-venom v5" style={{ background: effect.color1 }}></div>
-              <div className="serpixel-snake s1" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s2" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s3" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s4" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s5" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s6" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s7" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
-              <div className="serpixel-snake s8" style={{ backgroundImage: getBgImage(effect, '/serpe1.png') }}>{getIconContent(effect)}</div>
+              <div className="serpixel-snake s1" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s2" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s3" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s4" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s5" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s6" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s7" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
+              <div className="serpixel-snake s8" style={getParticleStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') })}>{getIconContent(effect, null, 30)}</div>
             </>
           ));
         case 'tempesta':
           return wrapOuterEffect(effect, (
             <>
-              <div className="storm-drop d1" style={{ background: effect.color1 }}>{getIconContent(effect)}</div>
-              <div className="storm-drop d2" style={{ background: effect.color1 }}>{getIconContent(effect)}</div>
-              <div className="storm-drop d3" style={{ background: effect.color1 }}>{getIconContent(effect)}</div>
+              <div className="storm-drop d1" style={getParticleStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
+              <div className="storm-drop d2" style={getParticleStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
+              <div className="storm-drop d3" style={getParticleStyle(effect, { background: effect.color1 })}>{getIconContent(effect, null, 10)}</div>
             </>
           ));
         case 'ghiacciolo':
           return wrapOuterEffect(effect, (
             <>
-              <div className="ice-flake f1" style={{ color: effect.color1 }}>{getIconContent(effect, '❄️')}</div>
-              <div className="ice-flake f2" style={{ color: effect.color1 }}>{getIconContent(effect, '❄️')}</div>
-              <div className="ice-flake f3" style={{ color: effect.color1 }}>{getIconContent(effect, '❄️')}</div>
+              <div className="ice-flake f1" style={getParticleStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
+              <div className="ice-flake f2" style={getParticleStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
+              <div className="ice-flake f3" style={getParticleStyle(effect, { color: effect.color1 })}>{getIconContent(effect, '❄️', 12)}</div>
             </>
           ));
         default:
           return null;
       }
     });
+  };
+
+  const renderCustomAnimationsCSS = (animations?: CustomAnimationDef[]) => {
+    if (!animations || animations.length === 0) return null;
+    const css = animations.map(anim => {
+      const keyframes = anim.keyframes.sort((a, b) => a.percent - b.percent).map(kf => {
+        return `${kf.percent}% { transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%)) rotate(${kf.rotation}deg) scale(${kf.scale}); opacity: ${kf.opacity}; }`;
+      }).join('\n');
+      return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
+    }).join('\n');
+    return <style>{css}</style>;
   };
 
   const avatarUrl = (currentUser as any)?.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
@@ -778,7 +867,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Icona/Emoji/URL</label>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Sostituisci Particelle (Emoji/URL)</label>
                                   <div className="flex gap-2">
                                     <button 
                                       type="button" 
@@ -807,7 +896,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   </div>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-3 gap-3">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({effect.x ?? 50}%)</label>
                                   <input type="range" min="0" max="100" value={effect.x ?? 50} onChange={e => updateBaseEffect(effect.id, 'x', parseInt(e.target.value))} className="w-full accent-brand" />
@@ -819,6 +908,10 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione ({effect.rotation ?? 0}°)</label>
                                   <input type="range" min="0" max="360" value={effect.rotation ?? 0} onChange={e => updateBaseEffect(effect.id, 'rotation', parseInt(e.target.value))} className="w-full accent-brand" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione ({effect.size ?? 100}%)</label>
+                                  <input type="range" min="10" max="300" value={effect.size ?? 100} onChange={e => updateBaseEffect(effect.id, 'size', parseInt(e.target.value))} className="w-full accent-brand" />
                                 </div>
                               </div>
                             </div>
@@ -892,6 +985,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     <option value="orbit-2d">Orbita 2D</option>
                                     <option value="orbit-3d">Orbita 3D</option>
                                     <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
+                                    {customAnimations.map(a => (
+                                      <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
+                                    ))}
                                   </select>
                                 </div>
                                 <div>
@@ -901,6 +997,96 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
                                   <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Animazioni Personalizzate (Timeline) */}
+                    <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-white font-bold text-sm uppercase">Animazioni Personalizzate (Timeline)</h4>
+                        <button type="button" onClick={addCustomAnimation} className="text-xs bg-brand hover:bg-brand/80 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                          <Plus size={12} /> Nuova Animazione
+                        </button>
+                      </div>
+
+                      {customAnimations.length === 0 ? (
+                        <p className="text-xs text-[#949ba4] italic">Nessuna animazione personalizzata creata.</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {customAnimations.map((anim) => (
+                            <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
+                              <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="absolute top-2 right-2 text-[#f23f43] hover:text-white transition-colors">
+                                <X size={16} />
+                              </button>
+                              
+                              <div className="grid grid-cols-3 gap-3 mb-4 pr-6">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
+                                  <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
+                                  <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
+                                  <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                    <option value="linear">Lineare</option>
+                                    <option value="ease">Morbida (Ease)</option>
+                                    <option value="ease-in-out">Morbida In/Out</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="border-t border-[#3f4147] pt-3">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
+                                  <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                    + Keyframe
+                                  </button>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
+                                    <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
+                                      <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="absolute top-1 right-1 text-[#f23f43] hover:text-white transition-colors">
+                                        <X size={12} />
+                                      </button>
+                                      
+                                      <div className="w-full flex items-center gap-2 mb-1 pr-4">
+                                        <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
+                                        <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-5 gap-2 w-full">
+                                        <div>
+                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">X ({kf.x}%)</label>
+                                          <input type="range" min="-200" max="200" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Y ({kf.y}%)</label>
+                                          <input type="range" min="-200" max="200" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Scala ({kf.scale}x)</label>
+                                          <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Rot. ({kf.rotation}°)</label>
+                                          <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', parseInt(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[9px] text-[#949ba4] mb-0.5">Opacità ({kf.opacity})</label>
+                                          <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', parseFloat(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             </div>
@@ -923,6 +1109,8 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
                     
                     <div className="dec-wrapper relative w-32 h-32 mb-8">
+                      {renderCustomAnimationsCSS(customAnimations)}
+                      
                       {/* Inner Effects (z-0) */}
                       <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
                         {renderInnerEffects(baseEffects)}
@@ -951,9 +1139,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       </div>
 
                       {/* Outer Effects (z-20) */}
-                      <div className="absolute inset-0 pointer-events-none z-20">
-                        {renderOuterEffects(baseEffects)}
-                      </div>
+                      {renderOuterEffects(baseEffects)}
 
                       {/* Elements (z-index animated 5 or 25) */}
                       {elements.map(el => {
@@ -976,7 +1162,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                               left: `${el.x}%`,
                               top: `${el.y}%`,
                               transform: 'translate(-50%, -50%)',
-                              animation: getAnimation(el.animation, el.delay),
+                              animation: getAnimation(el.animation, el.delay, customAnimations),
                               width: `${el.size}cqw`,
                               height: `${el.size}cqw`,
                               fontSize: `${el.size}cqw`

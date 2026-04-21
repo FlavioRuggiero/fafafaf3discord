@@ -2,6 +2,24 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
 
+export type CustomKeyframe = {
+  id: string;
+  percent: number;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  opacity: number;
+};
+
+export type CustomAnimationDef = {
+  id: string;
+  name: string;
+  duration: number;
+  timingFunction: 'linear' | 'ease' | 'ease-in-out';
+  keyframes: CustomKeyframe[];
+};
+
 export type CustomElement = {
   id: string;
   type: 'emoji' | 'image';
@@ -22,6 +40,7 @@ export type BaseEffectConfig = {
   x?: number;
   y?: number;
   rotation?: number;
+  size?: number;
 };
 
 export type CustomDecoration = {
@@ -41,8 +60,9 @@ export type CustomDecoration = {
     baseEffect?: string; // Legacy
     effectColor1?: string; // Legacy
     effectColor2?: string; // Legacy
-    baseEffects?: BaseEffectConfig[]; // Nuovo sistema
+    baseEffects?: BaseEffectConfig[];
     elements?: CustomElement[];
+    customAnimations?: CustomAnimationDef[];
   };
 };
 
