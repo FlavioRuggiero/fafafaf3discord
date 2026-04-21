@@ -224,7 +224,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
-    return <style dangerouslySetInnerHTML={{ __html: css }} />;
+    return <style>{css}</style>;
   };
 
   const customDec = customDecorations.find(d => d.id === activeDecoration);
