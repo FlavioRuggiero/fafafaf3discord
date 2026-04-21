@@ -11,6 +11,8 @@ export type CustomKeyframe = {
   rotation: number;
   opacity: number;
   zIndex: number;
+  positionMode?: 'relative' | 'absolute' | 'target';
+  targetId?: string;
 };
 
 export type CustomAnimationDef = {
@@ -28,6 +30,7 @@ export type CustomElement = {
   animation: string;
   x: number;
   y: number;
+  rotation?: number;
   size: number;
   delay: number;
   parentId?: string;

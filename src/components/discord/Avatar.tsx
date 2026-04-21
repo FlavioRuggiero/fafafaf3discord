@@ -216,11 +216,29 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
     });
   };
 
-  const renderCustomAnimationsCSS = (animations?: CustomAnimationDef[]) => {
+  const renderCustomAnimationsCSS = (animations?: CustomAnimationDef[], elements?: CustomElement[]) => {
     if (!animations || animations.length === 0) return null;
     const css = animations.map(anim => {
       const keyframes = anim.keyframes.sort((a, b) => a.percent - b.percent).map(kf => {
-        return `${kf.percent}% { transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%)) rotate(${kf.rotation}deg) scale(${kf.scale}); opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
+        let leftTop = '';
+        let transform = '';
+        const mode = kf.positionMode || 'relative';
+
+        if (mode === 'absolute') {
+          leftTop = `left: ${kf.x}%; top: ${kf.y}%;`;
+          transform = `transform: translate(-50%, -50%);`;
+        } else if (mode === 'target' && kf.targetId && elements) {
+          const targetEl = elements.find(e => e.id === kf.targetId);
+          const tx = targetEl ? targetEl.x : 50;
+          const ty = targetEl ? targetEl.y : 50;
+          leftTop = `left: ${tx}%; top: ${ty}%;`;
+          transform = `transform: translate(-50%, -50%);`;
+        } else {
+          // relative
+          transform = `transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%));`;
+        }
+
+        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
@@ -266,6 +284,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           left: `${el.x}%`,
           top: `${el.y}%`,
           transform: 'translate(-50%, -50%)',
+          rotate: `${el.rotation || 0}deg`,
           animation: getAnimation(el.animation, el.delay, customAnimations),
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
@@ -295,7 +314,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
 
     return (
       <div className={`relative rounded-full flex items-center justify-center dec-wrapper ${speakingClass} ${className} ${clipEffects ? 'overflow-hidden' : ''}`}>
-        {renderCustomAnimationsCSS(customDec.config?.customAnimations)}
+        {renderCustomAnimationsCSS(customDec.config?.customAnimations, customDec.config?.elements)}
         
         {/* Inner Effects */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
