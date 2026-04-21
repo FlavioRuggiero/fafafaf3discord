@@ -201,8 +201,15 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
 
     return (
       <div className={`relative rounded-full flex items-center justify-center dec-wrapper ${speakingClass} ${className}`}>
+        
+        {/* Inner Effects (z-0) */}
+        <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
+          {renderInnerEffects(effectsToRender)}
+        </div>
+
+        {/* Avatar & Border (z-10) */}
         <div 
-          className="relative rounded-full flex items-center justify-center w-full h-full z-10"
+          className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
           style={{
             border: `2px solid ${customDec.border_color}`,
             boxShadow: `0 0 10px ${customDec.shadow_color}, inset 0 0 10px ${customDec.shadow_color}`,
@@ -219,48 +226,45 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
               }} 
             />
           )}
-          
-          {/* Effetti Base (Dietro l'avatar) */}
-          {renderInnerEffects(effectsToRender)}
-          
           <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
         </div>
 
-        {/* Effetti Base (Davanti all'avatar) e Elementi Fluttuanti */}
+        {/* Outer Effects (z-20) */}
         <div className={`absolute inset-0 pointer-events-none z-20 ${clipEffects ? 'overflow-hidden rounded-full' : ''}`}>
           {renderOuterEffects(effectsToRender)}
+        </div>
 
-          {customDec.config?.elements?.map(el => {
-            if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-              const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-              const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
-              return (
-                <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                  <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
-                    {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
-                  </div>
-                </div>
-              );
-            }
+        {/* Elements (z-index animated 5 or 25) */}
+        {customDec.config?.elements?.map(el => {
+          if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+            const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+            const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
             return (
-              <div 
-                key={el.id} 
-                className={`absolute flex items-center justify-center`}
-                style={{ 
-                  left: `${el.x}%`,
-                  top: `${el.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  animation: getAnimation(el.animation, el.delay),
-                  width: `${el.size}cqw`,
-                  height: `${el.size}cqw`,
-                  fontSize: `${el.size}cqw`
-                }}
-              >
-                {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+              <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                  {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                </div>
               </div>
             );
-          })}
-        </div>
+          }
+          return (
+            <div 
+              key={el.id} 
+              className={`absolute flex items-center justify-center z-20`}
+              style={{ 
+                left: `${el.x}%`,
+                top: `${el.y}%`,
+                transform: 'translate(-50%, -50%)',
+                animation: getAnimation(el.animation, el.delay),
+                width: `${el.size}cqw`,
+                height: `${el.size}cqw`,
+                fontSize: `${el.size}cqw`
+              }}
+            >
+              {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+            </div>
+          );
+        })}
       </div>
     );
   }

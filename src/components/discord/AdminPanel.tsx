@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useShop, CustomElement, BaseEffectConfig } from "@/contexts/ShopContext";
+import EmojiPicker, { Theme } from "emoji-picker-react";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -46,7 +47,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   
   const [newDecAnim, setNewDecAnim] = useState('none');
   
-  // Nuovo stato per gli effetti base multipli
   const [baseEffects, setBaseEffects] = useState<BaseEffectConfig[]>([]);
   
   const [newDecImage, setNewDecImage] = useState<File | null>(null);
@@ -56,6 +56,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Stato per il selettore Emoji
+  const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -724,8 +727,17 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Icona/Emoji/URL (Opzionale)</label>
-                                  <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="Es. ❄️ o URL" className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Icona/Emoji/URL</label>
+                                  <div className="flex gap-2">
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setEmojiPickerTarget({type: 'base', id: effect.id})} 
+                                      className="bg-[#1e1f22] hover:bg-[#35373c] transition-colors rounded border border-[#3f4147] text-xl flex items-center justify-center w-9 h-9 flex-shrink-0"
+                                    >
+                                      {effect.icon && !effect.icon.startsWith('http') ? effect.icon : '😀'}
+                                    </button>
+                                    <input type="text" value={effect.icon} onChange={e => updateBaseEffect(effect.id, 'icon', e.target.value)} placeholder="URL Immagine" className="flex-1 bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                  </div>
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-3">
@@ -778,18 +790,32 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
-                                  <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder={el.type === 'emoji' ? '✨' : 'https://...'} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                  {el.type === 'emoji' ? (
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
+                                      className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
+                                    >
+                                      {el.content || '✨'}
+                                    </button>
+                                  ) : (
+                                    <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
+                                  )}
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                              
+                              <div className="grid grid-cols-2 gap-3 mb-3">
                                 <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X (%)</label>
-                                  <input type="number" min="-50" max="150" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos X ({el.x}%)</label>
+                                  <input type="range" min="-50" max="150" value={el.x} onChange={e => updateElement(el.id, 'x', parseInt(e.target.value)||0)} className="w-full accent-brand" />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y (%)</label>
-                                  <input type="number" min="-50" max="150" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Pos Y ({el.y}%)</label>
+                                  <input type="range" min="-50" max="150" value={el.y} onChange={e => updateElement(el.id, 'y', parseInt(e.target.value)||0)} className="w-full accent-brand" />
                                 </div>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-3">
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
                                   <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -832,14 +858,19 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
                     
                     <div className="dec-wrapper relative w-32 h-32 mb-8">
+                      {/* Inner Effects (z-0) */}
+                      <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
+                        {renderInnerEffects(baseEffects)}
+                      </div>
+
+                      {/* Avatar & Border (z-10) */}
                       <div 
-                        className="relative rounded-full flex items-center justify-center w-full h-full z-10"
+                        className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
                         style={{
                           border: `2px solid ${newDecBorder}`,
                           boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
                         }}
                       >
-                        {/* Sfondo Animato */}
                         {newDecImagePreview && (
                           <img 
                             src={newDecImagePreview} 
@@ -851,49 +882,45 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                             }} 
                           />
                         )}
-                        
-                        {/* Effetti Base (Dietro l'avatar) */}
-                        {renderInnerEffects(baseEffects)}
-
-                        {/* Avatar Base (Usa l'avatar dell'utente corrente) */}
                         <img src={avatarUrl} className="w-full h-full rounded-full object-cover relative z-10" />
                       </div>
 
-                      {/* Effetti Base (Davanti all'avatar) e Elementi Fluttuanti */}
+                      {/* Outer Effects (z-20) */}
                       <div className="absolute inset-0 pointer-events-none z-20">
                         {renderOuterEffects(baseEffects)}
+                      </div>
 
-                        {elements.map(el => {
-                          if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-                            const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-                            const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
-                            return (
-                              <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-                                <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
-                                  {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
-                                </div>
-                              </div>
-                            );
-                          }
+                      {/* Elements (z-index animated 5 or 25) */}
+                      {elements.map(el => {
+                        if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+                          const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+                          const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
                           return (
-                            <div 
-                              key={el.id} 
-                              className={`absolute flex items-center justify-center`}
-                              style={{ 
-                                left: `${el.x}%`,
-                                top: `${el.y}%`,
-                                transform: 'translate(-50%, -50%)',
-                                animation: getAnimation(el.animation, el.delay),
-                                width: `${el.size}cqw`,
-                                height: `${el.size}cqw`,
-                                fontSize: `${el.size}cqw`
-                              }}
-                            >
-                              {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+                            <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                              <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                                {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                              </div>
                             </div>
                           );
-                        })}
-                      </div>
+                        }
+                        return (
+                          <div 
+                            key={el.id} 
+                            className={`absolute flex items-center justify-center z-20`}
+                            style={{ 
+                              left: `${el.x}%`,
+                              top: `${el.y}%`,
+                              transform: 'translate(-50%, -50%)',
+                              animation: getAnimation(el.animation, el.delay),
+                              width: `${el.size}cqw`,
+                              height: `${el.size}cqw`,
+                              fontSize: `${el.size}cqw`
+                            }}
+                          >
+                            {el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <span 
@@ -1254,6 +1281,25 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           )}
         </div>
       </div>
+
+      {/* Emoji Picker Modal */}
+      {emojiPickerTarget && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50" onClick={() => setEmojiPickerTarget(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#2b2d31] rounded-lg shadow-2xl border border-[#1e1f22] overflow-hidden">
+            <EmojiPicker
+              theme={Theme.DARK}
+              onEmojiClick={(emojiObj) => {
+                if (emojiPickerTarget.type === 'base') {
+                  updateBaseEffect(emojiPickerTarget.id, 'icon', emojiObj.emoji);
+                } else {
+                  updateElement(emojiPickerTarget.id, 'content', emojiObj.emoji);
+                }
+                setEmojiPickerTarget(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );
