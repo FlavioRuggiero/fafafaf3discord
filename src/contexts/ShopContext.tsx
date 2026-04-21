@@ -75,6 +75,7 @@ export type CustomDecoration = {
 };
 
 export type DraftDecoration = {
+  id?: string;
   name: string;
   price: number;
   borderColor: string;
@@ -92,6 +93,7 @@ export type DraftDecoration = {
 };
 
 export const DEFAULT_DRAFT_DECORATION: DraftDecoration = {
+  id: undefined,
   name: '',
   price: 100,
   borderColor: '#5865F2',
