@@ -268,10 +268,8 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         >
           <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
             <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-              <div style={{ transform: `rotate(${el.rotation || 0}deg)`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {contentNode}
-                {childrenNodes}
-              </div>
+              {contentNode}
+              {childrenNodes}
             </div>
           </div>
         </div>
@@ -286,6 +284,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           left: `${el.x}%`,
           top: `${el.y}%`,
           transform: 'translate(-50%, -50%)',
+          rotate: `${el.rotation || 0}deg`,
           animation: getAnimation(el.animation, el.delay, customAnimations),
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
@@ -293,10 +292,8 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
         }}
       >
-        <div style={{ transform: `rotate(${el.rotation || 0}deg)`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {contentNode}
-          {childrenNodes}
-        </div>
+        {contentNode}
+        {childrenNodes}
       </div>
     );
   };
