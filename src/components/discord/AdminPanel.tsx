@@ -413,6 +413,15 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  const isDescendant = (potentialDescendantId: string, ancestorId: string, allElements: CustomElement[]) => {
+    let current = allElements.find(e => e.id === potentialDescendantId);
+    while (current && current.parentId) {
+      if (current.parentId === ancestorId) return true;
+      current = allElements.find(e => e.id === current!.parentId);
+    }
+    return false;
+  };
+
   const handleEditCustomDecoration = (dec: CustomDecoration) => {
     setEditDecorationId(dec.id);
     setNewDecName(dec.name);
