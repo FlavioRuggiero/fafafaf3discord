@@ -34,7 +34,6 @@ export type CustomElement = {
   size: number;
   delay: number;
   parentId?: string;
-  zIndex?: number;
 };
 
 export type BaseEffectConfig = {
