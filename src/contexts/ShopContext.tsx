@@ -42,6 +42,7 @@ export type BaseEffectConfig = {
   y?: number;
   rotation?: number;
   size?: number;
+  zIndex?: number;
 };
 
 export type CustomDecoration = {
