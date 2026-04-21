@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Upload, Plus, Copy, ClipboardPaste } from "lucide-react";
+import { X, Wand2, Upload, Plus, Copy, ClipboardPaste, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -21,6 +21,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
   const [isCreatingDec, setIsCreatingDec] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
+
+  // Stati per UI Comprimibile
+  const [collapsedElements, setCollapsedElements] = useState<Record<string, boolean>>({});
+  const [collapsedAnims, setCollapsedAnims] = useState<Record<string, boolean>>({});
+
+  const toggleElement = (id: string) => setCollapsedElements(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleAnim = (id: string) => setCollapsedAnims(prev => ({ ...prev, [id]: !prev[id] }));
 
   if (!isOpen) return null;
 
@@ -70,7 +77,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const pasteBaseEffect = () => {
     if (clipboard.baseEffect) {
-      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random()}` }] });
+      updateDraft({ baseEffects: [...draftDecoration.baseEffects, { ...clipboard.baseEffect, id: `be-${Date.now()}-${Math.random().toString(36).substring(7)}` }] });
       showSuccess("Effetto incollato!");
     }
   };
@@ -111,7 +118,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const pasteElement = () => {
     if (clipboard.element) {
-      updateDraft({ elements: [...draftDecoration.elements, { ...clipboard.element, id: `el-${Date.now()}-${Math.random()}` }] });
+      updateDraft({ elements: [...draftDecoration.elements, { ...clipboard.element, id: `el-${Date.now()}-${Math.random().toString(36).substring(7)}` }] });
       showSuccess("Elemento incollato!");
     }
   };
@@ -154,8 +161,8 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
 
   const pasteCustomAnimation = () => {
     if (clipboard.animation) {
-      const newAnimId = `anim-${Date.now()}-${Math.random()}`;
-      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random()}` }));
+      const newAnimId = `anim-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const newKeyframes = clipboard.animation.keyframes.map(kf => ({ ...kf, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}` }));
       updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...clipboard.animation, id: newAnimId, name: `${clipboard.animation.name} (Copia)`, keyframes: newKeyframes }] });
       showSuccess("Animazione incollata!");
     }
@@ -216,7 +223,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
       updateDraft({
         customAnimations: draftDecoration.customAnimations.map(a => {
           if (a.id === animId) {
-            return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random()}` }] };
+            return { ...a, keyframes: [...a.keyframes, { ...clipboard.keyframe!, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}` }] };
           }
           return a;
         })
@@ -514,8 +521,10 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
         >
           <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
             <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-              {contentNode}
-              {childrenNodes}
+              <div style={{ transform: `rotate(${el.rotation || 0}deg)`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {contentNode}
+                {childrenNodes}
+              </div>
             </div>
           </div>
         </div>
@@ -530,7 +539,6 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
           left: `${el.x}%`,
           top: `${el.y}%`,
           transform: 'translate(-50%, -50%)',
-          rotate: `${el.rotation || 0}deg`,
           animation: getAnimation(el.animation, el.delay, customAnimations),
           width: `${el.size}cqw`,
           height: `${el.size}cqw`,
@@ -538,8 +546,10 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
           zIndex: el.animation.startsWith('custom_anim_') ? undefined : 20
         }}
       >
-        {contentNode}
-        {childrenNodes}
+        <div style={{ transform: `rotate(${el.rotation || 0}deg)`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {contentNode}
+          {childrenNodes}
+        </div>
       </div>
     );
   };
@@ -824,102 +834,115 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div className="space-y-3">
                     {draftDecoration.elements.map((el, idx) => (
                       <div key={el.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
-                            <Copy size={16} />
-                          </button>
-                          <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
-                            <X size={16} />
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 mb-3 pr-12">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
-                            <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="emoji">Emoji</option>
-                              <option value="image">URL Immagine</option>
-                            </select>
+                        <div className="flex justify-between items-center cursor-pointer mb-2" onClick={() => toggleElement(el.id)}>
+                          <div className="flex items-center gap-2">
+                            <ChevronDown size={16} className={`text-[#949ba4] transition-transform ${collapsedElements[el.id] ? '-rotate-90' : ''}`} />
+                            <span className="text-xs font-bold text-white uppercase">
+                              Elemento: {el.type === 'emoji' ? el.content : 'Immagine'}
+                            </span>
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
-                            {el.type === 'emoji' ? (
-                              <button 
-                                type="button" 
-                                onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
-                                className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
-                              >
-                                {el.content || '✨'}
-                              </button>
-                            ) : (
-                              <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
-                              <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
-                              <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
-                            </div>
-                            <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                          <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                            <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors p-1" title="Copia">
+                              <Copy size={14} />
+                            </button>
+                            <button type="button" onClick={() => removeElement(el.id)} className="text-[#f23f43] hover:text-white transition-colors p-1" title="Elimina">
+                              <X size={14} />
+                            </button>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
-                            <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="none">Nessuna</option>
-                              <option value="float">Fluttua</option>
-                              <option value="pulse">Pulsazione</option>
-                              <option value="spin">Rotazione</option>
-                              <option value="shake">Tremolio</option>
-                              <option value="orbit-2d">Orbita 2D</option>
-                              <option value="orbit-3d">Orbita 3D</option>
-                              <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
-                              {draftDecoration.customAnimations.map(a => (
-                                <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
-                              ))}
-                            </select>
+                        {!collapsedElements[el.id] && (
+                          <div className="mt-3 pt-3 border-t border-[#3f4147]">
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
+                                <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="emoji">Emoji</option>
+                                  <option value="image">URL Immagine</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Contenuto</label>
+                                {el.type === 'emoji' ? (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setEmojiPickerTarget({type: 'element', id: el.id})} 
+                                    className="w-full bg-[#1e1f22] hover:bg-[#35373c] transition-colors text-white rounded p-1.5 text-xl border border-[#3f4147] h-8 flex items-center justify-center"
+                                  >
+                                    {el.content || '✨'}
+                                  </button>
+                                ) : (
+                                  <input type="text" value={el.content} onChange={e => updateElement(el.id, 'content', e.target.value)} placeholder="https://..." className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147] h-8" />
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos X</label>
+                                  <input type="number" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="100" value={el.x} onChange={e => updateElement(el.id, 'x', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase">Pos Y</label>
+                                  <input type="number" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-12 bg-[#111214] text-white text-[10px] px-1 py-0.5 rounded border border-[#3f4147] outline-none" />
+                                </div>
+                                <input type="range" min="0" max="100" value={el.y} onChange={e => updateElement(el.id, 'y', Number(e.target.value))} className="w-full accent-brand" />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Animazione</label>
+                                <select value={el.animation} onChange={e => updateElement(el.id, 'animation', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="none">Nessuna</option>
+                                  <option value="float">Fluttua</option>
+                                  <option value="pulse">Pulsazione</option>
+                                  <option value="spin">Rotazione</option>
+                                  <option value="shake">Tremolio</option>
+                                  <option value="orbit-2d">Orbita 2D</option>
+                                  <option value="orbit-3d">Orbita 3D</option>
+                                  <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
+                                  {draftDecoration.customAnimations.map(a => (
+                                    <option key={a.id} value={`custom_anim_${a.id}`}>{a.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
+                                <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
+                                <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione</label>
+                                <input type="number" value={el.rotation || 0} onChange={e => updateElement(el.id, 'rotation', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
+                                <select 
+                                  value={el.parentId || ''} 
+                                  onChange={e => updateElement(el.id, 'parentId', e.target.value || undefined)} 
+                                  className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]"
+                                >
+                                  <option value="">Nessuno (Base)</option>
+                                  {draftDecoration.elements
+                                    .filter(other => other.id !== el.id && !isDescendant(other.id, el.id, draftDecoration.elements))
+                                    .map(other => (
+                                      <option key={other.id} value={other.id}>
+                                        {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
+                                      </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Dimensione</label>
-                            <input type="number" value={el.size} onChange={e => updateElement(el.id, 'size', parseInt(e.target.value)||15)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Ritardo (s)</label>
-                            <input type="number" step="0.1" value={el.delay} onChange={e => updateElement(el.id, 'delay', parseFloat(e.target.value)||0)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Rotazione</label>
-                            <input type="number" value={el.rotation || 0} onChange={e => updateElement(el.id, 'rotation', Number(e.target.value))} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Attacca a</label>
-                            <select 
-                              value={el.parentId || ''} 
-                              onChange={e => updateElement(el.id, 'parentId', e.target.value || undefined)} 
-                              className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]"
-                            >
-                              <option value="">Nessuno (Base)</option>
-                              {draftDecoration.elements
-                                .filter(other => other.id !== el.id && !isDescendant(other.id, el.id, draftDecoration.elements))
-                                .map(other => (
-                                  <option key={other.id} value={other.id}>
-                                    {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
-                                  </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -949,237 +972,249 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser }: Cu
                   <div className="space-y-4">
                     {draftDecoration.customAnimations.map((anim) => (
                       <div key={anim.id} className="bg-[#2b2d31] p-3 rounded border border-[#3f4147] relative">
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          <button type="button" onClick={() => copyCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
-                            <Copy size={16} />
-                          </button>
-                          <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
-                            <X size={16} />
-                          </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-3 mb-4 pr-12">
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
-                            <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                        <div className="flex justify-between items-center cursor-pointer mb-2" onClick={() => toggleAnim(anim.id)}>
+                          <div className="flex items-center gap-2">
+                            <ChevronDown size={16} className={`text-[#949ba4] transition-transform ${collapsedAnims[anim.id] ? '-rotate-90' : ''}`} />
+                            <span className="text-xs font-bold text-white uppercase">
+                              Animazione: {anim.name}
+                            </span>
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
-                            <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
-                            <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
-                              <option value="linear">Lineare</option>
-                              <option value="ease">Morbida (Ease)</option>
-                              <option value="ease-in-out">Morbida In/Out</option>
-                            </select>
+                          <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                            <button type="button" onClick={() => copyCustomAnimation(anim.id)} className="text-[#b5bac1] hover:text-white transition-colors p-1" title="Copia">
+                              <Copy size={14} />
+                            </button>
+                            <button type="button" onClick={() => removeCustomAnimation(anim.id)} className="text-[#f23f43] hover:text-white transition-colors p-1" title="Elimina">
+                              <X size={14} />
+                            </button>
                           </div>
                         </div>
 
-                        <div className="border-t border-[#3f4147] pt-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
-                            <div className="flex gap-2">
-                              {clipboard.keyframe && (
-                                <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
-                                  <ClipboardPaste size={10} /> Incolla
-                                </button>
-                              )}
-                              <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
-                                + Keyframe
-                              </button>
+                        {!collapsedAnims[anim.id] && (
+                          <div className="mt-3 pt-3 border-t border-[#3f4147]">
+                            <div className="grid grid-cols-3 gap-3 mb-4">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Animazione</label>
+                                <input type="text" value={anim.name} onChange={e => updateCustomAnimation(anim.id, 'name', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Durata (s)</label>
+                                <input type="number" step="0.1" min="0.1" value={anim.duration} onChange={e => updateCustomAnimation(anim.id, 'duration', parseFloat(e.target.value)||1)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Curva</label>
+                                <select value={anim.timingFunction} onChange={e => updateCustomAnimation(anim.id, 'timingFunction', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
+                                  <option value="linear">Lineare</option>
+                                  <option value="ease">Morbida (Ease)</option>
+                                  <option value="ease-in-out">Morbida In/Out</option>
+                                </select>
+                              </div>
                             </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
-                              <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
-                                <div className="absolute top-1 right-1 flex gap-1">
-                                  <button type="button" onClick={() => copyKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
-                                    <Copy size={12} />
-                                  </button>
-                                  <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                                
-                                <div className="w-full flex items-center gap-2 mb-2 pr-10">
-                                  <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
-                                  <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
-                                </div>
 
-                                <div className="col-span-full flex gap-3 mb-3 p-2 bg-[#111214] rounded border border-[#3f4147] w-full">
-                                  <div className="flex-1">
-                                    <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Modalità Posizione</label>
-                                    <select 
-                                      value={kf.positionMode || 'relative'} 
-                                      onChange={e => updateKeyframe(anim.id, kf.id, 'positionMode', e.target.value)}
-                                      className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
-                                    >
-                                      <option value="relative">Relativa (Offset)</option>
-                                      <option value="absolute">Assoluta (Globale)</option>
-                                      <option value="target">Segui Elemento</option>
-                                    </select>
-                                  </div>
-                                  {kf.positionMode === 'target' && (
-                                    <div className="flex-1">
-                                      <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Elemento Bersaglio</label>
-                                      <select 
-                                        value={kf.targetId || ''} 
-                                        onChange={e => updateKeyframe(anim.id, kf.id, 'targetId', e.target.value)}
-                                        className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
-                                      >
-                                        <option value="">Seleziona...</option>
-                                        {draftDecoration.elements.map(e => (
-                                          <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
-                                        ))}
-                                      </select>
-                                    </div>
+                            <div className="border-t border-[#3f4147] pt-3">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-[10px] font-bold text-[#b5bac1] uppercase">Keyframes (Timeline)</span>
+                                <div className="flex gap-2">
+                                  {clipboard.keyframe && (
+                                    <button type="button" onClick={() => pasteKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors flex items-center gap-1">
+                                      <ClipboardPaste size={10} /> Incolla
+                                    </button>
                                   )}
-                                </div>
-                                
-                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
-                                  {kf.positionMode !== 'target' && (
-                                    <>
-                                      <div>
-                                        <div className="flex justify-between items-center mb-0.5">
-                                          <label className="text-[9px] text-[#949ba4]">X {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
-                                          <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                        </div>
-                                        <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                      </div>
-                                      <div>
-                                        <div className="flex justify-between items-center mb-0.5">
-                                          <label className="text-[9px] text-[#949ba4]">Y {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
-                                          <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                        </div>
-                                        <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                      </div>
-                                    </>
-                                  )}
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Scala</label>
-                                      <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
-                                      <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Opacità</label>
-                                      <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex justify-between items-center mb-0.5">
-                                      <label className="text-[9px] text-[#949ba4]">Z-Index</label>
-                                      <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                    </div>
-                                    <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                  </div>
+                                  <button type="button" onClick={() => addKeyframe(anim.id)} className="text-[10px] bg-[#1e1f22] hover:bg-[#35373c] text-white px-2 py-1 rounded border border-[#3f4147] transition-colors">
+                                    + Keyframe
+                                  </button>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
+                              
+                              <div className="space-y-2">
+                                {anim.keyframes.sort((a, b) => a.percent - b.percent).map((kf, idx) => (
+                                  <div key={kf.id} className="bg-[#1e1f22] p-2 rounded border border-[#3f4147] flex flex-wrap gap-2 items-center relative">
+                                    <div className="absolute top-1 right-1 flex gap-1">
+                                      <button type="button" onClick={() => copyKeyframe(anim.id, kf.id)} className="text-[#b5bac1] hover:text-white transition-colors" title="Copia">
+                                        <Copy size={12} />
+                                      </button>
+                                      <button type="button" onClick={() => removeKeyframe(anim.id, kf.id)} className="text-[#f23f43] hover:text-white transition-colors" title="Elimina">
+                                        <X size={12} />
+                                      </button>
+                                    </div>
+                                    
+                                    <div className="w-full flex items-center gap-2 mb-2 pr-10">
+                                      <span className="text-[10px] font-bold text-brand w-8">{kf.percent}%</span>
+                                      <input type="range" min="0" max="100" value={kf.percent} onChange={e => updateKeyframe(anim.id, kf.id, 'percent', parseInt(e.target.value))} className="flex-1 accent-brand" />
+                                    </div>
 
-                        {/* Mini Preview Animazione */}
-                        <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
-                          <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
-                          <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
-                            <span className="text-4xl">✨</span>
+                                    <div className="col-span-full flex gap-3 mb-3 p-2 bg-[#111214] rounded border border-[#3f4147] w-full">
+                                      <div className="flex-1">
+                                        <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Modalità Posizione</label>
+                                        <select 
+                                          value={kf.positionMode || 'relative'} 
+                                          onChange={e => updateKeyframe(anim.id, kf.id, 'positionMode', e.target.value)}
+                                          className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
+                                        >
+                                          <option value="relative">Relativa (Offset)</option>
+                                          <option value="absolute">Assoluta (Globale)</option>
+                                          <option value="target">Segui Elemento</option>
+                                        </select>
+                                      </div>
+                                      {kf.positionMode === 'target' && (
+                                        <div className="flex-1">
+                                          <label className="text-[9px] text-[#949ba4] uppercase mb-1 block">Elemento Bersaglio</label>
+                                          <select 
+                                            value={kf.targetId || ''} 
+                                            onChange={e => updateKeyframe(anim.id, kf.id, 'targetId', e.target.value)}
+                                            className="w-full bg-[#1e1f22] text-white text-[10px] p-1 rounded border border-[#3f4147] outline-none"
+                                          >
+                                            <option value="">Seleziona...</option>
+                                            {draftDecoration.elements.map(e => (
+                                              <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
+                                      {kf.positionMode !== 'target' && (
+                                        <>
+                                          <div>
+                                            <div className="flex justify-between items-center mb-0.5">
+                                              <label className="text-[9px] text-[#949ba4]">X {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
+                                              <input type="number" value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                            </div>
+                                            <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.x} onChange={e => updateKeyframe(anim.id, kf.id, 'x', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                          </div>
+                                          <div>
+                                            <div className="flex justify-between items-center mb-0.5">
+                                              <label className="text-[9px] text-[#949ba4]">Y {kf.positionMode === 'absolute' ? '(%)' : '(Offset)'}</label>
+                                              <input type="number" value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                            </div>
+                                            <input type="range" min={kf.positionMode === 'absolute' ? "0" : "-300"} max={kf.positionMode === 'absolute' ? "100" : "300"} value={kf.y} onChange={e => updateKeyframe(anim.id, kf.id, 'y', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                          </div>
+                                        </>
+                                      )}
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Scala</label>
+                                          <input type="number" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="5" step="0.1" value={kf.scale} onChange={e => updateKeyframe(anim.id, kf.id, 'scale', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Rot. (°)</label>
+                                          <input type="number" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="-360" max="360" value={kf.rotation} onChange={e => updateKeyframe(anim.id, kf.id, 'rotation', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Opacità</label>
+                                          <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between items-center mb-0.5">
+                                          <label className="text-[9px] text-[#949ba4]">Z-Index</label>
+                                          <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                        </div>
+                                        <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Mini Preview Animazione */}
+                            <div className="mt-4 p-4 bg-[#1e1f22] rounded border border-[#3f4147] flex items-center justify-center h-32 overflow-hidden relative">
+                              <span className="text-[#949ba4] absolute top-2 left-2 text-[10px] uppercase font-bold">Anteprima Animazione</span>
+                              <div style={{ animation: `custom_anim_${anim.id} ${anim.duration}s ${anim.timingFunction} infinite` }}>
+                                <span className="text-4xl">✨</span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
+
+                </form>
               </div>
 
-            </form>
-          </div>
+              {/* Anteprima a Destra */}
+              <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
+                <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
+                
+                <div className="dec-wrapper relative w-32 h-32 mb-8">
+                  {renderCustomAnimationsCSS(draftDecoration.customAnimations, draftDecoration.elements)}
+                  
+                  {/* Inner Effects */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    {renderInnerEffects(draftDecoration.baseEffects)}
+                  </div>
 
-          {/* Anteprima a Destra */}
-          <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
-            <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
-            
-            <div className="dec-wrapper relative w-32 h-32 mb-8">
-              {renderCustomAnimationsCSS(draftDecoration.customAnimations, draftDecoration.elements)}
-              
-              {/* Inner Effects */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {renderInnerEffects(draftDecoration.baseEffects)}
+                  {/* Avatar & Border (z-10) */}
+                  <div 
+                    className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
+                    style={{
+                      border: `2px solid ${draftDecoration.borderColor}`,
+                      boxShadow: `0 0 10px ${draftDecoration.shadowColor}, inset 0 0 10px ${draftDecoration.shadowColor}`,
+                    }}
+                  >
+                    {draftDecoration.imagePreview && (
+                      <img 
+                        src={draftDecoration.imagePreview} 
+                        className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                        style={{ 
+                          animation: draftDecoration.anim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                     draftDecoration.anim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                     draftDecoration.anim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                        }} 
+                      />
+                    )}
+                    <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
+                  </div>
+
+                  {/* Outer Effects */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    {renderOuterEffects(draftDecoration.baseEffects)}
+                  </div>
+
+                  {/* Elements */}
+                  {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
+                </div>
+
+                <div 
+                  className="mb-8 text-center"
+                  style={draftDecoration.textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${draftDecoration.gradStart || '#fff'}80)` } : {}}
+                >
+                  <span 
+                    className="font-bold text-2xl"
+                    style={draftDecoration.textColorType === 'solid' ? {
+                      color: draftDecoration.textColor,
+                      textShadow: `0 0 10px ${draftDecoration.textColor}80`
+                    } : {
+                      backgroundImage: `linear-gradient(90deg, ${draftDecoration.gradStart || '#fff'}, ${draftDecoration.gradEnd || '#fff'})`,
+                      WebkitBackgroundClip: 'text',
+                      backgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      color: 'transparent'
+                    }}
+                  >
+                    {draftDecoration.name || 'Nome Contorno'}
+                  </span>
+                </div>
+
+                <button 
+                  type="submit"
+                  form="user-custom-dec-form"
+                  disabled={isCreatingDec || !draftDecoration.name.trim()}
+                  className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
+                >
+                  {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
+                </button>
               </div>
-
-              {/* Avatar & Border (z-10) */}
-              <div 
-                className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
-                style={{
-                  border: `2px solid ${draftDecoration.borderColor}`,
-                  boxShadow: `0 0 10px ${draftDecoration.shadowColor}, inset 0 0 10px ${draftDecoration.shadowColor}`,
-                }}
-              >
-                {draftDecoration.imagePreview && (
-                  <img 
-                    src={draftDecoration.imagePreview} 
-                    className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-                    style={{ 
-                      animation: draftDecoration.anim === 'spin' ? 'spin-slow 4s linear infinite' : 
-                                 draftDecoration.anim === 'pulse' ? 'custom-pulse 2s infinite' : 
-                                 draftDecoration.anim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-                    }} 
-                  />
-                )}
-                <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
-              </div>
-
-              {/* Outer Effects */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {renderOuterEffects(draftDecoration.baseEffects)}
-              </div>
-
-              {/* Elements */}
-              {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
             </div>
-
-            <div 
-              className="mb-8 text-center"
-              style={draftDecoration.textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${draftDecoration.gradStart || '#fff'}80)` } : {}}
-            >
-              <span 
-                className="font-bold text-2xl"
-                style={draftDecoration.textColorType === 'solid' ? {
-                  color: draftDecoration.textColor,
-                  textShadow: `0 0 10px ${draftDecoration.textColor}80`
-                } : {
-                  backgroundImage: `linear-gradient(90deg, ${draftDecoration.gradStart || '#fff'}, ${draftDecoration.gradEnd || '#fff'})`,
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  color: 'transparent'
-                }}
-              >
-                {draftDecoration.name || 'Nome Contorno'}
-              </span>
-            </div>
-
-            <button 
-              type="submit"
-              form="user-custom-dec-form"
-              disabled={isCreatingDec || !draftDecoration.name.trim()}
-              className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
-            >
-              {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
-            </button>
           </div>
         </div>
       </div>
