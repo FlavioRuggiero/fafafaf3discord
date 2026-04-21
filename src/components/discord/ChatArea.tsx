@@ -169,7 +169,7 @@ interface ChatAreaProps {
 
 export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId, serverMembers, serverPermissions }: ChatAreaProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
-  const { allItems } = useShop();
+  const { allItems, getThemeClass, getThemeStyle } = useShop();
   
   const adminIdRef = useRef(adminId);
   const moderatorIdsRef = useRef(moderatorIds);
@@ -1741,7 +1741,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               <span className="text-xl">👋</span>
               <span className="flex items-center">
                 <ProfilePopover user={getUserWithRoles(msg.user as User)}>
-                  <span className="font-bold text-[#dbdee1] cursor-pointer hover:underline mr-1.5">{msg.user.name}</span>
+                  <span 
+                    className={`font-bold cursor-pointer hover:underline mr-1.5 ${getThemeClass(msg.user.avatar_decoration)}`}
+                    style={getThemeStyle(msg.user.avatar_decoration)}
+                  >
+                    {msg.user.name}
+                  </span>
                 </ProfilePopover>
                 {msg.user.id === adminId && (
                   <Tooltip delayDuration={0}>
@@ -1789,7 +1794,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
             <div className="flex flex-col items-center text-center text-white bg-yellow-500/10 px-6 py-3 rounded-lg border border-yellow-600 shadow-sm max-w-3xl">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="text-[11px] text-[#949ba4] uppercase tracking-wider flex items-center">
-                  da {msg.user.name}
+                  da <span className={getThemeClass(msg.user.avatar_decoration)} style={getThemeStyle(msg.user.avatar_decoration)}>{msg.user.name}</span>
                   {msg.user.id === adminId && <Shield size={10} className="text-red-500 ml-1" />}
                   {msg.user.id !== adminId && moderatorIds.includes(msg.user.id) && <Shield size={10} className="text-blue-400 ml-1" />}
                   <span className="ml-1.5">• {msg.timestamp}</span>
@@ -1877,7 +1882,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               {repliedMessage ? (
                 <>
                   <Avatar src={repliedMessage.user.avatar} decoration={repliedMessage.user.avatar_decoration} className="w-4 h-4 mr-1.5 object-cover" alt="" />
-                  <span className="font-medium text-[#dbdee1] text-xs mr-2 hover:underline opacity-80 group-hover/reply:opacity-100 whitespace-nowrap">{repliedMessage.user.name}</span>
+                  <span className={`font-medium text-xs mr-2 hover:underline opacity-80 group-hover/reply:opacity-100 whitespace-nowrap ${getThemeClass(repliedMessage.user.avatar_decoration)}`} style={getThemeStyle(repliedMessage.user.avatar_decoration)}>{repliedMessage.user.name}</span>
                   <span className="text-[#b5bac1] text-xs truncate max-w-[50%] md:max-w-[70%] opacity-80 group-hover/reply:opacity-100 group-hover/reply:text-white">
                     {repliedMessageContent}
                   </span>
@@ -1903,7 +1908,12 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
               {(!isSameUserAsPrevious || isEditing) && (
                 <div className="flex items-center min-w-0 mb-0.5">
                   <ProfilePopover user={getUserWithRoles(msg.user as User)}>
-                    <span className="font-medium text-[#dbdee1] mr-1.5 cursor-pointer hover:underline truncate">{msg.user.name}</span>
+                    <span 
+                      className={`font-medium mr-1.5 cursor-pointer hover:underline truncate ${getThemeClass(msg.user.avatar_decoration)}`}
+                      style={getThemeStyle(msg.user.avatar_decoration)}
+                    >
+                      {msg.user.name}
+                    </span>
                   </ProfilePopover>
                   {msg.user.id === adminId && (
                     <Tooltip delayDuration={0}>

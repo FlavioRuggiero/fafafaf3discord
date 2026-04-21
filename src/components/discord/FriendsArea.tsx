@@ -4,6 +4,7 @@ import { User, Friendship } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
+import { useShop } from "@/contexts/ShopContext";
 
 interface FriendsAreaProps {
   currentUser: User;
@@ -12,6 +13,7 @@ interface FriendsAreaProps {
 }
 
 export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAreaProps) => {
+  const { getThemeClass, getThemeStyle } = useShop();
   const [activeTab, setActiveTab] = useState<'online' | 'all' | 'pending' | 'add'>('online');
   const [searchQuery, setSearchQuery] = useState("");
   const [addFriendQuery, setAddFriendQuery] = useState("");
@@ -45,7 +47,8 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
         banner_url: p?.banner_url || undefined,
         level: p?.level || 1,
         digitalcardus: p?.digitalcardus || 25,
-        xp: p?.xp || 0
+        xp: p?.xp || 0,
+        avatar_decoration: p?.avatar_decoration || null
       };
 
       return { ...f, otherUser: user };
@@ -87,7 +90,8 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
         status: onlineUserIds.has(p.id) ? 'online' : 'offline',
         level: p.level,
         digitalcardus: p.digitalcardus,
-        xp: p.xp
+        xp: p.xp,
+        avatar_decoration: p.avatar_decoration || null
       }));
       setSearchResults(users);
     }
@@ -241,7 +245,12 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
                     <div key={user.id} className="flex items-center justify-between p-3 bg-[#2b2d31] rounded-lg border border-[#1e1f22]">
                       <div className="flex items-center">
                         <img src={user.avatar} className="w-10 h-10 rounded-full bg-[#1e1f22]" />
-                        <span className="ml-3 text-white font-medium">{user.name}</span>
+                        <span 
+                          className={`ml-3 font-medium ${getThemeClass(user.avatar_decoration)}`}
+                          style={getThemeStyle(user.avatar_decoration)}
+                        >
+                          {user.name}
+                        </span>
                       </div>
                       <button 
                         onClick={() => sendFriendRequest(user.id)}
@@ -273,7 +282,12 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
                       <div className="flex items-center">
                         <img src={f.otherUser.avatar} className="w-8 h-8 rounded-full bg-[#1e1f22]" />
                         <div className="ml-3 flex flex-col">
-                          <span className="text-white font-medium">{f.otherUser.name}</span>
+                          <span 
+                            className={`font-medium ${getThemeClass(f.otherUser.avatar_decoration)}`}
+                            style={getThemeStyle(f.otherUser.avatar_decoration)}
+                          >
+                            {f.otherUser.name}
+                          </span>
                           <span className="text-[#949ba4] text-xs">{isIncoming ? 'Richiesta ricevuta' : 'Richiesta inviata'}</span>
                         </div>
                       </div>
@@ -325,7 +339,12 @@ export const FriendsArea = ({ currentUser, onStartDM, onlineUserIds }: FriendsAr
                         <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[3px] border-[#313338] group-hover:border-[#35373c] ${f.otherUser.status === 'online' ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
                       </div>
                       <div className="ml-3 flex flex-col">
-                        <span className="text-white font-medium">{f.otherUser.name}</span>
+                        <span 
+                          className={`font-medium ${getThemeClass(f.otherUser.avatar_decoration)}`}
+                          style={getThemeStyle(f.otherUser.avatar_decoration)}
+                        >
+                          {f.otherUser.name}
+                        </span>
                         <span className="text-[#949ba4] text-xs">{f.otherUser.status === 'online' ? 'Online' : 'Offline'}</span>
                       </div>
                     </div>

@@ -6,6 +6,7 @@ import { User } from "@/types/discord";
 import { useVoiceChannel } from "@/contexts/VoiceChannelProvider";
 import { Avatar } from "./Avatar";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/contexts/ShopContext";
 
 interface UserPanelProps {
   currentUser: User;
@@ -14,6 +15,7 @@ interface UserPanelProps {
 
 export const UserPanel = ({ currentUser: initialUser, onOpenUserSettings }: UserPanelProps) => {
   const { isMuted, toggleMute, isDeafened, toggleDeafen } = useVoiceChannel();
+  const { getThemeClass, getThemeStyle } = useShop();
   const [liveUser, setLiveUser] = useState(initialUser);
 
   // Sincronizza con le props iniziali
@@ -86,7 +88,12 @@ export const UserPanel = ({ currentUser: initialUser, onOpenUserSettings }: User
           <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full border-[3px] border-[#232428] bg-[#23a559] z-30" />
         </div>
         <div className="ml-2 flex flex-col min-w-0">
-          <span className="text-sm font-semibold text-white truncate leading-tight">{liveUser?.name}</span>
+          <span 
+            className={`text-sm font-semibold truncate leading-tight ${getThemeClass(liveUser?.avatar_decoration)}`}
+            style={getThemeStyle(liveUser?.avatar_decoration)}
+          >
+            {liveUser?.name}
+          </span>
           <span className="text-[11px] text-[#dbdee1] truncate leading-tight">Online</span>
         </div>
       </div>

@@ -318,6 +318,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       case 'pulse': return `custom-pulse 2s infinite ${delayStr}`;
       case 'spin': return `spin-slow 4s linear infinite ${delayStr}`;
       case 'shake': return `custom-shake 0.5s infinite ${delayStr}`;
+      case 'orbit-2d': return `custom-orbit-2d 4s linear infinite ${delayStr}`;
       default: return 'none';
     }
   };
@@ -547,9 +548,17 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                           <option value="twin-rings">Anelli Gemelli</option>
                           <option value="circo">Circo</option>
                           <option value="pulse-ring">Anello Pulsante</option>
+                          <option value="supernova">Supernova Cosmica</option>
+                          <option value="esquelito">Esquelito Explosivo</option>
+                          <option value="oceanic">Vortice Oceanico</option>
+                          <option value="saturn-fire">Saturno a Fuoco</option>
+                          <option value="gustavo-armando">Gustavo Armando</option>
+                          <option value="serpixel-agitato">Serpixel Agitato</option>
+                          <option value="tempesta">Tempesta</option>
+                          <option value="ghiacciolo">Ghiacciolo</option>
                         </select>
 
-                        {baseEffect !== 'none' && (
+                        {baseEffect !== 'none' && !['supernova', 'esquelito', 'oceanic', 'gustavo-armando', 'serpixel-agitato', 'tempesta', 'ghiacciolo'].includes(baseEffect) && (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Colore Effetto 1</label>
@@ -606,6 +615,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                     <option value="pulse">Pulsazione</option>
                                     <option value="spin">Rotazione</option>
                                     <option value="shake">Tremolio</option>
+                                    <option value="orbit-2d">Orbita 2D</option>
+                                    <option value="orbit-3d">Orbita 3D</option>
+                                    <option value="orbit-3d-reverse">Orbita 3D Inversa</option>
                                   </select>
                                 </div>
                                 <div>
@@ -673,9 +685,106 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         <img src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} className="w-full h-full rounded-full object-cover relative z-10" />
                       </div>
 
-                      {/* Elementi Fluttuanti */}
+                      {/* Effetti Base Premium (Dietro o Davanti) */}
                       <div className="absolute inset-0 pointer-events-none z-20">
+                        {baseEffect === 'oceanic' && (
+                          <>
+                            <div className="water-drop-wrapper w1"><div className="water-drop-inner">💧</div></div>
+                            <div className="water-drop-wrapper w2"><div className="water-drop-inner">💧</div></div>
+                            <div className="water-drop-wrapper w3"><div className="water-drop-inner">💧</div></div>
+                            <div className="oceanic-bubble b1"></div>
+                            <div className="oceanic-bubble b2"></div>
+                            <div className="oceanic-bubble b3"></div>
+                          </>
+                        )}
+                        {baseEffect === 'saturn-fire' && (
+                          <>
+                            <div className="saturn-wrapper back"><div className="saturn-ring-inner" style={{ borderTopColor: effectColor1, borderBottomColor: effectColor2 }}></div></div>
+                            <div className="saturn-wrapper front"><div className="saturn-ring-inner" style={{ borderTopColor: effectColor1, borderBottomColor: effectColor2 }}></div></div>
+                            <div className="fire-particle f1"></div>
+                            <div className="fire-particle f2"></div>
+                            <div className="fire-particle f3"></div>
+                          </>
+                        )}
+                        {baseEffect === 'supernova' && (
+                          <>
+                            <div className="supernova-star s1"></div>
+                            <div className="supernova-star s2"></div>
+                            <div className="supernova-star s3"></div>
+                          </>
+                        )}
+                        {baseEffect === 'esquelito' && (
+                          <>
+                            <div className="esquelito-skull sk1"></div>
+                            <div className="esquelito-skull sk2"></div>
+                            <div className="esquelito-skull sk3"></div>
+                          </>
+                        )}
+                        {baseEffect === 'gustavo-armando' && (
+                          <>
+                            <div className="gustavo-sprite gustavo-trail t2"></div>
+                            <div className="gustavo-sprite gustavo-trail t1"></div>
+                            <div className="gustavo-sprite gustavo-main"></div>
+                            <div className="gustavo-orbit-wrapper o1"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o2"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o3"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o4"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o5"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o6"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o7"><div className="gustavo-orbit-inner"></div></div>
+                            <div className="gustavo-orbit-wrapper o8"><div className="gustavo-orbit-inner"></div></div>
+                          </>
+                        )}
+                        {baseEffect === 'serpixel-agitato' && (
+                          <>
+                            <div className="serpixel-scanline"></div>
+                            <div className="serpixel-diamond-wrapper dw1"><div className="serpixel-diamond"></div></div>
+                            <div className="serpixel-diamond-wrapper dw2"><div className="serpixel-diamond"></div></div>
+                            <div className="serpixel-diamond-wrapper dw3"><div className="serpixel-diamond"></div></div>
+                            <div className="serpixel-diamond-wrapper dw4"><div className="serpixel-diamond"></div></div>
+                            <div className="serpixel-venom v1"></div>
+                            <div className="serpixel-venom v2"></div>
+                            <div className="serpixel-venom v3"></div>
+                            <div className="serpixel-venom v4"></div>
+                            <div className="serpixel-venom v5"></div>
+                            <div className="serpixel-snake s1"></div>
+                            <div className="serpixel-snake s2"></div>
+                            <div className="serpixel-snake s3"></div>
+                            <div className="serpixel-snake s4"></div>
+                            <div className="serpixel-snake s5"></div>
+                            <div className="serpixel-snake s6"></div>
+                            <div className="serpixel-snake s7"></div>
+                            <div className="serpixel-snake s8"></div>
+                          </>
+                        )}
+                        {baseEffect === 'tempesta' && (
+                          <>
+                            <div className="storm-drop d1"></div>
+                            <div className="storm-drop d2"></div>
+                            <div className="storm-drop d3"></div>
+                          </>
+                        )}
+                        {baseEffect === 'ghiacciolo' && (
+                          <>
+                            <div className="ice-flake f1">❄️</div>
+                            <div className="ice-flake f2">❄️</div>
+                            <div className="ice-flake f3">❄️</div>
+                          </>
+                        )}
+
+                        {/* Elementi Fluttuanti Custom */}
                         {elements.map(el => {
+                          if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+                            const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+                            const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-inner' : 'custom-orbit-3d-inner-rev';
+                            return (
+                              <div key={el.id} className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+                                <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw` }}>
+                                  {el.type === 'emoji' ? <span style={{fontSize: `${el.size}cqw`}}>{el.content}</span> : <img src={el.content} className="w-full h-full object-contain" />}
+                                </div>
+                              </div>
+                            );
+                          }
                           return (
                             <div 
                               key={el.id} 

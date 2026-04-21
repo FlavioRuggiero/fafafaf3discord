@@ -38,8 +38,8 @@ type ShopContextType = {
   customDecorations: CustomDecoration[];
   allItems: ShopItem[];
   refreshCustomDecorations: () => Promise<void>;
-  getThemeStyle: (id: string) => React.CSSProperties;
-  getThemeClass: (id: string) => string;
+  getThemeStyle: (id: string | null | undefined) => React.CSSProperties;
+  getThemeClass: (id: string | null | undefined) => string;
 };
 
 const ShopContext = createContext<ShopContextType | null>(null);
@@ -67,7 +67,8 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
     }))
   ];
 
-  const getThemeClass = (id: string) => {
+  const getThemeClass = (id: string | null | undefined) => {
+    if (!id) return '';
     switch(id) {
       case 'supernova': return 'theme-text-supernova';
       case 'esquelito': return 'theme-text-esquelito';
@@ -79,7 +80,8 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const getThemeStyle = (id: string): React.CSSProperties => {
+  const getThemeStyle = (id: string | null | undefined): React.CSSProperties => {
+    if (!id) return {};
     const custom = customDecorations.find(c => c.id === id);
     if (custom) {
       if (custom.text_color_type === 'solid') {
@@ -95,9 +97,6 @@ export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
           textShadow: `0 0 15px ${custom.text_gradient_start || '#fff'}80`
         };
       }
-    }
-    if (!getThemeClass(id)) {
-      return { color: 'white' };
     }
     return {};
   };

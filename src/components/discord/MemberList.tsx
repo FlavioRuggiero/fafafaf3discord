@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
 import * as ContextMenu from "@radix-ui/react-context-menu";
+import { useShop } from "@/contexts/ShopContext";
 
 interface MemberListProps {
   users: User[];
@@ -36,6 +37,7 @@ const statusText = {
 
 export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, onBanMember, serverRoles, onToggleMemberRole }: MemberListProps) => {
   const { adminId, moderatorIds, user: authUser } = useAuth();
+  const { getThemeClass, getThemeStyle } = useShop();
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredUsers = users.filter(u => 
@@ -49,7 +51,7 @@ export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, 
   const offlineUsers = otherUsers.filter(u => u.status === 'offline');
 
   const UserItem = ({ user, isCreator }: { user: User, isCreator?: boolean }) => {
-    const isAdmin = user.id === adminId;
+    const isAdmin<think>Continuing the `src/components/discord/MemberList.tsx` file exactly where it left off.</think>=== adminId;
     const isModerator = moderatorIds.includes(user.id);
 
     const canInteract = !isCreator && user.id !== authUser?.id && (serverPermissions?.can_kick_members || serverPermissions?.can_ban_members || serverPermissions?.can_assign_roles);
@@ -78,7 +80,10 @@ export const MemberList = ({ users, creatorId, serverPermissions, onKickMember, 
             
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'}`}>
+                <span 
+                  className={`text-[15px] font-medium truncate ${user.status === 'offline' ? 'text-[#80848e]' : 'text-[#80848e] group-hover:text-[#dbdee1]'} ${getThemeClass(user.avatar_decoration)}`}
+                  style={getThemeStyle(user.avatar_decoration)}
+                >
                   {user.name}
                 </span>
                 {isAdmin && (
