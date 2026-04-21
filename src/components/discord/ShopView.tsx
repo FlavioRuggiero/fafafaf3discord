@@ -6,28 +6,18 @@ import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X, Crown } 
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
-import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
+import { ShopItem } from '@/data/shopItems';
 import { playSound } from '@/utils/sounds';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useShop } from '@/contexts/ShopContext';
 
 interface ShopViewProps {
   currentUser: User;
   onToggleSidebar?: () => void;
 }
 
-const getThemeTextClass = (id: string) => {
-  switch(id) {
-    case 'supernova': return 'theme-text-supernova';
-    case 'esquelito': return 'theme-text-esquelito';
-    case 'oceanic': return 'theme-text-oceanic';
-    case 'saturn-fire': return 'theme-text-saturn-fire';
-    case 'gustavo-armando': return 'theme-text-gustavo';
-    case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
-    default: return 'text-white';
-  }
-};
-
 export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
+  const { allItems, getThemeClass, getThemeStyle } = useShop();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   
@@ -66,6 +56,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
 
   // Logica deterministica per la rotazione oraria sincronizzata
   useEffect(() => {
+    if (allItems.length === 0) return;
+    
     let currentHourSeed = 0;
 
     const updateShop = () => {
@@ -81,7 +73,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
           return x - Math.floor(x);
         };
 
-        const items = [...SHOP_ITEMS];
+        const items = [...allItems];
         for (let i = items.length - 1; i > 0; i--) {
           const j = Math.floor(random() * (i + 1));
           [items[i], items[j]] = [items[j], items[i]];
@@ -102,7 +94,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     updateShop();
     const interval = setInterval(updateShop, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [allItems]);
 
   const handleClaimReward = async () => {
     if (!canClaimReward) return;
@@ -174,7 +166,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     playSound('/openingsound.mp3');
 
     let totalWeight = 0;
-    const weightedItems = SHOP_ITEMS.map(item => {
+    const weightedItems = allItems.map(item => {
       let weight = 50000 / (item.price * item.price); 
       
       // Usa i valori dinamici dal database
@@ -187,7 +179,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     });
 
     let random = Math.random() * totalWeight;
-    let selectedItem = SHOP_ITEMS[0];
+    let selectedItem = allItems[0];
     for (const { item, weight } of weightedItems) {
       random -= weight;
       if (random <= 0) {
@@ -404,7 +396,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                       </div>
                     )}
                     
-                    <h3 className={`font-bold mb-4 text-sm ${getThemeTextClass(item.id)}`}>{item.name}</h3>
+                    <h3 className={`font-bold mb-4 text-sm ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>{item.name}</h3>
 
                     <div className="mt-auto w-full">
                       {isOwned ? (
@@ -563,7 +555,7 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
               )}
             </div>
 
-            <h3 className={`text-xl font-bold mb-2 ${getThemeTextClass(chestReward.id)}`}>{chestReward.name}</h3>
+            <h3 className={`text-xl font-bold mb-2 ${getThemeClass(chestReward.id)}`} style={getThemeStyle(chestReward.id)}>{chestReward.name}</h3>
             <p className="text-[#b5bac1] text-sm mb-6 uppercase tracking-wider font-bold">{chestReward.category}</p>
 
             {chestRefund !== null && (

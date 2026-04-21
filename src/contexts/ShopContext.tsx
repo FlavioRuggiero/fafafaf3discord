@@ -1,0 +1,90 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
+
+export type CustomDecoration = {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  image_url: string | null;
+  border_color: string;
+  shadow_color: string;
+  text_gradient_start: string;
+  text_gradient_end: string;
+  animation_type: string;
+};
+
+type ShopContextType = {
+  customDecorations: CustomDecoration[];
+  allItems: ShopItem[];
+  refreshCustomDecorations: () => Promise<void>;
+  getThemeStyle: (id: string) => React.CSSProperties;
+  getThemeClass: (id: string) => string;
+};
+
+const ShopContext = createContext<ShopContextType | null>(null);
+
+export const ShopProvider = ({ children }: { children: React.ReactNode }) => {
+  const [customDecorations, setCustomDecorations] = useState<CustomDecoration[]>([]);
+
+  const refreshCustomDecorations = async () => {
+    const { data } = await supabase.from('custom_decorations').select('*');
+    if (data) setCustomDecorations(data);
+  };
+
+  useEffect(() => {
+    refreshCustomDecorations();
+  }, []);
+
+  const allItems: ShopItem[] = [
+    ...SHOP_ITEMS,
+    ...customDecorations.map(cd => ({
+      id: cd.id,
+      name: cd.name,
+      price: cd.price,
+      type: 'decoration' as const,
+      category: cd.category,
+    }))
+  ];
+
+  const getThemeClass = (id: string) => {
+    switch(id) {
+      case 'supernova': return 'theme-text-supernova';
+      case 'esquelito': return 'theme-text-esquelito';
+      case 'oceanic': return 'theme-text-oceanic';
+      case 'saturn-fire': return 'theme-text-saturn-fire';
+      case 'gustavo-armando': return 'theme-text-gustavo';
+      case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
+      default: return '';
+    }
+  };
+
+  const getThemeStyle = (id: string): React.CSSProperties => {
+    const custom = customDecorations.find(c => c.id === id);
+    if (custom) {
+      return {
+        background: `linear-gradient(90deg, ${custom.text_gradient_start}, ${custom.text_gradient_end})`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        textShadow: `0 0 15px ${custom.text_gradient_start}80`
+      };
+    }
+    if (!getThemeClass(id)) {
+      return { color: 'white' };
+    }
+    return {};
+  };
+
+  return (
+    <ShopContext.Provider value={{ customDecorations, allItems, refreshCustomDecorations, getThemeStyle, getThemeClass }}>
+      {children}
+    </ShopContext.Provider>
+  );
+};
+
+export const useShop = () => {
+  const context = useContext(ShopContext);
+  if (!context) throw new Error("useShop must be used within ShopProvider");
+  return context;
+};

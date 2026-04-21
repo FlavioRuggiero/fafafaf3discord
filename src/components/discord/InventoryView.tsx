@@ -6,28 +6,17 @@ import { Archive, Menu, Check, Coins, DollarSign, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
-import { SHOP_ITEMS } from '@/data/shopItems';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useShop } from '@/contexts/ShopContext';
 
 interface InventoryViewProps {
   currentUser: User;
   onToggleSidebar?: () => void;
 }
 
-export const getThemeTextClass = (id: string) => {
-  switch(id) {
-    case 'supernova': return 'theme-text-supernova';
-    case 'esquelito': return 'theme-text-esquelito';
-    case 'oceanic': return 'theme-text-oceanic';
-    case 'saturn-fire': return 'theme-text-saturn-fire';
-    case 'gustavo-armando': return 'theme-text-gustavo';
-    case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
-    default: return 'text-white';
-  }
-};
-
 export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewProps) => {
-  const [itemToSell, setItemToSell] = useState<typeof SHOP_ITEMS[0] | null>(null);
+  const { allItems, getThemeClass, getThemeStyle } = useShop();
+  const [itemToSell, setItemToSell] = useState<any | null>(null);
   
   const handleEquip = async (id: string) => {
     const { error } = await supabase.from('profiles').update({
@@ -74,7 +63,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
   };
 
   // Filtra solo gli oggetti acquistati
-  const ownedItems = SHOP_ITEMS.filter(item => currentUser.purchased_decorations?.includes(item.id));
+  const ownedItems = allItems.filter(item => currentUser.purchased_decorations?.includes(item.id));
   
   // Raggruppa per categoria
   const categories = Array.from(new Set(ownedItems.map(item => item.category)));
@@ -179,7 +168,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                           </div>
                         )}
                         
-                        <h3 className={`font-bold mb-4 text-sm relative z-20 ${getThemeTextClass(item.id)}`}>{item.name}</h3>
+                        <h3 className={`font-bold mb-4 text-sm relative z-20 ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>{item.name}</h3>
 
                         <div className="mt-auto w-full relative z-30">
                           {item.type === 'privilege' ? (
@@ -222,7 +211,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
             </div>
             
             <p className="text-[#dbdee1] mb-6 leading-relaxed">
-              Sei sicuro di voler vendere <strong className={getThemeTextClass(itemToSell.id)}>{itemToSell.name}</strong>? 
+              Sei sicuro di voler vendere <strong className={getThemeClass(itemToSell.id)} style={getThemeStyle(itemToSell.id)}>{itemToSell.name}</strong>? 
               <br className="mb-2" />
               Riceverai indietro <strong className="text-white">{Math.floor(itemToSell.price / 2)}</strong> <img src="/digitalcardus.png" alt="dc" className="w-4 h-4 inline-block align-text-bottom" />.
             </p>

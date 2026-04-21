@@ -1,4 +1,5 @@
 import React from 'react';
+import { useShop } from '@/contexts/ShopContext';
 
 interface AvatarProps {
   src: string;
@@ -10,6 +11,8 @@ interface AvatarProps {
 }
 
 export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipEffects }: AvatarProps) => {
+  const { customDecorations } = useShop();
+  
   // Se isSpeaking è un booleano, significa che siamo in un contesto vocale.
   const isVoiceContext = typeof isSpeaking === 'boolean';
   
@@ -26,6 +29,33 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
 
   if (!activeDecoration) {
     return <img src={src} alt={alt} className={`rounded-full object-cover ${speakingClass} ${className}`} />;
+  }
+
+  // Controllo se è una decorazione custom
+  const customDec = customDecorations.find(d => d.id === activeDecoration);
+  if (customDec) {
+    return (
+      <div 
+        className={`relative rounded-full flex items-center justify-center ${speakingClass} ${className}`}
+        style={{
+          border: `2px solid ${customDec.border_color}`,
+          boxShadow: `0 0 10px ${customDec.shadow_color}, inset 0 0 10px ${customDec.shadow_color}`,
+        }}
+      >
+        {customDec.image_url && (
+          <img 
+            src={customDec.image_url} 
+            className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+            style={{ 
+              animation: customDec.animation_type === 'spin' ? 'spin-slow 4s linear infinite' : 
+                         customDec.animation_type === 'pulse' ? 'custom-pulse 2s infinite' : 
+                         customDec.animation_type === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+            }} 
+          />
+        )}
+        <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
+      </div>
+    );
   }
 
   return (

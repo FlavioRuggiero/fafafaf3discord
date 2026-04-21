@@ -15,7 +15,7 @@ import { BombParty } from "./BombParty";
 import { CustomAudioPlayer } from "./CustomAudioPlayer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
-import { SHOP_ITEMS } from "@/data/shopItems";
+import { useShop } from "@/contexts/ShopContext";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "🎉"];
 
@@ -169,6 +169,7 @@ interface ChatAreaProps {
 
 export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onToggleMembers, onToggleSidebar, showMembers, serverCreatorId, serverMembers, serverPermissions }: ChatAreaProps) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
+  const { allItems } = useShop();
   
   const adminIdRef = useRef(adminId);
   const moderatorIdsRef = useRef(moderatorIds);
@@ -185,8 +186,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
   const [realMessages, setRealMessages] = useState<LocalMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);const [isLoading, setIsLoading] = useState(true);
   const [tableExists, setTableExists] = useState(true);
   
   // Pagination States
@@ -280,7 +280,7 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
 
   // Emoji personalizzate
   const ownedEmojiPacks = currentUserProfile?.purchased_decorations?.filter((id: string) => id.startsWith('emoji-pack-')) || [];
-  const customEmojis = ownedEmojiPacks.flatMap((packId: string) => SHOP_ITEMS.find(i => i.id === packId)?.emojis || []);
+  const customEmojis = ownedEmojiPacks.flatMap((packId: string) => allItems.find(i => i.id === packId)?.emojis || []);
   const allReactionEmojis = [...EMOJIS, ...customEmojis];
 
   // Limiti di upload standard
@@ -2323,9 +2323,9 @@ export const ChatArea = ({ channel, messages: propMessages, onSendMessage, onTog
                           
                           {/* Floating Emojis */}
                           <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-80 group-hover:opacity-100 transition-opacity">
-                            {SHOP_ITEMS.find(i => i.type === 'emoji_pack')?.emojis?.[0] && <img src={SHOP_ITEMS.find(i => i.type === 'emoji_pack')!.emojis![0]} className="absolute left-[15%] bottom-0 w-4 h-4 object-contain drop-shadow-md" style={{ animation: 'float-emoji-1 3s ease-in-out infinite' }} />}
-                            {SHOP_ITEMS.find(i => i.type === 'emoji_pack')?.emojis?.[1] && <img src={SHOP_ITEMS.find(i => i.type === 'emoji_pack')!.emojis![1]} className="absolute left-[50%] bottom-0 w-3 h-3 object-contain drop-shadow-md" style={{ animation: 'float-emoji-2 2.5s ease-in-out infinite 0.5s' }} />}
-                            {SHOP_ITEMS.find(i => i.type === 'emoji_pack')?.emojis?.[2] && <img src={SHOP_ITEMS.find(i => i.type === 'emoji_pack')!.emojis![2]} className="absolute right-[20%] bottom-0 w-4 h-4 object-contain drop-shadow-md" style={{ animation: 'float-emoji-3 3.5s ease-in-out infinite 1s' }} />}
+                            {allItems.find(i => i.type === 'emoji_pack')?.emojis?.[0] && <img src={allItems.find(i => i.type === 'emoji_pack')!.emojis![0]} className="absolute left-[15%] bottom-0 w-4 h-4 object-contain drop-shadow-md" style={{ animation: 'float-emoji-1 3s ease-in-out infinite' }} />}
+                            {allItems.find(i => i.type === 'emoji_pack')?.emojis?.[1] && <img src={allItems.find(i => i.type === 'emoji_pack')!.emojis![1]} className="absolute left-[50%] bottom-0 w-3 h-3 object-contain drop-shadow-md" style={{ animation: 'float-emoji-2 2.5s ease-in-out infinite 0.5s' }} />}
+                            {allItems.find(i => i.type === 'emoji_pack')?.emojis?.[2] && <img src={allItems.find(i => i.type === 'emoji_pack')!.emojis![2]} className="absolute right-[20%] bottom-0 w-4 h-4 object-contain drop-shadow-md" style={{ animation: 'float-emoji-3 3.5s ease-in-out infinite 1s' }} />}
                           </div>
 
                           <span className="relative z-10 drop-shadow-[0_0_5px_rgba(250,204,21,0.6)]">Personalizzate</span>

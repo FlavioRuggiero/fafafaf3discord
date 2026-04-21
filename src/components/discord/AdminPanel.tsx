@@ -1,40 +1,30 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost } from "lucide-react";
+import { X, Search, Shield, Coins, Plus, Minus, Palette, Settings2, TrendingUp, PackageOpen, Ghost, Wand2, Upload, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePopover } from "./ProfilePopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SHOP_ITEMS } from "@/data/shopItems";
+import { useShop } from "@/contexts/ShopContext";
 
 interface AdminPanelProps {
   onClose: () => void;
 }
 
-const getThemeTextClass = (id: string) => {
-  switch(id) {
-    case 'supernova': return 'theme-text-supernova';
-    case 'esquelito': return 'theme-text-esquelito';
-    case 'oceanic': return 'theme-text-oceanic';
-    case 'saturn-fire': return 'theme-text-saturn-fire';
-    case 'gustavo-armando': return 'theme-text-gustavo';
-    case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
-    default: return 'text-white';
-  }
-};
-
 export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const { adminId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests' | 'jumpscare'>('dc');
+  const { allItems, customDecorations, refreshCustomDecorations } = useShop();
+  
+  const [activeTab, setActiveTab] = useState<'dc' | 'mods' | 'cosmetics' | 'chests' | 'jumpscare' | 'custom-editor'>('dc');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
-  const [selectedCosmeticId, setSelectedCosmeticId] = useState<string>(SHOP_ITEMS[0]?.id || '');
+  const [selectedCosmeticId, setSelectedCosmeticId] = useState<string>(allItems[0]?.id || '');
 
   // Stati per la gestione dei bauli
   const [chestSettings, setChestSettings] = useState({ premium_multiplier: 2.0, rare_threshold: 100 });
@@ -42,6 +32,19 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   // Stato per Jumpscare
   const [selectedJumpscareTarget, setSelectedJumpscareTarget] = useState<string>('all');
+
+  // Stati per Editor Contorni Custom
+  const [newDecName, setNewDecName] = useState('');
+  const [newDecPrice, setNewDecPrice] = useState(100);
+  const [newDecBorder, setNewDecBorder] = useState('#5865F2');
+  const [newDecShadow, setNewDecShadow] = useState('#5865F2');
+  const [newDecGradStart, setNewDecGradStart] = useState('#5865F2');
+  const [newDecGradEnd, setNewDecGradEnd] = useState('#00ffff');
+  const [newDecAnim, setNewDecAnim] = useState('none');
+  const [newDecImage, setNewDecImage] = useState<File | null>(null);
+  const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
+  const [isCreatingDec, setIsCreatingDec] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -153,7 +156,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   };
 
   const handleSendJumpscare = async () => {
-    // Ottieni il canale globale già esistente
     const channel = supabase.channel('global_jumpscare');
     
     const sendPayload = () => {
@@ -170,11 +172,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       });
     };
 
-    // Se il canale è già connesso (grazie a Index.tsx), invia direttamente
     if (channel.state === 'joined') {
       sendPayload();
     } else {
-      // Altrimenti iscriviti e poi invia
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           sendPayload();
@@ -183,10 +183,72 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
+  // Editor Contorni Custom
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setNewDecImage(file);
+      setNewDecImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleCreateCustomDecoration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDecName.trim()) return;
+    
+    setIsCreatingDec(true);
+    const customId = `custom-${Date.now()}`;
+    let imageUrl = null;
+
+    if (newDecImage) {
+      const fileExt = newDecImage.name.split('.').pop();
+      const filePath = `custom_decorations/${customId}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, newDecImage);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
+      }
+    }
+
+    const { error } = await supabase.from('custom_decorations').insert({
+      id: customId,
+      name: newDecName.trim(),
+      price: newDecPrice,
+      category: 'Contorni Custom',
+      image_url: imageUrl,
+      border_color: newDecBorder,
+      shadow_color: newDecShadow,
+      text_gradient_start: newDecGradStart,
+      text_gradient_end: newDecGradEnd,
+      animation_type: newDecAnim
+    });
+
+    if (error) {
+      showError("Errore durante la creazione. Hai eseguito lo script SQL?");
+    } else {
+      showSuccess("Contorno creato con successo!");
+      setNewDecName('');
+      setNewDecImage(null);
+      setNewDecImagePreview(null);
+      await refreshCustomDecorations();
+    }
+    setIsCreatingDec(false);
+  };
+
+  const handleDeleteCustomDecoration = async (id: string) => {
+    const { error } = await supabase.from('custom_decorations').delete().eq('id', id);
+    if (error) {
+      showError("Errore durante l'eliminazione.");
+    } else {
+      showSuccess("Contorno eliminato.");
+      await refreshCustomDecorations();
+    }
+  };
+
   // Calcolo live delle probabilità
   const calculateChances = (isPremium: boolean) => {
     let totalWeight = 0;
-    const weights = SHOP_ITEMS.map(item => {
+    const weights = allItems.map(item => {
       let weight = 50000 / (item.price * item.price);
       if (isPremium && item.price >= chestSettings.rare_threshold) {
         weight *= chestSettings.premium_multiplier;
@@ -202,7 +264,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="bg-[#313338] rounded-lg w-[700px] max-h-[85vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#313338] rounded-lg w-[800px] max-h-[85vh] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex-shrink-0 p-4 border-b border-[#1e1f22] flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -244,6 +306,15 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             </div>
           </button>
           <button
+            onClick={() => setActiveTab('custom-editor')}
+            className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'custom-editor' ? 'border-brand text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
+          >
+            <div className="flex items-center gap-2">
+              <Wand2 size={16} className={activeTab === 'custom-editor' ? 'text-brand' : ''} />
+              Editor Contorni
+            </div>
+          </button>
+          <button
             onClick={() => setActiveTab('chests')}
             className={`pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'chests' ? 'border-[#5865f2] text-white' : 'border-transparent text-[#949ba4] hover:text-[#dbdee1]'}`}
           >
@@ -266,6 +337,180 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
         {/* Content */}
         <div className="p-4 flex-1 overflow-hidden flex flex-col">
           
+          {activeTab === 'custom-editor' && (
+            <div className="flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2">
+              <div className="bg-[#2b2d31] p-6 rounded-lg border border-[#1e1f22] mb-6">
+                <h3 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
+                  <Wand2 className="text-brand" /> Crea Contorno Custom
+                </h3>
+                
+                <form onSubmit={handleCreateCustomDecoration} className="flex flex-col md:flex-row gap-6">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome</label>
+                        <input 
+                          type="text" 
+                          value={newDecName}
+                          onChange={e => setNewDecName(e.target.value)}
+                          required
+                          className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
+                        />
+                      </div>
+                      <div className="w-32">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Prezzo (DC)</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={newDecPrice}
+                          onChange={e => setNewDecPrice(parseInt(e.target.value) || 0)}
+                          required
+                          className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
+                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecBorder} onChange={e => setNewDecBorder(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecBorder}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Ombra</label>
+                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecShadow} onChange={e => setNewDecShadow(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecShadow}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Gradiente Testo (Inizio)</label>
+                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecGradStart} onChange={e => setNewDecGradStart(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecGradStart}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Gradiente Testo (Fine)</label>
+                        <div className="flex items-center gap-2 bg-[#1e1f22] p-1 rounded border border-[#3f4147]">
+                          <input type="color" value={newDecGradEnd} onChange={e => setNewDecGradEnd(e.target.value)} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
+                          <span className="text-white text-sm uppercase">{newDecGradEnd}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione</label>
+                        <select 
+                          value={newDecAnim}
+                          onChange={e => setNewDecAnim(e.target.value)}
+                          className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                        >
+                          <option value="none">Nessuna</option>
+                          <option value="spin">Rotazione</option>
+                          <option value="pulse">Pulsazione</option>
+                          <option value="bounce">Rimbalzo</option>
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine (Opzionale)</label>
+                        <button 
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full bg-[#1e1f22] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Upload size={16} /> {newDecImage ? 'Cambia Immagine' : 'Carica Immagine'}
+                        </button>
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={isCreatingDec || !newDecName.trim()}
+                      className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg mt-4 disabled:opacity-50"
+                    >
+                      {isCreatingDec ? 'Creazione in corso...' : 'Crea Contorno'}
+                    </button>
+                  </div>
+
+                  {/* Anteprima */}
+                  <div className="w-full md:w-64 flex flex-col items-center justify-center bg-[#1e1f22] rounded-lg border border-[#3f4147] p-6">
+                    <h3 className="text-[#b5bac1] font-bold mb-6 uppercase text-xs tracking-wider">Anteprima Live</h3>
+                    <div 
+                      className="relative rounded-full flex items-center justify-center w-24 h-24 mb-6"
+                      style={{
+                        border: `2px solid ${newDecBorder}`,
+                        boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
+                      }}
+                    >
+                      {newDecImagePreview && (
+                        <img 
+                          src={newDecImagePreview} 
+                          className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                          style={{ 
+                            animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                       newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                       newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                          }} 
+                        />
+                      )}
+                      <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=preview" className="w-full h-full rounded-full object-cover relative z-10" />
+                    </div>
+                    <span 
+                      className="font-bold text-xl text-center"
+                      style={{
+                        background: `linear-gradient(90deg, ${newDecGradStart}, ${newDecGradEnd})`,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        textShadow: `0 0 15px ${newDecGradStart}80`
+                      }}
+                    >
+                      {newDecName || 'Nome Contorno'}
+                    </span>
+                  </div>
+                </form>
+              </div>
+
+              {/* Lista Contorni Custom */}
+              {customDecorations.length > 0 && (
+                <div className="bg-[#2b2d31] p-4 rounded-lg border border-[#1e1f22]">
+                  <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Contorni Custom Esistenti</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {customDecorations.map(dec => (
+                      <div key={dec.id} className="flex items-center justify-between bg-[#1e1f22] p-3 rounded border border-[#3f4147]">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-8 h-8 rounded-full relative flex items-center justify-center"
+                            style={{ border: `2px solid ${dec.border_color}`, boxShadow: `0 0 5px ${dec.shadow_color}` }}
+                          >
+                            {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold" style={{ background: `linear-gradient(90deg, ${dec.text_gradient_start}, ${dec.text_gradient_end})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                              {dec.name}
+                            </span>
+                            <span className="text-[10px] text-[#949ba4]">{dec.price} DC</span>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteCustomDecoration(dec.id)}
+                          className="p-1.5 text-[#f23f43] hover:bg-[#f23f43]/20 rounded transition-colors"
+                          title="Elimina"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'jumpscare' && (
             <div className="flex flex-col flex-1 min-h-0">
               <div className="flex-shrink-0 bg-[#2b2d31] p-6 rounded-lg border border-[#1e1f22] mb-4 text-center">
@@ -358,16 +603,19 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     <div className="w-20 text-right">Standard</div>
                     <div className="w-20 text-right text-yellow-500">Premium</div>
                   </div>
-                  {SHOP_ITEMS.sort((a,b) => b.price - a.price).map(item => {
+                  {allItems.sort((a,b) => b.price - a.price).map(item => {
                      const stdChance = standardChances.find(c => c.id === item.id)?.chance || 0;
                      const prmChance = premiumChances.find(c => c.id === item.id)?.chance || 0;
                      const isRare = item.price >= chestSettings.rare_threshold;
                      const diff = prmChance - stdChance;
                      
+                     // Usa il context per lo stile del testo
+                     const { getThemeClass, getThemeStyle } = useShop();
+                     
                      return (
                        <div key={item.id} className="flex items-center bg-[#1e1f22] p-2 rounded border border-transparent hover:border-[#3f4147]">
                          <div className="flex-1 min-w-0 flex items-center gap-2">
-                           <span className={`text-xs font-medium truncate ${getThemeTextClass(item.id)}`}>{item.name}</span>
+                           <span className={`text-xs font-medium truncate ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>{item.name}</span>
                            <span className="text-[10px] text-[#949ba4] bg-[#2b2d31] px-1.5 rounded">{item.price} DC</span>
                            {isRare && <span className="text-[10px] text-yellow-500 bg-yellow-500/10 px-1.5 rounded border border-yellow-500/20">Raro</span>}
                          </div>
@@ -384,7 +632,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
             </div>
           )}
 
-          {activeTab !== 'chests' && activeTab !== 'jumpscare' && (
+          {activeTab !== 'chests' && activeTab !== 'jumpscare' && activeTab !== 'custom-editor' && (
             <>
               {activeTab === 'cosmetics' && (
                 <div className="flex-shrink-0 mb-4 bg-[#2b2d31] p-3 rounded-lg border border-[#1e1f22]">
@@ -394,7 +642,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                     onChange={(e) => setSelectedCosmeticId(e.target.value)}
                     className="w-full bg-[#1e1f22] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
                   >
-                    {SHOP_ITEMS.map(item => (
+                    {allItems.map(item => (
                       <option key={item.id} value={item.id}>
                         {item.name} ({item.category}) - {item.price} DC
                       </option>

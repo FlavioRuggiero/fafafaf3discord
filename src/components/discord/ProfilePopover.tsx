@@ -7,9 +7,9 @@ import { Shield, Archive, ChevronDown, ChevronUp, Crown, ArrowRightLeft } from "
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar } from "./Avatar";
-import { SHOP_ITEMS } from "@/data/shopItems";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { useShop } from "@/contexts/ShopContext";
 
 const statusColors = {
   online: "bg-[#23a559]",
@@ -25,20 +25,9 @@ const statusText = {
   offline: "Offline",
 };
 
-const getThemeTextClass = (id: string) => {
-  switch(id) {
-    case 'supernova': return 'theme-text-supernova';
-    case 'esquelito': return 'theme-text-esquelito';
-    case 'oceanic': return 'theme-text-oceanic';
-    case 'saturn-fire': return 'theme-text-saturn-fire';
-    case 'gustavo-armando': return 'theme-text-gustavo';
-    case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
-    default: return 'text-[#dbdee1]';
-  }
-};
-
 export const ProfilePopover = ({ user, children, side = "right", align = "start" }: { user: User | null, children: React.ReactNode, side?: "top" | "right" | "bottom" | "left", align?: "start" | "center" | "end" }) => {
   const { user: authUser, adminId, moderatorIds } = useAuth();
+  const { allItems, getThemeClass, getThemeStyle } = useShop();
   const [showInventory, setShowInventory] = useState(false);
   const [isRequestingTrade, setIsRequestingTrade] = useState(false);
 
@@ -51,8 +40,8 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
   const xpPercent = Math.min(100, (currentXp / xpNeeded) * 100);
   
   const ownedItems = (user.purchased_decorations
-    ?.map(id => SHOP_ITEMS.find(i => i.id === id))
-    .filter(Boolean) as typeof SHOP_ITEMS)
+    ?.map(id => allItems.find(i => i.id === id))
+    .filter(Boolean) as typeof allItems)
     ?.sort((a, b) => b.price - a.price) || [];
 
   const sendBroadcast = (targetId: string, event: string, payload: any) => {
@@ -290,7 +279,7 @@ export const ProfilePopover = ({ user, children, side = "right", align = "start"
                               <Avatar src={user.avatar} decoration={item.id} className="w-8 h-8" />
                             </div>
                           )}
-                          <span className={`text-[10px] font-medium truncate w-full ${getThemeTextClass(item.id)}`}>
+                          <span className={`text-[10px] font-medium truncate w-full ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>
                             {item.name}
                           </span>
                           <div className="flex items-center gap-1 mt-1 bg-[#1e1f22] px-1.5 py-0.5 rounded-full border border-[#3f4147]">

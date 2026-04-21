@@ -189,6 +189,16 @@ body {
   100% { transform: rotate(360deg); }
 }
 
+/* Animazioni Custom Decorations */
+@keyframes custom-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+@keyframes custom-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10%); }
+}
+
 /* Nuovi Contorni Base */
 
 /* Circo */

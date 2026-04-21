@@ -5,8 +5,8 @@ import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen, Crown 
 import { User } from '@/types/discord';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { SHOP_ITEMS, ShopItem } from '@/data/shopItems';
 import { Avatar } from './Avatar';
+import { useShop } from '@/contexts/ShopContext';
 
 interface TradeModalProps {
   tradeId: string;
@@ -14,19 +14,8 @@ interface TradeModalProps {
   onClose: () => void;
 }
 
-const getThemeTextClass = (id: string) => {
-  switch(id) {
-    case 'supernova': return 'theme-text-supernova';
-    case 'esquelito': return 'theme-text-esquelito';
-    case 'oceanic': return 'theme-text-oceanic';
-    case 'saturn-fire': return 'theme-text-saturn-fire';
-    case 'gustavo-armando': return 'theme-text-gustavo';
-    case 'serpixel-agitato': return 'theme-text-serpixel-agitato';
-    default: return 'text-white';
-  }
-};
-
 export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) => {
+  const { allItems, getThemeClass, getThemeStyle } = useShop();
   const [trade, setTrade] = useState<any>(null);
   const [myProfile, setMyProfile] = useState<any>(null);
   const [theirProfile, setTheirProfile] = useState<any>(null);
@@ -64,7 +53,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
           
           // Calcola il rimborso (metà del valore)
           const refund = duplicates.reduce((acc: number, id: string) => {
-            const item = SHOP_ITEMS.find(i => i.id === id);
+            const item = allItems.find(i => i.id === id);
             return acc + Math.floor((item?.price || 0) / 2);
           }, 0);
 
@@ -135,7 +124,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
 
   const calculateTotalValue = (itemIds: string[]) => {
     return itemIds.reduce((total, id) => {
-      const item = SHOP_ITEMS.find(i => i.id === id);
+      const item = allItems.find(i => i.id === id);
       return total + (item ? item.price : 0);
     }, 0);
   };
@@ -180,7 +169,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
       // Workaround: L'RPC richiede che lo status sia 'pending'. Lo rimettiamo temporaneamente a pending.
       await supabase.from('trades').update({ status: 'pending' }).eq('id', tradeId);
 
-      const itemPrices = SHOP_ITEMS.reduce((acc, item) => ({ ...acc, [item.id]: item.price }), {});
+      const itemPrices = allItems.reduce((acc, item) => ({ ...acc, [item.id]: item.price }), {});
       const { data, error } = await supabase.rpc('execute_trade', { 
         p_trade_id: tradeId, 
         p_item_prices: itemPrices 
@@ -208,7 +197,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   };
 
   const renderItemCard = (itemId: string, action: 'add' | 'remove' | 'none', ownerProfile: any) => {
-    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    const item = allItems.find(i => i.id === itemId);
     if (!item) return null;
 
     const avatarSrc = ownerProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ownerProfile?.id}`;
@@ -240,7 +229,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
           </div>
         )}
         
-        <span className={`text-[10px] font-medium truncate w-full ${getThemeTextClass(item.id)}`}>
+        <span className={`text-[10px] font-medium truncate w-full ${getThemeClass(item.id)}`} style={getThemeStyle(item.id)}>
           {item.name}
         </span>
         
