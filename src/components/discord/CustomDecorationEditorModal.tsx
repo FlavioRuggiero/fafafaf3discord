@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Upload, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Wand2, Upload, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
