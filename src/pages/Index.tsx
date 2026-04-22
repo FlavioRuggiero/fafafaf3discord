@@ -13,6 +13,7 @@ import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
 import { MySingingCanary } from "@/components/discord/MySingingCanary";
 import { Progression } from "@/components/discord/Progression";
 import { FriendsArea } from "@/components/discord/FriendsArea";
+import { PlagueLordMinigame } from "@/components/discord/PlagueLordMinigame";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -101,6 +102,9 @@ const Index = () => {
   // Jumpscare State
   const [jumpscareActive, setJumpscareActive] = useState(false);
 
+  // Plague Lord State
+  const [activePlagueAttack, setActivePlagueAttack] = useState<{ attackerId: string, attackerName: string, targetItemId: string } | null>(null);
+
   // Gestione intelligente della scomparsa del badge notifiche
   useEffect(() => {
     if (notificationCount === 0) {
@@ -166,13 +170,118 @@ const Index = () => {
           const audio = new Audio('/jumpscare.mp3');
           audio.volume = 1.0;
           audio.play().catch(e => console.error("Audio play failed", e));
-          // Aumentato a 3500ms per compensare il ritardo di 1s dell'animazione
           setTimeout(() => setJumpscareActive(false), 3500);
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(sub); };
   }, [currentUser?.id]);
+
+  // Listener globale per Plague Lord
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const channel = supabase.channel(`plague_events_${currentUser.id}`);
+    
+    channel.on('broadcast', { event: 'plague_attack' }, async (payload) => {
+      const { attackerId, attackerName } = payload.payload;
+      
+      // Controlla l'inventario della vittima (me stesso)
+      const myItems = currentUserRef.current?.purchased_decorations || [];
+      
+      if (myItems.length === 0) {
+        // Inventario vuoto, l'attacco fallisce
+        const replyChannel = supabase.channel(`plague_events_${attackerId}`);
+        replyChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            replyChannel.send({
+              type: 'broadcast',
+              event: 'plague_result',
+              payload: { type: 'empty', victimName: currentUserRef.current?.name }
+            });
+            setTimeout(() => supabase.removeChannel(replyChannel), 1000);
+          }
+        });
+        return;
+      }
+
+      // Scegli un oggetto a caso
+      const randomItem = myItems[Math.floor(Math.random() * myItems.length)];
+      
+      // Avvia il minigioco
+      setActivePlagueAttack({ attackerId, attackerName, targetItemId: randomItem });
+      playSound('/jumpscare.mp3'); // Suono spaventoso per l'attacco
+    });
+
+    channel.on('broadcast', { event: 'plague_result' }, (payload) => {
+      const { type, victimName, itemName } = payload.payload;
+      if (type === 'empty') {
+        showError(`L'attacco è fallito! ${victimName} non ha oggetti nell'inventario.`);
+      } else if (type === 'defended') {
+        showError(`Maledizione! ${victimName} è riuscito a difendersi dal Signore della Peste.`);
+      } else if (type === 'success') {
+        showSuccess(`VITTORIA! Il Signore della Peste ha rubato ${itemName} da ${victimName}! Controlla l'inventario.`);
+      }
+    });
+
+    channel.subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id]);
+
+  const handlePlagueMinigameComplete = async (success: boolean) => {
+    if (!activePlagueAttack || !currentUser) return;
+    
+    const { attackerId, targetItemId } = activePlagueAttack;
+    setActivePlagueAttack(null);
+
+    const replyChannel = supabase.channel(`plague_events_${attackerId}`);
+    
+    if (success) {
+      // Difeso con successo
+      replyChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          replyChannel.send({
+            type: 'broadcast',
+            event: 'plague_result',
+            payload: { type: 'defended', victimName: currentUser.name }
+          });
+          setTimeout(() => supabase.removeChannel(replyChannel), 1000);
+        }
+      });
+    } else {
+      // Perso, ruba l'oggetto
+      const { data, error } = await supabase.rpc('steal_item', {
+        p_attacker_id: attackerId,
+        p_victim_id: currentUser.id,
+        p_item_id: targetItemId
+      });
+
+      if (!error && data) {
+        // Aggiorna lo stato locale per rimuovere l'oggetto
+        const newDecs = (currentUser.purchased_decorations || []).filter(id => id !== targetItemId);
+        setCurrentUser(prev => prev ? { ...prev, purchased_decorations: newDecs } : null);
+        
+        // Recupera il nome dell'oggetto per la notifica
+        const { data: itemData } = await supabase.from('custom_decorations').select('name').eq('id', targetItemId).maybeSingle();
+        const itemName = itemData?.name || 'un oggetto';
+
+        replyChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            replyChannel.send({
+              type: 'broadcast',
+              event: 'plague_result',
+              payload: { type: 'success', victimName: currentUser.name, itemName }
+            });
+            setTimeout(() => supabase.removeChannel(replyChannel), 1000);
+          }
+        });
+        showError(`Hai perso! Il Signore della Peste ti ha rubato un oggetto.`);
+      }
+    }
+  };
 
   // Listener globale per le notifiche (Messaggi e Menzioni)
   useEffect(() => {
@@ -1534,7 +1643,12 @@ const Index = () => {
           activeChannel?.id === 'shop' ? (
             <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.id === 'inventory' ? (
-            <InventoryView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+            <InventoryView 
+              currentUser={currentUser} 
+              onToggleSidebar={() => setShowSidebar(true)} 
+              onlineUserIds={onlineUserIds}
+              serverMembers={serverMembersList}
+            />
           ) : activeChannel?.id === 'progression' ? (
             <Progression currentUser={currentUser} />
           ) : activeChannel?.id === 'daily-minigame' ? (
@@ -1654,6 +1768,15 @@ const Index = () => {
           <div className="fixed inset-0 z-[999999] pointer-events-none flex items-center justify-center overflow-hidden">
             <img src="/jumpscare.png" alt="Jumpscare" className="animate-jumpscare object-cover w-full h-full" />
           </div>
+        )}
+
+        {/* Plague Lord Minigame Overlay */}
+        {activePlagueAttack && (
+          <PlagueLordMinigame 
+            attackerName={activePlagueAttack.attackerName}
+            targetItemId={activePlagueAttack.targetItemId}
+            onComplete={handlePlagueMinigameComplete}
+          />
         )}
       </div>
     </VoiceChannelProvider>

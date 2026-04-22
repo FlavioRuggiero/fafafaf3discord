@@ -85,6 +85,14 @@ export const SHOP_ITEMS: ShopItem[] = [
 
   // Oggetti Speciali (Consumabili)
   {
+    id: 'consumable-peste',
+    name: 'Signore della Peste',
+    price: 125,
+    type: 'consumable',
+    category: 'Speciali',
+    description: 'Usalo su un utente online. Se non riesce a cliccarlo entro 30 secondi, gli ruberai un oggetto a caso dal suo inventario!'
+  },
+  {
     id: 'custom-dec-ticket',
     name: 'Contorno personalizzato',
     price: 750,
