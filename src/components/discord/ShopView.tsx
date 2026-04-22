@@ -379,12 +379,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                     ) : item.type === 'consumable' ? (
                       <Tooltip delayDuration={0}>
                         <TooltipTrigger asChild>
-                          <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-brand shadow-[0_0_15px_rgba(88,101,242,0.3)] mx-auto cursor-help relative z-20 overflow-hidden">
-                            {item.id === 'consumable-peste' ? (
-                              <img src="/signore-della-peste.png" className="w-16 h-16 object-contain animate-pulse" />
-                            ) : (
-                              <Wand2 size={40} className="text-brand" />
-                            )}
+                          <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-brand shadow-[0_0_15px_rgba(88,101,242,0.3)] mx-auto cursor-help">
+                            <Wand2 size={40} className="text-brand" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-sm max-w-xs text-center z-[99999]">

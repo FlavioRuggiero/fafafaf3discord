@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User } from '@/types/discord';
 import { Archive, Menu, Check, Coins, DollarSign, Crown, Wand2, Edit2, Search, X, Skull } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,34 +28,6 @@ export const InventoryView = ({ currentUser, onToggleSidebar, onlineUserIds, ser
   // Stati per l'attacco
   const [showAttackModal, setShowAttackModal] = useState(false);
   const [attackSearchQuery, setAttackSearchQuery] = useState("");
-  const [globalOnlineUsers, setGlobalOnlineUsers] = useState<any[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-
-  useEffect(() => {
-    if (showAttackModal) {
-      const fetchOnlineUsers = async () => {
-        setIsLoadingUsers(true);
-        const ids = Array.from(onlineUserIds).filter(id => id !== currentUser.id);
-        if (ids.length === 0) {
-          setGlobalOnlineUsers([]);
-          setIsLoadingUsers(false);
-          return;
-        }
-        
-        const { data } = await supabase.from('profiles').select('id, first_name, avatar_url, avatar_decoration').in('id', ids);
-        if (data) {
-          setGlobalOnlineUsers(data.map(p => ({
-            id: p.id,
-            name: p.first_name || 'Utente',
-            avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
-            avatar_decoration: p.avatar_decoration
-          })));
-        }
-        setIsLoadingUsers(false);
-      };
-      fetchOnlineUsers();
-    }
-  }, [showAttackModal, onlineUserIds, currentUser.id]);
 
   const handleEquip = async (item: ShopItem) => {
     const updateField = item.type === 'cursor' ? { active_cursor: item.id } : { avatar_decoration: item.id };
@@ -105,7 +77,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar, onlineUserIds, ser
     setItemToSell(null);
   };
 
-  const handleLaunchAttack = async (targetUser: any) => {
+  const handleLaunchAttack = async (targetUser: User) => {
     // 1. Rimuovi l'oggetto dall'inventario dell'attaccante
     const currentDecs = [...(currentUser.purchased_decorations || [])];
     const indexToRemove = currentDecs.indexOf('consumable-peste');
@@ -141,8 +113,8 @@ export const InventoryView = ({ currentUser, onToggleSidebar, onlineUserIds, ser
   const ownedItems = allItems.filter(item => currentUser.purchased_decorations?.includes(item.id));
   const categories = Array.from(new Set(ownedItems.map(item => item.category)));
 
-  // Filtra gli utenti online per l'attacco
-  const attackableUsers = globalOnlineUsers.filter(u => u.name.toLowerCase().includes(attackSearchQuery.toLowerCase()));
+  // Filtra gli utenti online per l'attacco (escludendo se stessi)
+  const attackableUsers = serverMembers.filter(u => onlineUserIds.has(u.id) && u.id !== currentUser.id && u.name.toLowerCase().includes(attackSearchQuery.toLowerCase()));
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] relative overflow-hidden h-full min-w-0">
@@ -380,11 +352,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar, onlineUserIds, ser
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-              {isLoadingUsers ? (
-                <div className="text-center text-[#949ba4] py-8">
-                  Ricerca vittime in corso...
-                </div>
-              ) : attackableUsers.length === 0 ? (
+              {attackableUsers.length === 0 ? (
                 <div className="text-center text-[#949ba4] py-8">
                   Nessun utente online trovato.
                 </div>
