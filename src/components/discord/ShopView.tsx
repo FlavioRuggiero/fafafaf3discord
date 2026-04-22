@@ -601,3 +601,257 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
     </div>
   );
 };
+
+// Helper functions for rendering effects and elements
+const getAnimation = (anim: string, delay: number, customAnims?: CustomAnimationDef[]) => {
+  const delayStr = delay > 0 ? `${delay}s` : '0s';
+  if (anim.startsWith('custom_anim_')) {
+    const customAnim = customAnims?.find(a => `custom_anim_${a.id}` === anim);
+    if (customAnim) return `custom_anim_${customAnim.id} ${customAnim.duration}s ${customAnim.timingFunction} infinite ${delayStr}`;
+  }
+  switch(anim) {
+    case 'float': return `custom-float 3s ease-in-out infinite ${delayStr}`;
+    case 'pulse': return `custom-pulse 2s infinite ${delayStr}`;
+    case 'spin': return `spin-slow 4s linear infinite ${delayStr}`;
+    case 'shake': return `custom-shake 0.5s infinite ${delayStr}`;
+    case 'orbit-2d': return `custom-orbit-2d 4s linear infinite ${delayStr}`;
+    default: return 'none';
+  }
+};
+
+const getBgImage = (effect: BaseEffectConfig, defaultUrl: string) => {
+  if (!effect.icon) return `url('${defaultUrl}')`;
+  if (effect.icon.startsWith('http') || effect.icon.startsWith('/')) return `url('${effect.icon}')`;
+  return 'none';
+};
+
+const getIconContent = (effect: BaseEffectConfig, defaultIcon: string | null = null, sizeCqw?: number) => {
+  const icon = effect.icon || defaultIcon;
+  if (!icon) return null;
+  if (icon.startsWith('http') || icon.startsWith('/')) return null;
+  return <span className="w-full h-full flex items-center justify-center" style={{ fontSize: sizeCqw ? `${sizeCqw}cqw` : 'inherit' }}>{icon}</span>;
+};
+
+const getEffectStyle = (effect: BaseEffectConfig, baseStyle: React.CSSProperties = {}, defaultZIndex: number = 20): React.CSSProperties => {
+  const x = effect.x ?? 50;
+  const y = effect.y ?? 50;
+  const rot = effect.rotation ?? 0;
+  const scale = effect.size !== undefined ? effect.size / 100 : 1;
+  const z = effect.zIndex ?? defaultZIndex;
+
+  const transformStyle: React.CSSProperties = {};
+  if (x !== 50 || y !== 50) transformStyle.translate = `${x - 50}% ${y - 50}%`;
+  if (rot !== 0) transformStyle.rotate = `${rot}deg`;
+  if (scale !== 1) transformStyle.scale = `${scale}`;
+
+  let finalStyle = { ...baseStyle, ...transformStyle, zIndex: z };
+  if (effect.icon && !effect.icon.startsWith('http') && !effect.icon.startsWith('/')) {
+    finalStyle = { ...finalStyle, background: 'transparent', boxShadow: 'none', borderColor: 'transparent' };
+  }
+  return finalStyle;
+};
+
+const renderInnerEffects = (effects: BaseEffectConfig[]) => {
+  return effects.map(effect => {
+    switch(effect.type) {
+      case 'scanline': return <div key={effect.id} className="custom-scanline" style={getEffectStyle(effect, { color: effect.color1 }, 0)}></div>;
+      case 'radar': return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(from 0deg, transparent 70%, ${effect.color1} 100%)`, animation: 'spin-slow 1.5s linear infinite' }, 0)}></div>;
+      case 'twin-rings': return (
+          <React.Fragment key={effect.id}>
+            <div className="absolute inset-[-3px] rounded-full" style={getEffectStyle(effect, { border: `2px dashed ${effect.color1}`, animation: 'spin-slow 4s linear infinite' }, 0)}></div>
+            <div className="absolute inset-[-6px] rounded-full" style={getEffectStyle(effect, { border: `2px dashed ${effect.color2}`, animation: 'spin-slow 3s linear infinite reverse' }, 0)}></div>
+          </React.Fragment>
+        );
+      case 'circo': return <div key={effect.id} className="absolute inset-[-3px] rounded-full" style={getEffectStyle(effect, { background: `repeating-conic-gradient(${effect.color1} 0deg 20deg, ${effect.color2} 20deg 40deg)`, animation: 'spin-slow 8s linear infinite' }, 0)}></div>;
+      case 'pulse-ring': return <div key={effect.id} className="absolute inset-0 rounded-full" style={getEffectStyle(effect, { border: `2px solid ${effect.color1}`, animation: 'custom-pulse-ring 2s infinite', '--pulse-color': effect.color1 } as any, 0)}></div>;
+      case 'supernova': return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(${effect.color1}, ${effect.color2}, ${effect.color1})`, filter: 'blur(5px)', animation: 'spin-slow 2s linear infinite' }, 0)}></div>;
+      case 'oceanic': return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(transparent, ${effect.color1}, ${effect.color2}, transparent 50%)`, animation: 'spin-slow 2s linear infinite' }, 0)}></div>;
+      case 'serpixel-agitato': return (
+          <React.Fragment key={effect.id}>
+            <div className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { background: `conic-gradient(transparent, ${effect.color1}, transparent, ${effect.color2}, transparent)`, animation: 'spin-slow 2s linear infinite' }, 0)}></div>
+            <div className="serpixel-scanline" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 15px ${effect.color1}` }, 0)}></div>
+          </React.Fragment>
+        );
+      case 'ghiacciolo': return <div key={effect.id} className="absolute inset-[-4px] rounded-full" style={getEffectStyle(effect, { borderTop: `3px solid ${effect.color1}`, borderLeft: `3px solid ${effect.color2}`, animation: 'spin-slow 6s linear infinite', opacity: 0.7 }, 0)}></div>;
+      default: return null;
+    }
+  });
+};
+
+const renderOuterEffects = (effects: BaseEffectConfig[]) => {
+  return effects.map(effect => {
+    switch(effect.type) {
+      case 'supernova': return (
+          <React.Fragment key={effect.id}>
+            <div className="supernova-star s1" style={getEffectStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }, 20)}>{getIconContent(effect, null, 12)}</div>
+            <div className="supernova-star s2" style={getEffectStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }, 20)}>{getIconContent(effect, null, 12)}</div>
+            <div className="supernova-star s3" style={getEffectStyle(effect, { background: effect.color2, backgroundImage: getBgImage(effect, ''), backgroundSize: 'contain' }, 20)}>{getIconContent(effect, null, 12)}</div>
+          </React.Fragment>
+        );
+      case 'esquelito': return (
+          <React.Fragment key={effect.id}>
+            <div className="esquelito-skull sk1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto1.png') }, 20)}>{getIconContent(effect, null, 50)}</div>
+            <div className="esquelito-skull sk2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/esqueleto2.png') }, 20)}>{getIconContent(effect, null, 50)}</div>
+            <div className="esquelito-skull sk3" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/esquelito3.png') }, 20)}>{getIconContent(effect, null, 50)}</div>
+          </React.Fragment>
+        );
+      case 'oceanic': return (
+          <React.Fragment key={effect.id}>
+            <div className="water-drop-wrapper w1" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+            <div className="water-drop-wrapper w2" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+            <div className="water-drop-wrapper w3" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="water-drop-inner">{getIconContent(effect, '💧', 30)}</div></div>
+            <div className="oceanic-bubble b1" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }, 20)}>{getIconContent(effect, null, 12)}</div>
+            <div className="oceanic-bubble b2" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }, 20)}>{getIconContent(effect, null, 12)}</div>
+            <div className="oceanic-bubble b3" style={getEffectStyle(effect, { background: effect.color1, boxShadow: `0 0 4px ${effect.color2}` }, 20)}>{getIconContent(effect, null, 12)}</div>
+          </React.Fragment>
+        );
+      case 'saturn-fire': return (
+          <React.Fragment key={effect.id}>
+            <div className="saturn-wrapper back" style={{ ...getEffectStyle(effect), zIndex: (effect.zIndex ?? 20) - 15 }}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+            <div className="saturn-wrapper front" style={{ ...getEffectStyle(effect), zIndex: (effect.zIndex ?? 20) + 5 }}><div className="saturn-ring-inner" style={{ borderTopColor: effect.color1, borderBottomColor: effect.color2, borderLeftColor: effect.color1, borderRightColor: effect.color2 }}></div></div>
+            <div className="fire-particle f1" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }, 20)}>{getIconContent(effect, null, 15)}</div>
+            <div className="fire-particle f2" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }, 20)}>{getIconContent(effect, null, 15)}</div>
+            <div className="fire-particle f3" style={getEffectStyle(effect, { background: `radial-gradient(circle, ${effect.color1} 0%, ${effect.color2} 60%, transparent 100%)` }, 20)}>{getIconContent(effect, null, 15)}</div>
+          </React.Fragment>
+        );
+      case 'gustavo-armando': return (
+          <React.Fragment key={effect.id}>
+            <div className="gustavo-sprite gustavo-trail t2" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') }, 20)}>{getIconContent(effect, null, 60)}</div>
+            <div className="gustavo-sprite gustavo-trail t1" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') }, 20)}>{getIconContent(effect, null, 60)}</div>
+            <div className="gustavo-sprite gustavo-main" style={getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/adrotto.png') }, 20)}>{getIconContent(effect, null, 60)}</div>
+            <div className="gustavo-orbit-wrapper o1" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o2" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o3" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o4" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o5" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o6" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o7" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+            <div className="gustavo-orbit-wrapper o8" style={{ ...getEffectStyle(effect), zIndex: undefined }}><div className="gustavo-orbit-inner" style={{ backgroundImage: getBgImage(effect, '/adrotto.png') }}>{getIconContent(effect, null, 35)}</div></div>
+          </React.Fragment>
+        );
+      case 'serpixel-agitato': return (
+          <React.Fragment key={effect.id}>
+            <div className="serpixel-diamond-wrapper dw1" style={getEffectStyle(effect, {}, 20)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+            <div className="serpixel-diamond-wrapper dw2" style={getEffectStyle(effect, {}, 20)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+            <div className="serpixel-diamond-wrapper dw3" style={getEffectStyle(effect, {}, 20)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+            <div className="serpixel-diamond-wrapper dw4" style={getEffectStyle(effect, {}, 20)}><div className="serpixel-diamond" style={{ background: effect.color2 }}>{getIconContent(effect, null, 10)}</div></div>
+            <div className="serpixel-venom v1" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
+            <div className="serpixel-venom v2" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
+            <div className="serpixel-venom v3" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
+            <div className="serpixel-venom v4" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
+            <div className="serpixel-venom v5" style={getEffectStyle(effect, { background: effect.color1 }, 20)}></div>
+            <div className="serpixel-snake s1" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s2" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s3" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s4" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s5" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s6" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s7" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+            <div className="serpixel-snake s8" style={{ ...getEffectStyle(effect, { backgroundImage: getBgImage(effect, '/serpe1.png') }), zIndex: undefined }}>{getIconContent(effect, null, 30)}</div>
+          </React.Fragment>
+        );
+      case 'tempesta': return (
+          <React.Fragment key={effect.id}>
+            <div className="storm-drop d1" style={getEffectStyle(effect, { background: effect.color1 }, 20)}>{getIconContent(effect, null, 10)}</div>
+            <div className="storm-drop d2" style={getEffectStyle(effect, { background: effect.color1 }, 20)}>{getIconContent(effect, null, 10)}</div>
+            <div className="storm-drop d3" style={getEffectStyle(effect, { background: effect.color1 }, 20)}>{getIconContent(effect, null, 10)}</div>
+          </React.Fragment>
+        );
+      case 'ghiacciolo': return (
+          <React.Fragment key={effect.id}>
+            <div className="ice-flake f1" style={getEffectStyle(effect, { color: effect.color1 }, 20)}>{getIconContent(effect, '❄️', 12)}</div>
+            <div className="ice-flake f2" style={getEffectStyle(effect, { color: effect.color1 }, 20)}>{getIconContent(effect, '❄️', 12)}</div>
+            <div className="ice-flake f3" style={getEffectStyle(effect, { color: effect.color1 }, 20)}>{getIconContent(effect, '❄️', 12)}</div>
+          </React.Fragment>
+        );
+      default: return null;
+    }
+  });
+};
+
+const renderCustomAnimationsCSS = (animations?: CustomAnimationDef[], elements?: CustomElement[]) => {
+  if (!animations || animations.length === 0) return null;
+  const css = animations.map(anim => {
+    const keyframes = anim.keyframes.sort((a, b) => a.percent - b.percent).map(kf => {
+      let leftTop = '';
+      let transform = '';
+      const mode = kf.positionMode || 'relative';
+
+      if (mode === 'absolute') {
+        leftTop = `left: ${kf.x}%; top: ${kf.y}%;`;
+        transform = `transform: translate(-50%, -50%);`;
+      } else if (mode === 'target' && kf.targetId && elements) {
+        const targetEl = elements.find(e => e.id === kf.targetId);
+        const tx = targetEl ? targetEl.x : 50;
+        const ty = targetEl ? targetEl.y : 50;
+        leftTop = `left: ${tx}%; top: ${ty}%;`;
+        transform = `transform: translate(-50%, -50%);`;
+      } else {
+        // relative
+        transform = `transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%));`;
+      }
+
+      return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; }`;
+    }).join('\n');
+    return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
+  }).join('\n');
+  return <style>{css}</style>;
+};
+
+const renderElementNode = (el: CustomElement, allElements: CustomElement[], customAnimations?: CustomAnimationDef[]) => {
+  const children = allElements.filter(child => child.parentId === el.id);
+  const childrenNodes = children.map(child => renderElementNode(child, allElements, customAnimations));
+
+  const contentNode = el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />;
+
+  const innerContent = (
+    <div style={{ rotate: `${el.rotation || 0}deg`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {contentNode}
+      {childrenNodes}
+    </div>
+  );
+
+  if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
+    const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+    const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
+    return (
+      <div
+        key={el.id}
+        className="absolute pointer-events-none"
+        style={{
+          left: `${el.x}%`,
+          top: `${el.y}%`,
+          transform: `translate(-50%, -50%)`,
+          width: '100%',
+          height: '100%',
+          zIndex: el.zIndex ?? 20
+        }}
+      >
+        <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
+          <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
+            {innerContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      key={el.id} 
+      className={`absolute flex items-center justify-center`}
+      style={{ 
+        left: `${el.x}%`,
+        top: `${el.y}%`,
+        transform: 'translate(-50%, -50%)',
+        animation: getAnimation(el.animation, el.delay, customAnimations),
+        width: `${el.size}cqw`,
+        height: `${el.size}cqw`,
+        fontSize: `${el.size}cqw`,
+        zIndex: el.zIndex ?? 20
+      }}
+    >
+      {innerContent}
+    </div>
+  );
+};
