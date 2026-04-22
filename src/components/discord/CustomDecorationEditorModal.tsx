@@ -1222,8 +1222,15 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                 {renderCustomAnimationsCSS(draftDecoration.customAnimations, draftDecoration.elements)}
                 
                 {/* Inner Effects */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  {renderInnerEffects(draftDecoration.baseEffects)}
+                <div 
+                  className="absolute pointer-events-none overflow-hidden rounded-full"
+                  style={{ top: '-65%', left: '-65%', width: '230%', height: '230%' }}
+                >
+                  <div className="absolute" style={{ top: '28.26%', left: '28.26%', width: '43.48%', height: '43.48%' }}>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {renderInnerEffects(draftDecoration.baseEffects)}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Avatar & Border (z-10) */}
@@ -1248,13 +1255,19 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                   <img src={currentUser.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} className="w-full h-full rounded-full object-cover relative z-10" />
                 </div>
 
-                {/* Outer Effects */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  {renderOuterEffects(draftDecoration.baseEffects)}
+                {/* Outer Effects & Elements */}
+                <div 
+                  className="absolute pointer-events-none overflow-hidden rounded-full border-2 border-dashed border-[#f23f43]/50"
+                  style={{ top: '-65%', left: '-65%', width: '230%', height: '230%' }}
+                >
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[#f23f43]/70 text-[8px] font-bold uppercase tracking-widest">Limite Area</div>
+                  <div className="absolute" style={{ top: '28.26%', left: '28.26%', width: '43.48%', height: '43.48%' }}>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {renderOuterEffects(draftDecoration.baseEffects)}
+                    </div>
+                    {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
+                  </div>
                 </div>
-
-                {/* Elements */}
-                {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
               </div>
 
               <div 
