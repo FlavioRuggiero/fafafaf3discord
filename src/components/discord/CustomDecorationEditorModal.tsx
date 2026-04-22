@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Upload, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Wand2, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -20,7 +20,6 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
   const { customDecorations, refreshCustomDecorations, draftDecoration, setDraftDecoration, clipboard, setClipboard } = useShop();
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
 
   // Stati per comprimere gli elementi
@@ -85,13 +84,6 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
 
   const updateDraft = (updates: Partial<DraftDecoration>) => {
     setDraftDecoration(prev => ({ ...prev, ...updates }));
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      updateDraft({ imageFile: file, imagePreview: URL.createObjectURL(file) });
-    }
   };
 
   const addBaseEffect = () => {
@@ -749,7 +741,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                 {/* Stile Bordo & Sfondo */}
                 <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
                   <h4 className="text-white font-bold mb-3 text-sm uppercase">Stile Bordo & Sfondo</h4>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Colore Bordo</label>
                       <div className="flex items-center gap-2 bg-[#2b2d31] p-1 rounded border border-[#3f4147]">
@@ -763,33 +755,6 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                         <input type="color" value={draftDecoration.shadowColor} onChange={e => updateDraft({ shadowColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
                         <span className="text-white text-sm uppercase">{draftDecoration.shadowColor}</span>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
-                      <select 
-                        value={draftDecoration.anim}
-                        onChange={e => updateDraft({ anim: e.target.value })}
-                        className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
-                      >
-                        <option value="none">Nessuna</option>
-                        <option value="spin">Rotazione</option>
-                        <option value="pulse">Pulsazione</option>
-                        <option value="bounce">Rimbalzo</option>
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
-                      <button 
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Upload size={16} /> {draftDecoration.imageFile || draftDecoration.imagePreview ? 'Cambia Immagine' : 'Carica Immagine'}
-                      </button>
-                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                     </div>
                   </div>
                 </div>
