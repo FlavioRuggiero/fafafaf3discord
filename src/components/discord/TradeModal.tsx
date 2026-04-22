@@ -191,19 +191,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   };
 
   const handleCancelTrade = async () => {
-    await supabase.from('trades').update({ status:<think>
-Continuing the `TradeModal.tsx` file from where it was cut off.
-The last line was:
-```tsx
     await supabase.from('trades').update({ status: 'cancelled' }).eq('id', tradeId);
-    notifyUpdate();
-    onClose();
-  };
-
-  const renderItemCard = (itemId: string, action: 'add' | 'remove' | 'none', ownerProfile: any) => {
-```
-I will output the rest of the file.
-</think>'cancelled' }).eq('id', tradeId);
     notifyUpdate();
     onClose();
   };
