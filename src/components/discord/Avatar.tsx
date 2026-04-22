@@ -346,9 +346,16 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
       <div className={`relative rounded-full flex items-center justify-center dec-wrapper ${speakingClass} ${className} ${clipEffects ? 'overflow-hidden' : ''}`}>
         {renderCustomAnimationsCSS(customDec.config?.customAnimations, customDec.config?.elements)}
         
-        {/* Inner Effects */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          {renderInnerEffects(effectsToRender)}
+        {/* Bounding Box for Inner Effects (Limits extreme custom decorations) */}
+        <div 
+          className="absolute pointer-events-none overflow-hidden rounded-full"
+          style={{ top: '-200%', left: '-200%', width: '500%', height: '500%' }}
+        >
+          <div className="absolute" style={{ top: '40%', left: '40%', width: '20%', height: '20%' }}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              {renderInnerEffects(effectsToRender)}
+            </div>
+          </div>
         </div>
 
         {/* Avatar & Border (z-10) */}
@@ -373,13 +380,18 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
         </div>
 
-        {/* Outer Effects */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          {renderOuterEffects(effectsToRender)}
+        {/* Bounding Box for Outer Effects & Elements (Limits extreme custom decorations) */}
+        <div 
+          className="absolute pointer-events-none overflow-hidden rounded-full"
+          style={{ top: '-200%', left: '-200%', width: '500%', height: '500%' }}
+        >
+          <div className="absolute" style={{ top: '40%', left: '40%', width: '20%', height: '20%' }}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              {renderOuterEffects(effectsToRender)}
+            </div>
+            {customDec.config?.elements?.map(el => renderStandaloneElement(el, customDec.config!.elements!, customDec.config?.customAnimations))}
+          </div>
         </div>
-
-        {/* Elements */}
-        {customDec.config?.elements?.map(el => renderStandaloneElement(el, customDec.config!.elements!, customDec.config?.customAnimations))}
       </div>
     );
   }
