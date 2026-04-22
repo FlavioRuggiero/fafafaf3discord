@@ -46,17 +46,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [newDecGradStart, setNewDecGradStart] = useState('#5865F2');
   const [newDecGradEnd, setNewDecGradEnd] = useState('#00ffff');
   
-  const [newDecAnim, setNewDecAnim] = useState('none');
-  
   const [baseEffects, setBaseEffects] = useState<BaseEffectConfig[]>([]);
   const [elements, setElements] = useState<CustomElement[]>([]);
   const [customAnimations, setCustomAnimations] = useState<CustomAnimationDef[]>([]);
   
-  const [newDecImage, setNewDecImage] = useState<File | null>(null);
-  const [newDecImagePreview, setNewDecImagePreview] = useState<string | null>(null);
-  
   const [isCreatingDec, setIsCreatingDec] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Stato per il selettore Emoji
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
@@ -220,15 +214,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   };
 
-  // Editor Contorni Custom
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setNewDecImage(file);
-      setNewDecImagePreview(URL.createObjectURL(file));
-    }
-  };
-
   // --- COPY / PASTE LOGIC (SYSTEM CLIPBOARD) ---
 
   const copyBaseEffect = async (id: string) => {
@@ -364,6 +349,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     const newId = `el-${Date.now()}`;
     setElements([...elements, {
       id: newId,
+      name: '',
       type: 'emoji',
       content: '✨',
       animation: 'float',
@@ -469,12 +455,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     setNewDecTextColor(dec.text_color);
     setNewDecGradStart(dec.text_gradient_start);
     setNewDecGradEnd(dec.text_gradient_end);
-    setNewDecAnim(dec.animation_type);
     setBaseEffects(dec.config?.baseEffects || []);
     setElements(dec.config?.elements || []);
     setCustomAnimations(dec.config?.customAnimations || []);
-    setNewDecImagePreview(dec.image_url);
-    setNewDecImage(null);
     
     // Scroll to top
     const container = document.getElementById('custom-editor-container');
@@ -491,12 +474,9 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     setNewDecTextColor('#ffffff');
     setNewDecGradStart('#5865F2');
     setNewDecGradEnd('#00ffff');
-    setNewDecAnim('none');
     setBaseEffects([]);
     setElements([]);
     setCustomAnimations([]);
-    setNewDecImagePreview(null);
-    setNewDecImage(null);
   };
 
   const handleCreateCustomDecoration = async (e: React.FormEvent) => {
@@ -505,17 +485,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
     
     setIsCreatingDec(true);
     const customId = editDecorationId || `custom-${Date.now()}`;
-    let imageUrl = newDecImagePreview;
-
-    if (newDecImage) {
-      const fileExt = newDecImage.name.split('.').pop();
-      const filePath = `custom_decorations/${customId}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, newDecImage);
-      if (!uploadError) {
-        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-        imageUrl = data.publicUrl;
-      }
-    }
 
     const config = {
       baseEffects,
@@ -527,14 +496,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
       name: newDecName.trim(),
       price: newDecPrice,
       category: 'Contorni Custom',
-      image_url: imageUrl,
+      image_url: null,
       border_color: newDecBorder,
       shadow_color: newDecShadow,
       text_color_type: textColorType,
       text_color: newDecTextColor,
       text_gradient_start: newDecGradStart,
       text_gradient_end: newDecGradEnd,
-      animation_type: newDecAnim,
+      animation_type: 'none',
       config: config
     };
 
@@ -812,69 +781,94 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
           transform = `transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%));`;
         }
 
-        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
+        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; }`;
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
     return <style>{css}</style>;
   };
 
-  const renderElementNode = (el: CustomElement, allElements: CustomElement[], customAnimations?: CustomAnimationDef[]) => {
-    const children = allElements.filter(child => child.parentId === el.id);
-    const childrenNodes = children.map(child => renderElementNode(child, allElements, customAnimations));
-
-    const contentNode = el.type === 'emoji' ? el.content : <img src={el.content} className="w-full h-full object-contain" />;
-
-    const innerContent = (
-      <div style={{ rotate: `${el.rotation || 0}deg`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {contentNode}
-        {childrenNodes}
-      </div>
-    );
-
-    if (el.animation === 'orbit-3d' || el.animation === 'orbit-3d-reverse') {
-      const wrapperAnim = el.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
-      const innerAnim = el.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
-      return (
-        <div
-          key={el.id}
-          className="absolute pointer-events-none"
-          style={{
-            left: `${el.x}%`,
-            top: `${el.y}%`,
-            transform: `translate(-50%, -50%)`,
-            width: '100%',
-            height: '100%',
-            zIndex: el.zIndex ?? 20
-          }}
-        >
-          <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}` }}>
-            <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${el.delay > 0 ? el.delay+'s' : '0s'}`, width: `${el.size}cqw`, height: `${el.size}cqw`, fontSize: `${el.size}cqw` }}>
-              {innerContent}
-            </div>
-          </div>
-        </div>
-      );
+  const renderStandaloneElement = (el: CustomElement, allElements: CustomElement[], customAnimations?: CustomAnimationDef[]) => {
+    const chain: CustomElement[] = [el];
+    let curr = el;
+    const visited = new Set<string>([el.id]);
+    while (curr.parentId) {
+      const parent = allElements.find(e => e.id === curr.parentId);
+      if (parent && !visited.has(parent.id)) {
+        chain.unshift(parent);
+        visited.add(parent.id);
+        curr = parent;
+      } else {
+        break;
+      }
     }
 
-    return (
-      <div 
-        key={el.id} 
-        className={`absolute flex items-center justify-center`}
-        style={{ 
-          left: `${el.x}%`,
-          top: `${el.y}%`,
-          transform: 'translate(-50%, -50%)',
-          animation: getAnimation(el.animation, el.delay, customAnimations),
-          width: `${el.size}cqw`,
-          height: `${el.size}cqw`,
-          fontSize: `${el.size}cqw`,
-          zIndex: el.zIndex ?? 20
-        }}
-      >
-        {innerContent}
-      </div>
-    );
+    let resultNode: React.ReactNode = null;
+
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const nodeEl = chain[i];
+      const isOutermost = i === 0;
+      const isTarget = i === chain.length - 1;
+
+      const contentNode = isTarget ? (
+        nodeEl.type === 'emoji' ? nodeEl.content : <img src={nodeEl.content} className="w-full h-full object-contain" />
+      ) : null;
+
+      const innerContent = (
+        <div style={{ rotate: `${nodeEl.rotation || 0}deg`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {contentNode}
+          {resultNode}
+        </div>
+      );
+
+      const zIndex = isOutermost ? (el.zIndex ?? 20) : undefined;
+
+      if (nodeEl.animation === 'orbit-3d' || nodeEl.animation === 'orbit-3d-reverse') {
+        const wrapperAnim = nodeEl.animation === 'orbit-3d' ? 'custom-orbit-3d-wrapper' : 'custom-orbit-3d-wrapper-rev';
+        const innerAnim = nodeEl.animation === 'orbit-3d' ? 'custom-orbit-inner' : 'custom-orbit-3d-inner-rev';
+        resultNode = (
+          <div
+            key={isTarget ? nodeEl.id : `ghost-${nodeEl.id}-${el.id}`}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${nodeEl.x}%`,
+              top: `${nodeEl.y}%`,
+              transform: `translate(-50%, -50%)`,
+              width: '100%',
+              height: '100%',
+              zIndex: zIndex
+            }}
+          >
+            <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}` }}>
+              <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}`, width: `${nodeEl.size}cqw`, height: `${nodeEl.size}cqw`, fontSize: `${nodeEl.size}cqw` }}>
+                {innerContent}
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        resultNode = (
+          <div 
+            key={isTarget ? nodeEl.id : `ghost-${nodeEl.id}-${el.id}`}
+            className={`absolute flex items-center justify-center pointer-events-none`}
+            style={{ 
+              left: `${nodeEl.x}%`,
+              top: `${nodeEl.y}%`,
+              transform: 'translate(-50%, -50%)',
+              animation: getAnimation(nodeEl.animation, nodeEl.delay, customAnimations),
+              width: `${nodeEl.size}cqw`,
+              height: `${nodeEl.size}cqw`,
+              fontSize: `${nodeEl.size}cqw`,
+              zIndex: zIndex
+            }}
+          >
+            {innerContent}
+          </div>
+        );
+      }
+    }
+
+    return resultNode;
   };
 
   const avatarUrl = (currentUser as any)?.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
@@ -1061,33 +1055,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
-                        <select 
-                          value={newDecAnim}
-                          onChange={e => setNewDecAnim(e.target.value)}
-                          className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
-                        >
-                          <option value="none">Nessuna</option>
-                          <option value="spin">Rotazione</option>
-                          <option value="pulse">Pulsazione</option>
-                          <option value="bounce">Rimbalzo</option>
-                        </select>
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
-                        <button 
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Upload size={16} /> {newDecImage || newDecImagePreview ? 'Cambia Immagine' : 'Carica Immagine'}
-                        </button>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
-                      </div>
-                    </div>
                   </div>
 
                   {/* Effetti Base Multipli */}
@@ -1235,7 +1202,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                               <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => toggleElement(el.id)}>
                                 <div className="flex items-center gap-2 text-white font-bold text-sm">
                                   {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                                  Elemento {el.type === 'emoji' ? el.content : 'Immagine'}
+                                  Elemento: {el.name || (el.type === 'emoji' ? el.content : 'Immagine')}
                                 </div>
                                 <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                                   <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors p-1" title="Copia">
@@ -1249,7 +1216,11 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                               
                               {!isCollapsed && (
                                 <div className="pt-2 border-t border-[#3f4147]">
-                                  <div className="grid grid-cols-2 gap-3 mb-3">
+                                  <div className="grid grid-cols-3 gap-3 mb-3">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Elemento</label>
+                                      <input type="text" value={el.name || ''} onChange={e => updateElement(el.id, 'name', e.target.value)} placeholder="Es. Scintilla" className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
+                                    </div>
                                     <div>
                                       <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
                                       <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -1331,7 +1302,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                           .filter(other => other.id !== el.id && !isDescendant(other.id, el.id, elements))
                                           .map(other => (
                                             <option key={other.id} value={other.id}>
-                                              {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
+                                              {other.name || (other.type === 'emoji' ? other.content : 'IMG')} ({other.id.slice(-4)})
                                             </option>
                                         ))}
                                       </select>
@@ -1462,14 +1433,14 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                                 >
                                                   <option value="">Seleziona...</option>
                                                   {elements.map(e => (
-                                                    <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
+                                                    <option key={e.id} value={e.id}>{e.name || (e.type === 'emoji' ? e.content : 'IMG')} ({e.id.slice(-4)})</option>
                                                   ))}
                                                 </select>
                                               </div>
                                             )}
                                           </div>
                                           
-                                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
+                                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 w-full">
                                             {kf.positionMode !== 'target' && (
                                               <>
                                                 <div>
@@ -1508,13 +1479,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                                                 <input type="number" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
                                               </div>
                                               <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
-                                            </div>
-                                            <div>
-                                              <div className="flex justify-between items-center mb-0.5">
-                                                <label className="text-[9px] text-[#949ba4]">Z-Index</label>
-                                                <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
-                                              </div>
-                                              <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                             </div>
                                           </div>
                                         </div>
@@ -1561,17 +1525,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                       boxShadow: `0 0 10px ${newDecShadow}, inset 0 0 10px ${newDecShadow}`,
                     }}
                   >
-                    {newDecImagePreview && (
-                      <img 
-                        src={newDecImagePreview} 
-                        className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-                        style={{ 
-                          animation: newDecAnim === 'spin' ? 'spin-slow 4s linear infinite' : 
-                                     newDecAnim === 'pulse' ? 'custom-pulse 2s infinite' : 
-                                     newDecAnim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-                        }} 
-                      />
-                    )}
                     <img src={avatarUrl} className="w-full h-full rounded-full object-cover relative z-10" />
                   </div>
 
@@ -1629,7 +1582,6 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
                         className="w-8 h-8 rounded-full relative flex items-center justify-center"
                         style={{ border: `2px solid ${dec.border_color}`, boxShadow: `0 0 5px ${dec.shadow_color}` }}
                       >
-                        {dec.image_url && <img src={dec.image_url} className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 mix-blend-screen" />}
                       </div>
                       <div className="flex flex-col" style={dec.text_color_type === 'gradient' ? { filter: `drop-shadow(0 0 4px ${dec.text_gradient_start}80)` } : {}}>
                         <span className="text-sm font-bold" style={

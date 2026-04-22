@@ -25,6 +25,7 @@ export type CustomAnimationDef = {
 
 export type CustomElement = {
   id: string;
+  name?: string;
   type: 'emoji' | 'image';
   content: string;
   animation: string;
@@ -84,12 +85,9 @@ export type DraftDecoration = {
   textColor: string;
   gradStart: string;
   gradEnd: string;
-  anim: string;
   baseEffects: BaseEffectConfig[];
   elements: CustomElement[];
   customAnimations: CustomAnimationDef[];
-  imageFile: File | null;
-  imagePreview: string | null;
 };
 
 export const DEFAULT_DRAFT_DECORATION: DraftDecoration = {
@@ -102,12 +100,9 @@ export const DEFAULT_DRAFT_DECORATION: DraftDecoration = {
   textColor: '#ffffff',
   gradStart: '#5865F2',
   gradEnd: '#00ffff',
-  anim: 'none',
   baseEffects: [],
   elements: [],
-  customAnimations: [],
-  imageFile: null,
-  imagePreview: null
+  customAnimations: []
 };
 
 export type ClipboardState = {

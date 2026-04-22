@@ -238,7 +238,7 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
           transform = `transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%));`;
         }
 
-        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
+        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; }`;
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
@@ -359,17 +359,6 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
             boxShadow: `0 0 10px ${customDec.shadow_color}, inset 0 0 10px ${customDec.shadow_color}`,
           }}
         >
-          {customDec.image_url && (
-            <img 
-              src={customDec.image_url} 
-              className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
-              style={{ 
-                animation: customDec.animation_type === 'spin' ? 'spin-slow 4s linear infinite' : 
-                           customDec.animation_type === 'pulse' ? 'custom-pulse 2s infinite' : 
-                           customDec.animation_type === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
-              }} 
-            />
-          )}
           <img src={src} alt={alt} className="w-full h-full rounded-full object-cover relative z-10" />
         </div>
 
