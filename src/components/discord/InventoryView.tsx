@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useShop } from '@/contexts/ShopContext';
 import { CustomDecorationEditorModal } from './CustomDecorationEditorModal';
 import { ShopItem } from '@/data/shopItems';
+import { CursorPreview } from './CursorPreview';
 
 interface InventoryViewProps {
   currentUser: User;
@@ -189,8 +190,8 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                             </TooltipContent>
                           </Tooltip>
                         ) : item.type === 'cursor' ? (
-                          <div className="mb-6 mt-2 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-gray-400 shadow-[0_0_15px_rgba(156,163,175,0.3)] mx-auto relative z-20">
-                            <MousePointer2 size={40} className="text-gray-400" />
+                          <div className="mb-6 mt-2 h-24 w-24 flex items-center justify-center mx-auto relative z-20">
+                            <CursorPreview id={item.id} />
                           </div>
                         ) : item.type === 'emoji_pack' ? (
                           <div className="mb-6 mt-2 relative w-24 h-24 group/pack mx-auto">

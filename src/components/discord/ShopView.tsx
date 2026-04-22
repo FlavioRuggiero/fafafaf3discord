@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '@/types/discord';
-import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X, Crown, Wand2, MousePointer2 } from 'lucide-react';
+import { ShoppingCart, Menu, Gift, Clock, Package, Sparkles, Unlock, X, Crown, Wand2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
@@ -10,6 +10,7 @@ import { ShopItem } from '@/data/shopItems';
 import { playSound } from '@/utils/sounds';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useShop } from '@/contexts/ShopContext';
+import { CursorPreview } from './CursorPreview';
 
 interface ShopViewProps {
   currentUser: User;
@@ -389,8 +390,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                     ) : item.type === 'cursor' ? (
                       <Tooltip delayDuration={0}>
                         <TooltipTrigger asChild>
-                          <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-gray-400 shadow-[0_0_15px_rgba(156,163,175,0.3)] mx-auto cursor-help">
-                            <MousePointer2 size={40} className="text-gray-400" />
+                          <div className="mb-6 mt-4 h-24 w-24 flex items-center justify-center mx-auto cursor-help">
+                            <CursorPreview id={item.id} />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent className="bg-[#111214] text-[#dbdee1] border-[#1e1f22] font-medium text-sm max-w-xs text-center z-[99999]">
@@ -572,8 +573,8 @@ export const ShopView = ({ currentUser, onToggleSidebar }: ShopViewProps) => {
                   <Wand2 size={64} className="text-brand" />
                 </div>
               ) : chestReward.type === 'cursor' ? (
-                <div className="w-32 h-32 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-gray-400 shadow-[0_0_20px_rgba(156,163,175,0.3)]">
-                  <MousePointer2 size={64} className="text-gray-400" />
+                <div className="w-32 h-32 flex items-center justify-center mx-auto">
+                  <CursorPreview id={chestReward.id} />
                 </div>
               ) : chestReward.type === 'emoji_pack' ? (
                 <div className="w-32 h-32 grid grid-cols-2 gap-2 p-3 bg-[#1e1f22] rounded-xl border-2 border-brand shadow-[0_0_20px_rgba(88,101,242,0.3)]">

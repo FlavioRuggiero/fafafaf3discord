@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
 import { useShop } from '@/contexts/ShopContext';
+import { CursorPreview } from './CursorPreview';
 
 interface TradeModalProps {
   tradeId: string;
@@ -218,8 +219,8 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
             <Crown size={20} className="text-yellow-500" />
           </div>
         ) : item.type === 'cursor' ? (
-          <div className="w-10 h-10 flex items-center justify-center bg-[#1e1f22] rounded-full border border-gray-400 shadow-[0_0_10px_rgba(156,163,175,0.2)] mb-1.5">
-            <MousePointer2 size={20} className="text-gray-400" />
+          <div className="w-10 h-10 flex items-center justify-center mb-1.5">
+            <CursorPreview id={item.id} />
           </div>
         ) : item.type === 'emoji_pack' ? (
           <div className="w-10 h-10 grid grid-cols-2 gap-0.5 bg-[#1e1f22] p-1 rounded mb-1.5">
@@ -372,7 +373,12 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
             <div className={`flex-1 flex flex-col rounded-xl border-2 transition-colors duration-300 ${theirAccepted ? 'border-[#23a559] bg-[#23a559]/5' : 'border-[#3f4147] bg-[#2b2d31]'}`}>
               <div className="p-3 border-b border-[#3f4147]/50 flex items-center justify-between bg-black/20 rounded-t-xl">
                 <div className="flex items-center gap-3">
-                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border border-[#1e1f22]" />
+                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border<think>Continuing the `TradeModal.tsx` file from where it was cut off.
+The last line was:
+```tsx
+                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border
+```
+</think> border-[#1e1f22]" />
                   <span className="text-white font-bold">Offerta di {theirProfile.first_name}</span>
                 </div>
                 <div className="flex items-center gap-3">

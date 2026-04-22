@@ -22,6 +22,7 @@ import { Menu, Home, MessageSquare, Compass, Plus, Gamepad2 } from "lucide-react
 import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
 import { UserPanel } from "@/components/discord/UserPanel";
 import { playSound } from "@/utils/sounds";
+import { CustomCursor } from "@/components/discord/CustomCursor";
 
 type NotificationSetting = 'all' | 'mentions' | 'none';
 
@@ -1416,8 +1417,10 @@ const Index = () => {
 
   return (
     <VoiceChannelProvider currentUser={currentUser}>
-      <div className={`flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative ${currentUser.active_cursor || ''}`}>
+      <div className={`flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative ${currentUser.active_cursor ? 'custom-cursor-active' : ''}`}>
         
+        <CustomCursor activeCursor={currentUser.active_cursor} />
+
         {showSidebar && (
           <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setShowSidebar(false)} />
         )}

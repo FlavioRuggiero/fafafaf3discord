@@ -47,6 +47,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'cursor-flame', name: 'Cursore Fiamma', price: 120, type: 'cursor', category: 'Cursori' },
   { id: 'cursor-magic', name: 'Cursore Magico', price: 140, type: 'cursor', category: 'Cursori' },
   { id: 'cursor-sword', name: 'Cursore Spada', price: 150, type: 'cursor', category: 'Cursori' },
+  { id: 'cursor-dragon', name: 'Dragone Cinese', price: 300, type: 'cursor', category: 'Cursori Premium' },
 
   // Privilegi
   { 
