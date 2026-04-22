@@ -13,6 +13,7 @@ export interface User {
   last_reward_date?: string;
   server_roles?: ServerRole[];
   avatar_decoration?: string | null;
+  active_cursor?: string | null;
   purchased_decorations?: string[];
   entrance_audio_url?: string | null;
   claimed_levels?: number[];

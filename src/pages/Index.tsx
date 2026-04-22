@@ -455,6 +455,7 @@ const Index = () => {
       xp: p.xp || 0,
       server_roles: userRoles,
       avatar_decoration: p.avatar_decoration || null,
+      active_cursor: p.active_cursor || null,
       purchased_decorations: p.purchased_decorations || [],
       entrance_audio_url: p.entrance_audio_url || null,
       claimed_levels: p.claimed_levels || [],
@@ -555,6 +556,7 @@ const Index = () => {
             global_role: role,
             last_reward_date: updatedProfile.last_reward_date, // Accetta null
             avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
+            active_cursor: updatedProfile.active_cursor !== undefined ? updatedProfile.active_cursor : prev.active_cursor,
             purchased_decorations: updatedProfile.purchased_decorations || [],
             entrance_audio_url: updatedProfile.entrance_audio_url || null,
             claimed_levels: updatedProfile.claimed_levels || [],
@@ -601,7 +603,11 @@ const Index = () => {
         await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
       }
       
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color, active_cursor, entrance_audio_url, claimed_levels, standard_chests, premium_chests, singing_island, last_reward_date')
+        .eq('id', user.id)
+        .single();
       
       const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
       
@@ -626,6 +632,7 @@ const Index = () => {
         xp: profile?.xp || 0,
         last_reward_date: profile?.last_reward_date || null,
         avatar_decoration: profile?.avatar_decoration || null,
+        active_cursor: profile?.active_cursor || null,
         purchased_decorations: profile?.purchased_decorations || [],
         entrance_audio_url: profile?.entrance_audio_url || null,
         claimed_levels: profile?.claimed_levels || [],
@@ -1409,7 +1416,7 @@ const Index = () => {
 
   return (
     <VoiceChannelProvider currentUser={currentUser}>
-      <div className="flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative">
+      <div className={`flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative ${currentUser.active_cursor || ''}`}>
         
         {showSidebar && (
           <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setShowSidebar(false)} />

@@ -34,6 +34,25 @@ body {
   background-color: #313338;
 }
 
+/* =========================================
+   CURSORI PERSONALIZZATI
+   ========================================= */
+.cursor-neon, .cursor-neon * {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%23111214" stroke="%2339ff14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>') 3 3, auto !important;
+}
+
+.cursor-flame, .cursor-flame * {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%23ff4500" stroke="%23ff8c00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>') 3 3, auto !important;
+}
+
+.cursor-magic, .cursor-magic * {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%23a855f7" stroke="%23d8b4fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>') 3 3, auto !important;
+}
+
+.cursor-sword, .cursor-sword * {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%23cbd5e1" stroke="%23475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>') 3 3, auto !important;
+}
+
 /* Animazione Bordo Elettrificato per Admin */
 @keyframes electric-glow {
   0% { box-shadow: 0 0 8px 2px rgba(0, 255, 255, 0.6), inset 0 0 8px 2px rgba(0, 255, 255, 0.6); border-color: rgba(0, 255, 255, 0.8); }

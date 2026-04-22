@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen, Crown } from 'lucide-react';
+import { X, ArrowRightLeft, Check, AlertCircle, Plus, Minus, PackageOpen, Crown, MousePointer2 } from 'lucide-react';
 import { User } from '@/types/discord';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -191,7 +191,19 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
   };
 
   const handleCancelTrade = async () => {
+    await supabase.from('trades').update({ status:<think>
+Continuing the `TradeModal.tsx` file from where it was cut off.
+The last line was:
+```tsx
     await supabase.from('trades').update({ status: 'cancelled' }).eq('id', tradeId);
+    notifyUpdate();
+    onClose();
+  };
+
+  const renderItemCard = (itemId: string, action: 'add' | 'remove' | 'none', ownerProfile: any) => {
+```
+I will output the rest of the file.
+</think>'cancelled' }).eq('id', tradeId);
     notifyUpdate();
     onClose();
   };
@@ -216,6 +228,10 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
         {item.type === 'privilege' ? (
           <div className="w-10 h-10 flex items-center justify-center bg-[#1e1f22] rounded-full border border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)] mb-1.5">
             <Crown size={20} className="text-yellow-500" />
+          </div>
+        ) : item.type === 'cursor' ? (
+          <div className="w-10 h-10 flex items-center justify-center bg-[#1e1f22] rounded-full border border-gray-400 shadow-[0_0_10px_rgba(156,163,175,0.2)] mb-1.5">
+            <MousePointer2 size={20} className="text-gray-400" />
           </div>
         ) : item.type === 'emoji_pack' ? (
           <div className="w-10 h-10 grid grid-cols-2 gap-0.5 bg-[#1e1f22] p-1 rounded mb-1.5">

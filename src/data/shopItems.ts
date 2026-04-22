@@ -2,7 +2,7 @@ export type ShopItem = {
   id: string;
   name: string;
   price: number;
-  type: 'decoration' | 'emoji_pack' | 'privilege' | 'consumable';
+  type: 'decoration' | 'emoji_pack' | 'privilege' | 'consumable' | 'cursor';
   category: string;
   emojis?: string[];
   description?: string;
@@ -42,6 +42,12 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'gustavo-armando', name: 'Gustavo armando', price: 300, type: 'decoration', category: 'Contorni Premium' },
   { id: 'serpixel-agitato', name: 'Serpixel Agitato', price: 300, type: 'decoration', category: 'Contorni Premium' },
   
+  // Cursori
+  { id: 'cursor-neon', name: 'Cursore Neon', price: 100, type: 'cursor', category: 'Cursori' },
+  { id: 'cursor-flame', name: 'Cursore Fiamma', price: 120, type: 'cursor', category: 'Cursori' },
+  { id: 'cursor-magic', name: 'Cursore Magico', price: 140, type: 'cursor', category: 'Cursori' },
+  { id: 'cursor-sword', name: 'Cursore Spada', price: 150, type: 'cursor', category: 'Cursori' },
+
   // Privilegi
   { 
     id: 'privilege-banner', 

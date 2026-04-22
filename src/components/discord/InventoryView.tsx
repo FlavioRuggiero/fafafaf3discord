@@ -2,13 +2,14 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types/discord';
-import { Archive, Menu, Check, Coins, DollarSign, Crown, Wand2, Edit2 } from 'lucide-react';
+import { Archive, Menu, Check, Coins, DollarSign, Crown, Wand2, Edit2, MousePointer2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useShop } from '@/contexts/ShopContext';
 import { CustomDecorationEditorModal } from './CustomDecorationEditorModal';
+import { ShopItem } from '@/data/shopItems';
 
 interface InventoryViewProps {
   currentUser: User;
@@ -21,20 +22,18 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
   const [showCustomEditor, setShowCustomEditor] = useState(false);
   const [decorationToEdit, setDecorationToEdit] = useState<string | undefined>(undefined);
   
-  const handleEquip = async (id: string) => {
-    const { error } = await supabase.from('profiles').update({
-      avatar_decoration: id
-    }).eq('id', currentUser.id);
+  const handleEquip = async (item: ShopItem) => {
+    const updateField = item.type === 'cursor' ? { active_cursor: item.id } : { avatar_decoration: item.id };
+    const { error } = await supabase.from('profiles').update(updateField).eq('id', currentUser.id);
     if (error) showError("Errore durante l'equipaggiamento.");
-    else showSuccess("Contorno equipaggiato!");
+    else showSuccess(`${item.type === 'cursor' ? 'Cursore' : 'Contorno'} equipaggiato!`);
   };
 
-  const handleUnequip = async () => {
-    const { error } = await supabase.from('profiles').update({
-      avatar_decoration: null
-    }).eq('id', currentUser.id);
+  const handleUnequip = async (item: ShopItem) => {
+    const updateField = item.type === 'cursor' ? { active_cursor: null } : { avatar_decoration: null };
+    const { error } = await supabase.from('profiles').update(updateField).eq('id', currentUser.id);
     if (error) showError("Errore durante la rimozione.");
-    else showSuccess("Contorno rimosso!");
+    else showSuccess(`${item.type === 'cursor' ? 'Cursore' : 'Contorno'} rimosso!`);
   };
 
   const handleSell = async () => {
@@ -57,6 +56,9 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
     // Se l'oggetto venduto era equipaggiato e non ne abbiamo più copie, rimuovilo
     if (currentUser.avatar_decoration === itemToSell.id && !currentDecs.includes(itemToSell.id)) {
       updates.avatar_decoration = null;
+    }
+    if (currentUser.active_cursor === itemToSell.id && !currentDecs.includes(itemToSell.id)) {
+      updates.active_cursor = null;
     }
 
     const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
@@ -119,7 +121,7 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                 <h2 className="text-xl font-bold text-white mb-4 border-b border-[#3f4147] pb-2">{category}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {ownedItems.filter(item => item.category === category).map(item => {
-                    const isEquipped = currentUser.avatar_decoration === item.id;
+                    const isEquipped = item.type === 'cursor' ? currentUser.active_cursor === item.id : currentUser.avatar_decoration === item.id;
                     const count = currentUser.purchased_decorations?.filter(id => id === item.id).length || 0;
                     const isCreator = item.creator_id === currentUser.id;
 
@@ -186,6 +188,10 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                               {item.description}
                             </TooltipContent>
                           </Tooltip>
+                        ) : item.type === 'cursor' ? (
+                          <div className="mb-6 mt-2 h-24 w-24 flex items-center justify-center bg-[#1e1f22] rounded-full border-2 border-gray-400 shadow-[0_0_15px_rgba(156,163,175,0.3)] mx-auto relative z-20">
+                            <MousePointer2 size={40} className="text-gray-400" />
+                          </div>
                         ) : item.type === 'emoji_pack' ? (
                           <div className="mb-6 mt-2 relative w-24 h-24 group/pack mx-auto">
                             {/* Vista normale (4 emoji) */}
@@ -234,11 +240,11 @@ export const InventoryView = ({ currentUser, onToggleSidebar }: InventoryViewPro
                               In Chat
                             </button>
                           ) : isEquipped ? (
-                            <button onClick={handleUnequip} className="w-full py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
+                            <button onClick={() => handleUnequip(item)} className="w-full py-2 rounded bg-[#f23f43] text-white font-medium hover:bg-[#da373c] transition-colors text-sm">
                               Rimuovi
                             </button>
                           ) : (
-                            <button onClick={() => handleEquip(item.id)} className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
+                            <button onClick={() => handleEquip(item)} className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752C4] transition-colors text-sm">
                               Equipaggia
                             </button>
                           )}
