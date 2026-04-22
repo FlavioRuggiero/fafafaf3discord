@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Wand2, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Wand2, Upload, Plus, Copy, ClipboardPaste, ChevronDown, ChevronUp, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/discord";
 import { showSuccess, showError } from "@/utils/toast";
@@ -17,9 +17,10 @@ interface CustomDecorationEditorModalProps {
 }
 
 export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, editDecorationId }: CustomDecorationEditorModalProps) => {
-  const { customDecorations, refreshCustomDecorations, draftDecoration, setDraftDecoration } = useShop();
+  const { customDecorations, refreshCustomDecorations, draftDecoration, setDraftDecoration, clipboard, setClipboard } = useShop();
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
 
   // Stati per comprimere gli elementi
@@ -29,6 +30,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
   useEffect(() => {
     if (isOpen) {
       if (editDecorationId) {
+        // Se stiamo modificando un contorno diverso da quello attualmente nel draft, lo carichiamo
         if (draftDecoration.id !== editDecorationId) {
           const dec = customDecorations.find(d => d.id === editDecorationId);
           if (dec) {
@@ -42,16 +44,18 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
               textColor: dec.text_color,
               gradStart: dec.text_gradient_start,
               gradEnd: dec.text_gradient_end,
-              anim: 'none',
+              anim: dec.animation_type,
               baseEffects: dec.config?.baseEffects || [],
               elements: dec.config?.elements || [],
               customAnimations: dec.config?.customAnimations || [],
               imageFile: null,
-              imagePreview: null
+              imagePreview: dec.image_url
             });
           }
         }
       } else {
+        // Se stiamo creando un nuovo contorno, ma il draft attuale è associato a un ID (stavamo modificando), lo resettiamo.
+        // Se il draft attuale NON ha ID, significa che stavamo già creando un nuovo contorno, quindi preserviamo lo stato!
         if (draftDecoration.id) {
           setDraftDecoration({ ...DEFAULT_DRAFT_DECORATION });
         }
@@ -83,115 +87,12 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
     setDraftDecoration(prev => ({ ...prev, ...updates }));
   };
 
-  // --- COPY / PASTE LOGIC (SYSTEM CLIPBOARD) ---
-
-  const copyBaseEffect = async (id: string) => {
-    const effect = draftDecoration.baseEffects.find(e => e.id === id);
-    if (effect) {
-      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'baseEffect', data: effect }));
-      showSuccess("Effetto copiato negli appunti!");
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      updateDraft({ imageFile: file, imagePreview: URL.createObjectURL(file) });
     }
   };
-
-  const pasteBaseEffect = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const parsed = JSON.parse(text);
-      if (parsed.dyad_export_type === 'baseEffect' && parsed.data) {
-        const newEffect = { ...parsed.data, id: `be-${Date.now()}-${Math.random().toString(36).substring(7)}` };
-        updateDraft({ baseEffects: [...draftDecoration.baseEffects, newEffect] });
-        showSuccess("Effetto incollato!");
-      } else {
-        showError("Il testo negli appunti non è un Effetto Base valido.");
-      }
-    } catch (e) {
-      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
-    }
-  };
-
-  const copyElement = async (id: string) => {
-    const el = draftDecoration.elements.find(e => e.id === id);
-    if (el) {
-      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'element', data: el }));
-      showSuccess("Elemento copiato negli appunti!");
-    }
-  };
-
-  const pasteElement = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const parsed = JSON.parse(text);
-      if (parsed.dyad_export_type === 'element' && parsed.data) {
-        const newId = `el-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        updateDraft({ elements: [...draftDecoration.elements, { ...parsed.data, id: newId, parentId: undefined }] });
-        showSuccess("Elemento incollato!");
-      } else {
-        showError("Il testo negli appunti non è un Elemento valido.");
-      }
-    } catch (e) {
-      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
-    }
-  };
-
-  const copyCustomAnimation = async (id: string) => {
-    const anim = draftDecoration.customAnimations.find(a => a.id === id);
-    if (anim) {
-      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'animation', data: anim }));
-      showSuccess("Animazione copiata negli appunti!");
-    }
-  };
-
-  const pasteCustomAnimation = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const parsed = JSON.parse(text);
-      if (parsed.dyad_export_type === 'animation' && parsed.data) {
-        const newAnimId = `anim-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const newKeyframes = parsed.data.keyframes.map((kf: any) => ({ ...kf, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}`, targetId: undefined }));
-        updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...parsed.data, id: newAnimId, name: `${parsed.data.name} (Copia)`, keyframes: newKeyframes }] });
-        showSuccess("Animazione incollata!");
-      } else {
-        showError("Il testo negli appunti non è un'Animazione valida.");
-      }
-    } catch (e) {
-      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
-    }
-  };
-
-  const copyKeyframe = async (animId: string, kfId: string) => {
-    const anim = draftDecoration.customAnimations.find(a => a.id === animId);
-    if (anim) {
-      const kf = anim.keyframes.find(k => k.id === kfId);
-      if (kf) {
-        await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'keyframe', data: kf }));
-        showSuccess("Keyframe copiato negli appunti!");
-      }
-    }
-  };
-
-  const pasteKeyframe = async (animId: string) => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const parsed = JSON.parse(text);
-      if (parsed.dyad_export_type === 'keyframe' && parsed.data) {
-        updateDraft({
-          customAnimations: draftDecoration.customAnimations.map(a => {
-            if (a.id === animId) {
-              return { ...a, keyframes: [...a.keyframes, { ...parsed.data, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}`, targetId: undefined }] };
-            }
-            return a;
-          })
-        });
-        showSuccess("Keyframe incollato!");
-      } else {
-        showError("Il testo negli appunti non è un Keyframe valido.");
-      }
-    } catch (e) {
-      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
-    }
-  };
-
-  // --- END COPY / PASTE LOGIC ---
 
   const addBaseEffect = () => {
     updateDraft({
@@ -218,12 +119,35 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
     });
   };
 
+  const copyBaseEffect = async (id: string) => {
+    const effect = draftDecoration.baseEffects.find(e => e.id === id);
+    if (effect) {
+      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'baseEffect', data: effect }));
+      showSuccess("Effetto copiato negli appunti!");
+    }
+  };
+
+  const pasteBaseEffect = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'baseEffect' && parsed.data) {
+        const newEffect = { ...parsed.data, id: `be-${Date.now()}-${Math.random().toString(36).substring(7)}` };
+        updateDraft({ baseEffects: [...draftDecoration.baseEffects, newEffect] });
+        showSuccess("Effetto incollato!");
+      } else {
+        showError("Il testo negli appunti non è un Effetto Base valido.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
+  };
+
   const addElement = () => {
     const newId = `el-${Date.now()}`;
     updateDraft({
       elements: [...draftDecoration.elements, {
         id: newId,
-        name: '',
         type: 'emoji',
         content: '✨',
         animation: 'float',
@@ -249,6 +173,30 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
         .filter(el => el.id !== id)
         .map(el => el.parentId === id ? { ...el, parentId: undefined } : el)
     });
+  };
+
+  const copyElement = async (id: string) => {
+    const el = draftDecoration.elements.find(e => e.id === id);
+    if (el) {
+      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'element', data: el }));
+      showSuccess("Elemento copiato negli appunti!");
+    }
+  };
+
+  const pasteElement = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'element' && parsed.data) {
+        const newId = `el-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        updateDraft({ elements: [...draftDecoration.elements, { ...parsed.data, id: newId, parentId: undefined }] });
+        showSuccess("Elemento incollato!");
+      } else {
+        showError("Il testo negli appunti non è un Elemento valido.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
   };
 
   const addCustomAnimation = () => {
@@ -283,6 +231,31 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
       customAnimations: draftDecoration.customAnimations.filter(a => a.id !== id),
       elements: draftDecoration.elements.map(el => el.animation === `custom_anim_${id}` ? { ...el, animation: 'none' } : el)
     });
+  };
+
+  const copyCustomAnimation = async (id: string) => {
+    const anim = draftDecoration.customAnimations.find(a => a.id === id);
+    if (anim) {
+      await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'animation', data: anim }));
+      showSuccess("Animazione copiata negli appunti!");
+    }
+  };
+
+  const pasteCustomAnimation = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'animation' && parsed.data) {
+        const newAnimId = `anim-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const newKeyframes = parsed.data.keyframes.map((kf: any) => ({ ...kf, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}`, targetId: undefined }));
+        updateDraft({ customAnimations: [...draftDecoration.customAnimations, { ...parsed.data, id: newAnimId, name: `${parsed.data.name} (Copia)`, keyframes: newKeyframes }] });
+        showSuccess("Animazione incollata!");
+      } else {
+        showError("Il testo negli appunti non è un'Animazione valida.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
   };
 
   const addKeyframe = (animId: string) => {
@@ -324,6 +297,39 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
     });
   };
 
+  const copyKeyframe = async (animId: string, kfId: string) => {
+    const anim = draftDecoration.customAnimations.find(a => a.id === animId);
+    if (anim) {
+      const kf = anim.keyframes.find(k => k.id === kfId);
+      if (kf) {
+        await navigator.clipboard.writeText(JSON.stringify({ dyad_export_type: 'keyframe', data: kf }));
+        showSuccess("Keyframe copiato negli appunti!");
+      }
+    }
+  };
+
+  const pasteKeyframe = async (animId: string) => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed.dyad_export_type === 'keyframe' && parsed.data) {
+        updateDraft({
+          customAnimations: draftDecoration.customAnimations.map(a => {
+            if (a.id === animId) {
+              return { ...a, keyframes: [...a.keyframes, { ...parsed.data, id: `kf-${Date.now()}-${Math.random().toString(36).substring(7)}`, targetId: undefined }] };
+            }
+            return a;
+          })
+        });
+        showSuccess("Keyframe incollato!");
+      } else {
+        showError("Il testo negli appunti non è un Keyframe valido.");
+      }
+    } catch (e) {
+      showError("Impossibile incollare. Assicurati di aver copiato un elemento valido.");
+    }
+  };
+
   const isDescendant = (potentialDescendantId: string, ancestorId: string, allElements: CustomElement[]) => {
     let current = allElements.find(e => e.id === potentialDescendantId);
     while (current && current.parentId) {
@@ -339,6 +345,17 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
     
     setIsCreatingDec(true);
     const customId = draftDecoration.id || `custom-${Date.now()}`;
+    let imageUrl = draftDecoration.imagePreview;
+
+    if (draftDecoration.imageFile) {
+      const fileExt = draftDecoration.imageFile.name.split('.').pop();
+      const filePath = `custom_decorations/${customId}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, draftDecoration.imageFile);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
+      }
+    }
 
     const config = {
       baseEffects: draftDecoration.baseEffects,
@@ -350,14 +367,14 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
       name: draftDecoration.name.trim(),
       price: 750,
       category: 'Contorni Custom',
-      image_url: null,
+      image_url: imageUrl,
       border_color: draftDecoration.borderColor,
       shadow_color: draftDecoration.shadowColor,
       text_color_type: draftDecoration.textColorType,
       text_color: draftDecoration.textColor,
       text_gradient_start: draftDecoration.gradStart,
       text_gradient_end: draftDecoration.gradEnd,
-      animation_type: 'none',
+      animation_type: draftDecoration.anim,
       config: config,
       creator_id: currentUser.id
     };
@@ -585,7 +602,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
           transform = `transform: translate(calc(-50% + ${kf.x}%), calc(-50% + ${kf.y}%));`;
         }
 
-        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; }`;
+        return `${kf.percent}% { ${leftTop} ${transform} rotate: ${kf.rotation}deg; scale: ${kf.scale}; opacity: ${kf.opacity}; z-index: ${kf.zIndex ?? 20}; }`;
       }).join('\n');
       return `@keyframes custom_anim_${anim.id} { ${keyframes} }`;
     }).join('\n');
@@ -633,23 +650,19 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
         resultNode = (
           <div
             key={isTarget ? nodeEl.id : `ghost-${nodeEl.id}-${el.id}`}
-            className="absolute inset-0 pointer-events-none"
-            style={{ zIndex: zIndex }}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${nodeEl.x}%`,
+              top: `${nodeEl.y}%`,
+              transform: `translate(-50%, -50%)`,
+              width: '100%',
+              height: '100%',
+              zIndex: zIndex
+            }}
           >
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: `${nodeEl.x}%`,
-                top: `${nodeEl.y}%`,
-                transform: `translate(-50%, -50%)`,
-                width: '100%',
-                height: '100%',
-              }}
-            >
-              <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}` }}>
-                <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}`, width: `${nodeEl.size}cqw`, height: `${nodeEl.size}cqw`, fontSize: `${nodeEl.size}cqw` }}>
-                  {innerContent}
-                </div>
+            <div className="custom-orbit-container" style={{ animation: `${wrapperAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}` }}>
+              <div className="custom-orbit-element" style={{ animation: `${innerAnim} 4s linear infinite ${nodeEl.delay > 0 ? nodeEl.delay+'s' : '0s'}`, width: `${nodeEl.size}cqw`, height: `${nodeEl.size}cqw`, fontSize: `${nodeEl.size}cqw` }}>
+                {innerContent}
               </div>
             </div>
           </div>
@@ -658,23 +671,19 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
         resultNode = (
           <div 
             key={isTarget ? nodeEl.id : `ghost-${nodeEl.id}-${el.id}`}
-            className="absolute inset-0 pointer-events-none"
-            style={{ zIndex: zIndex }}
+            className={`absolute flex items-center justify-center pointer-events-none`}
+            style={{ 
+              left: `${nodeEl.x}%`,
+              top: `${nodeEl.y}%`,
+              transform: 'translate(-50%, -50%)',
+              animation: getAnimation(nodeEl.animation, nodeEl.delay, customAnimations),
+              width: `${nodeEl.size}cqw`,
+              height: `${nodeEl.size}cqw`,
+              fontSize: `${nodeEl.size}cqw`,
+              zIndex: zIndex
+            }}
           >
-            <div 
-              className={`absolute flex items-center justify-center pointer-events-none`}
-              style={{ 
-                left: `${nodeEl.x}%`,
-                top: `${nodeEl.y}%`,
-                transform: 'translate(-50%, -50%)',
-                animation: getAnimation(nodeEl.animation, nodeEl.delay, customAnimations),
-                width: `${nodeEl.size}cqw`,
-                height: `${nodeEl.size}cqw`,
-                fontSize: `${nodeEl.size}cqw`,
-              }}
-            >
-              {innerContent}
-            </div>
+            {innerContent}
           </div>
         );
       }
@@ -683,7 +692,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
     return resultNode;
   };
 
-  const avatarUrl = currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`;
+  const avatarUrl = (currentUser as any)?.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview";
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80" onClick={onClose}>
@@ -776,6 +785,33 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                       <input type="color" value={draftDecoration.shadowColor} onChange={e => updateDraft({ shadowColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
                       <span className="text-white text-sm uppercase">{draftDecoration.shadowColor}</span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
+                    <select 
+                      value={draftDecoration.anim}
+                      onChange={e => updateDraft({ anim: e.target.value })}
+                      className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                    >
+                      <option value="none">Nessuna</option>
+                      <option value="spin">Rotazione</option>
+                      <option value="pulse">Pulsazione</option>
+                      <option value="bounce">Rimbalzo</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
+                    <button 
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Upload size={16} /> {draftDecoration.imageFile || draftDecoration.imagePreview ? 'Cambia Immagine' : 'Carica Immagine'}
+                    </button>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                   </div>
                 </div>
               </div>
@@ -925,7 +961,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                           <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => toggleElement(el.id)}>
                             <div className="flex items-center gap-2 text-white font-bold text-sm">
                               {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                              {el.name || `Elemento ${el.type === 'emoji' ? el.content : 'Immagine'}`}
+                              Elemento {el.type === 'emoji' ? el.content : 'Immagine'}
                             </div>
                             <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                               <button type="button" onClick={() => copyElement(el.id)} className="text-[#b5bac1] hover:text-white transition-colors p-1" title="Copia">
@@ -939,11 +975,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                           
                           {!isCollapsed && (
                             <div className="pt-2 border-t border-[#3f4147]">
-                              <div className="grid grid-cols-3 gap-3 mb-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Nome Elemento</label>
-                                  <input type="text" value={el.name || ''} onChange={e => updateElement(el.id, 'name', e.target.value)} placeholder="Es. Scintilla" className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]" />
-                                </div>
+                              <div className="grid grid-cols-2 gap-3 mb-3">
                                 <div>
                                   <label className="block text-[10px] font-bold text-[#b5bac1] uppercase mb-1">Tipo</label>
                                   <select value={el.type} onChange={e => updateElement(el.id, 'type', e.target.value)} className="w-full bg-[#1e1f22] text-white rounded p-1.5 text-xs border border-[#3f4147]">
@@ -1025,7 +1057,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                                       .filter(other => other.id !== el.id && !isDescendant(other.id, el.id, draftDecoration.elements))
                                       .map(other => (
                                         <option key={other.id} value={other.id}>
-                                          {other.name || (other.type === 'emoji' ? other.content : 'IMG')} ({other.id.slice(-4)})
+                                          {other.type === 'emoji' ? other.content : 'IMG'} ({other.id.slice(-4)})
                                         </option>
                                     ))}
                                   </select>
@@ -1156,14 +1188,14 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                                             >
                                               <option value="">Seleziona...</option>
                                               {draftDecoration.elements.map(e => (
-                                                <option key={e.id} value={e.id}>{e.name || (e.type === 'emoji' ? e.content : 'IMG')} ({e.id.slice(-4)})</option>
+                                                <option key={e.id} value={e.id}>{e.type === 'emoji' ? e.content : 'IMG'} ({e.id.slice(-4)})</option>
                                               ))}
                                             </select>
                                           </div>
                                         )}
                                       </div>
                                       
-                                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 w-full">
+                                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full">
                                         {kf.positionMode !== 'target' && (
                                           <>
                                             <div>
@@ -1203,6 +1235,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                                           </div>
                                           <input type="range" min="0" max="1" step="0.1" value={kf.opacity} onChange={e => updateKeyframe(anim.id, kf.id, 'opacity', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
                                         </div>
+                                        <div>
+                                          <div className="flex justify-between items-center mb-0.5">
+                                            <label className="text-[9px] text-[#949ba4]">Z-Index</label>
+                                            <input type="number" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-10 bg-[#111214] text-white text-[9px] px-1 rounded border border-[#3f4147] outline-none" />
+                                          </div>
+                                          <input type="range" min="0" max="50" value={kf.zIndex ?? 20} onChange={e => updateKeyframe(anim.id, kf.id, 'zIndex', Number(e.target.value))} className="w-full accent-[#dbdee1]" />
+                                        </div>
                                       </div>
                                     </div>
                                   ))}
@@ -1217,78 +1256,89 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                </form>
+                )}
               </div>
 
-              {/* Anteprima a Destra */}
-              <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
-                <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
-                
-                <div className="dec-wrapper relative w-32 h-32 mb-8">
-                  {renderCustomAnimationsCSS(draftDecoration.customAnimations, draftDecoration.elements)}
-                  
-                  {/* Inner Effects */}
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    {renderInnerEffects(draftDecoration.baseEffects)}
-                  </div>
+            </form>
+          </div>
 
-                  {/* Avatar & Border (z-10) */}
-                  <div 
-                    className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
-                    style={{
-                      border: `2px solid ${draftDecoration.borderColor}`,
-                      boxShadow: `0 0 10px ${draftDecoration.shadowColor}, inset 0 0 10px ${draftDecoration.shadowColor}`,
-                    }}
-                  >
-                    <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
-                  </div>
-
-                  {/* Outer Effects */}
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    {renderOuterEffects(draftDecoration.baseEffects)}
-                  </div>
-
-                  {/* Elements */}
-                  {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
-                </div>
-
-                <div 
-                  className="mb-8 text-center"
-                  style={draftDecoration.textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${draftDecoration.gradStart || '#fff'}80)` } : {}}
-                >
-                  <span 
-                    className="font-bold text-2xl"
-                    style={draftDecoration.textColorType === 'solid' ? {
-                      color: draftDecoration.textColor,
-                      textShadow: `0 0 10px ${draftDecoration.textColor}80`
-                    } : {
-                      backgroundImage: `linear-gradient(90deg, ${draftDecoration.gradStart || '#fff'}, ${draftDecoration.gradEnd || '#fff'})`,
-                      WebkitBackgroundClip: 'text',
-                      backgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      color: 'transparent'
-                    }}
-                  >
-                    {draftDecoration.name || 'Nome Contorno'}
-                  </span>
-                </div>
-
-                <button 
-                  type="submit"
-                  form="custom-dec-form"
-                  disabled={isCreatingDec || !draftDecoration.name.trim()}
-                  className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
-                >
-                  {isCreatingDec ? 'Salvataggio in corso...' : (draftDecoration.id ? 'Salva Modifiche' : 'Crea Contorno')}
-                </button>
+          {/* Anteprima a Destra */}
+          <div className="w-full lg:w-[350px] flex-shrink-0 border-l border-[#1e1f22] bg-[#1e1f22] p-6 flex flex-col items-center overflow-y-auto custom-scrollbar">
+            <h3 className="text-[#b5bac1] font-bold mb-8 uppercase text-xs tracking-wider">Anteprima Live</h3>
+            
+            <div className="dec-wrapper relative w-32 h-32 mb-8">
+              {renderCustomAnimationsCSS(draftDecoration.customAnimations, draftDecoration.elements)}
+              
+              {/* Inner Effects */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                {renderInnerEffects(draftDecoration.baseEffects)}
               </div>
+
+              {/* Avatar & Border (z-10) */}
+              <div 
+                className="relative w-full h-full z-10 rounded-full flex items-center justify-center"
+                style={{
+                  border: `2px solid ${draftDecoration.borderColor}`,
+                  boxShadow: `0 0 10px ${draftDecoration.shadowColor}, inset 0 0 10px ${draftDecoration.shadowColor}`,
+                }}
+              >
+                {draftDecoration.imagePreview && (
+                  <img 
+                    src={draftDecoration.imagePreview} 
+                    className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                    style={{ 
+                      animation: draftDecoration.anim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                 draftDecoration.anim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                 draftDecoration.anim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                    }} 
+                  />
+                )}
+                <img src={currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`} className="w-full h-full rounded-full object-cover relative z-10" />
+              </div>
+
+              {/* Outer Effects */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                {renderOuterEffects(draftDecoration.baseEffects)}
+              </div>
+
+              {/* Elements */}
+              {draftDecoration.elements.filter(el => !el.parentId).map(el => renderElementNode(el, draftDecoration.elements, draftDecoration.customAnimations))}
             </div>
+
+            <div 
+              className="mb-8 text-center"
+              style={draftDecoration.textColorType === 'gradient' ? { filter: `drop-shadow(0 0 8px ${draftDecoration.gradStart || '#fff'}80)` } : {}}
+            >
+              <span 
+                className="font-bold text-2xl"
+                style={draftDecoration.textColorType === 'solid' ? {
+                  color: draftDecoration.textColor,
+                  textShadow: `0 0 10px ${draftDecoration.textColor}80`
+                } : {
+                  backgroundImage: `linear-gradient(90deg, ${draftDecoration.gradStart || '#fff'}, ${draftDecoration.gradEnd || '#fff'})`,
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  color: 'transparent'
+                }}
+              >
+                {draftDecoration.name || 'Nome Contorno'}
+              </span>
+            </div>
+
+            <button 
+              type="submit"
+              form="custom-dec-form"
+              disabled={isCreatingDec || !draftDecoration.name.trim()}
+              className="w-full py-3 bg-brand hover:bg-brand/80 text-white font-bold rounded transition-colors shadow-lg disabled:opacity-50"
+            >
+              {isCreatingDec ? 'Salvataggio in corso...' : (draftDecoration.id ? 'Salva Modifiche' : 'Crea Contorno')}
+            </button>
           </div>
         </div>
       </div>
