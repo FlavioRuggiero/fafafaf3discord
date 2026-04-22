@@ -20,6 +20,7 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
   const { customDecorations, refreshCustomDecorations, draftDecoration, setDraftDecoration, clipboard, setClipboard } = useShop();
   
   const [isCreatingDec, setIsCreatingDec] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [emojiPickerTarget, setEmojiPickerTarget] = useState<{type: 'base' | 'element', id: string} | null>(null);
 
   // Stati per comprimere gli elementi
@@ -43,12 +44,12 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
               textColor: dec.text_color,
               gradStart: dec.text_gradient_start,
               gradEnd: dec.text_gradient_end,
-              anim: 'none',
+              anim: dec.animation_type,
               baseEffects: dec.config?.baseEffects || [],
               elements: dec.config?.elements || [],
               customAnimations: dec.config?.customAnimations || [],
               imageFile: null,
-              imagePreview: null
+              imagePreview: dec.image_url
             });
           }
         }
@@ -84,6 +85,13 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
 
   const updateDraft = (updates: Partial<DraftDecoration>) => {
     setDraftDecoration(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      updateDraft({ imageFile: file, imagePreview: URL.createObjectURL(file) });
+    }
   };
 
   const addBaseEffect = () => {
@@ -338,6 +346,17 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
     
     setIsCreatingDec(true);
     const customId = draftDecoration.id || `custom-${Date.now()}`;
+    let imageUrl = draftDecoration.imagePreview;
+
+    if (draftDecoration.imageFile) {
+      const fileExt = draftDecoration.imageFile.name.split('.').pop();
+      const filePath = `custom_decorations/${customId}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, draftDecoration.imageFile);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
+      }
+    }
 
     const config = {
       baseEffects: draftDecoration.baseEffects,
@@ -349,14 +368,14 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
       name: draftDecoration.name.trim(),
       price: 750,
       category: 'Contorni Custom',
-      image_url: null,
+      image_url: imageUrl,
       border_color: draftDecoration.borderColor,
       shadow_color: draftDecoration.shadowColor,
       text_color_type: draftDecoration.textColorType,
       text_color: draftDecoration.textColor,
       text_gradient_start: draftDecoration.gradStart,
       text_gradient_end: draftDecoration.gradEnd,
-      animation_type: 'none',
+      animation_type: draftDecoration.anim,
       config: config,
       creator_id: currentUser.id
     };
@@ -744,6 +763,33 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                         <input type="color" value={draftDecoration.shadowColor} onChange={e => updateDraft({ shadowColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0" />
                         <span className="text-white text-sm uppercase">{draftDecoration.shadowColor}</span>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Animazione Sfondo</label>
+                      <select 
+                        value={draftDecoration.anim}
+                        onChange={e => updateDraft({ anim: e.target.value })}
+                        className="w-full bg-[#2b2d31] text-white rounded p-2 focus:outline-none border border-[#3f4147] cursor-pointer"
+                      >
+                        <option value="none">Nessuna</option>
+                        <option value="spin">Rotazione</option>
+                        <option value="pulse">Pulsazione</option>
+                        <option value="bounce">Rimbalzo</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Immagine Sfondo</label>
+                      <button 
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white rounded p-2 border border-[#3f4147] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Upload size={16} /> {draftDecoration.imageFile || draftDecoration.imagePreview ? 'Cambia Immagine' : 'Carica Immagine'}
+                      </button>
+                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                     </div>
                   </div>
                 </div>
@@ -1223,6 +1269,17 @@ export const CustomDecorationEditorModal = ({ isOpen, onClose, currentUser, edit
                     boxShadow: `0 0 10px ${draftDecoration.shadowColor}, inset 0 0 10px ${draftDecoration.shadowColor}`,
                   }}
                 >
+                  {draftDecoration.imagePreview && (
+                    <img 
+                      src={draftDecoration.imagePreview} 
+                      className="absolute inset-0 w-full h-full object-cover rounded-full opacity-60 pointer-events-none mix-blend-screen" 
+                      style={{ 
+                        animation: draftDecoration.anim === 'spin' ? 'spin-slow 4s linear infinite' : 
+                                   draftDecoration.anim === 'pulse' ? 'custom-pulse 2s infinite' : 
+                                   draftDecoration.anim === 'bounce' ? 'custom-bounce 2s infinite' : 'none' 
+                      }} 
+                    />
+                  )}
                   <img src={currentUser.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} className="w-full h-full rounded-full object-cover relative z-10" />
                 </div>
 
