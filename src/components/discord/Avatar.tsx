@@ -349,9 +349,9 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         {/* Bounding Box for Inner Effects (Limits extreme custom decorations) */}
         <div 
           className="absolute pointer-events-none overflow-hidden rounded-full"
-          style={{ top: '-65%', left: '-65%', width: '230%', height: '230%' }}
+          style={{ top: '-75%', left: '-75%', width: '250%', height: '250%' }}
         >
-          <div className="absolute" style={{ top: '28.26%', left: '28.26%', width: '43.48%', height: '43.48%' }}>
+          <div className="absolute" style={{ top: '30%', left: '30%', width: '40%', height: '40%' }}>
             <div className="absolute inset-0 flex items-center justify-center">
               {renderInnerEffects(effectsToRender)}
             </div>
@@ -383,9 +383,9 @@ export const Avatar = ({ src, alt, className = "", decoration, isSpeaking, clipE
         {/* Bounding Box for Outer Effects & Elements (Limits extreme custom decorations) */}
         <div 
           className="absolute pointer-events-none overflow-hidden rounded-full"
-          style={{ top: '-65%', left: '-65%', width: '230%', height: '230%' }}
+          style={{ top: '-75%', left: '-75%', width: '250%', height: '250%' }}
         >
-          <div className="absolute" style={{ top: '28.26%', left: '28.26%', width: '43.48%', height: '43.48%' }}>
+          <div className="absolute" style={{ top: '30%', left: '30%', width: '40%', height: '40%' }}>
             <div className="absolute inset-0 flex items-center justify-center">
               {renderOuterEffects(effectsToRender)}
             </div>
