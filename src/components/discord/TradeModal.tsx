@@ -373,12 +373,7 @@ export const TradeModal = ({ tradeId, currentUser, onClose }: TradeModalProps) =
             <div className={`flex-1 flex flex-col rounded-xl border-2 transition-colors duration-300 ${theirAccepted ? 'border-[#23a559] bg-[#23a559]/5' : 'border-[#3f4147] bg-[#2b2d31]'}`}>
               <div className="p-3 border-b border-[#3f4147]/50 flex items-center justify-between bg-black/20 rounded-t-xl">
                 <div className="flex items-center gap-3">
-                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border<think>Continuing the `TradeModal.tsx` file from where it was cut off.
-The last line was:
-```tsx
-                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border
-```
-</think> border-[#1e1f22]" />
+                  <img src={theirProfile.avatar_url} className="w-8 h-8 rounded-full border border-[#1e1f22]" />
                   <span className="text-white font-bold">Offerta di {theirProfile.first_name}</span>
                 </div>
                 <div className="flex items-center gap-3">
