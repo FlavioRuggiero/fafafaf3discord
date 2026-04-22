@@ -194,7 +194,7 @@ export const AdminPanel = ({ onClose }: AdminPanelProps) => {
 
         {/* Content */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex border-b border-[#1f2023] bg-[#2b2d31] overflow-x-auto custom-scrollbar">
+          <div className="flex-shrink-0 flex border-b border-[#1f2023] bg-[#2b2d31] overflow-x-auto custom-scrollbar">
             <button 
               onClick={() => setActiveTab('dc')}
               className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'dc' ? 'text-white border-brand' : 'text-[#b5bac1] border-transparent hover:text-[#dbdee1]'}`}
