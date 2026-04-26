@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell, Image as ImageIcon, Award, Music } from "lucide-react";
+import { Hash, Volume2, ChevronDown, Settings, LogOut, Plus, Trash2, Gamepad2, Edit2, FolderPlus, PhoneOff, MicOff, Headphones, Users, Search, X, Home, Shield, Lock, Clock, MessageSquare, Archive, Bell, Image as ImageIcon, Award, Music, FileUp } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Channel, Server, User, Profile, ServerMember, ServerPermissions } from "@/types/discord";
 import { supabase } from "@/integrations/supabase/client";
@@ -842,6 +842,14 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
                 {notificationCount}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => onChannelSelect({ id: 'shared-files', name: 'File Condivisi', type: 'text', category: '', server_id: null })}
+            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'shared-files' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+          >
+            <FileUp size={20} className="mr-3" />
+            <span className="font-medium">File Condivisi</span>
           </button>
           
           <div className="h-[1px] bg-[#1e1f22] mx-2 my-2"></div>

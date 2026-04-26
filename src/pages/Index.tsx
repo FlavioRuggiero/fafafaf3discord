@@ -13,6 +13,7 @@ import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
 import { MySingingCanary } from "@/components/discord/MySingingCanary";
 import { Progression } from "@/components/discord/Progression";
 import { FriendsArea } from "@/components/discord/FriendsArea";
+import { SharedFilesView } from "@/components/discord/SharedFilesView";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1551,6 +1552,8 @@ const Index = () => {
               onNavigateToMessage={handleNavigateToMessage}
               onNavigateToTrade={(id) => setActiveTradeId(id)}
             />
+          ) : activeChannel?.id === 'shared-files' ? (
+            <SharedFilesView currentUser={currentUser} onlineUserIds={onlineUserIds} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.type === 'dm' ? (
             <ChatArea 
               channel={activeChannel} 
