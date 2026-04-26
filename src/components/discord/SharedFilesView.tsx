@@ -45,7 +45,9 @@ export const SharedFilesView = ({ currentUser, onlineUserIds, onToggleSidebar }:
       .select('*, profiles(first_name, avatar_url, avatar_decoration)')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Errore nel recupero dei file condivisi:", error);
+    } else if (data) {
       setFiles(data);
     }
     setIsLoading(false);
