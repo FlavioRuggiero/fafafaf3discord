@@ -82,21 +82,30 @@ export const FileShareProvider = ({ children }: { children: React.ReactNode }) =
               setTimeout(() => { peer.destroy(); delete peersRef.current[transferId]; }, 1000);
               return;
             }
+            
             const slice = file.slice(offset, offset + chunkSize);
+            
+            // arrayBuffer() è asincrono, quindi non blocca l'interfaccia utente
             slice.arrayBuffer().then(buffer => {
               try {
                 peer.send(new Uint8Array(buffer));
                 offset += chunkSize;
                 
-                // Gestione della backpressure per evitare crash con file grandi
-                const checkBufferAndSend = () => {
-                  if ((peer as any)._channel && (peer as any)._channel.bufferedAmount > 1024 * 1024 * 2) {
-                    setTimeout(checkBufferAndSend, 50);
-                  } else {
+                const dataChannel = (peer as any)._channel;
+                
+                // Gestione della backpressure ottimizzata per il background
+                if (dataChannel && dataChannel.bufferedAmount > 1024 * 1024 * 2) {
+                  // Se il buffer è pieno (> 2MB), usiamo l'evento nativo WebRTC.
+                  // Questo evento NON viene rallentato dal browser quando la scheda è in background!
+                  dataChannel.bufferedAmountLowThreshold = 1024 * 1024; // Riprendi quando scende sotto 1MB
+                  dataChannel.onbufferedamountlow = () => {
+                    dataChannel.onbufferedamountlow = null; // Rimuovi il listener
                     sendNextChunk();
-                  }
-                };
-                checkBufferAndSend();
+                  };
+                } else {
+                  // Se il buffer è libero, continuiamo subito
+                  sendNextChunk();
+                }
               } catch (e) {
                 console.error("Errore invio chunk", e);
                 peer.destroy();
