@@ -72,6 +72,15 @@ export const SharedFilesView = ({ currentUser, onlineUserIds, onToggleSidebar }:
     setNewTitle("");
     setNewDesc("");
     setSelectedFile(null);
+    
+    // Forza l'aggiornamento della lista locale immediatamente
+    fetchFiles();
+  };
+
+  const handleRemoveFile = async (id: string) => {
+    await removeFile(id);
+    // Forza l'aggiornamento della lista locale immediatamente
+    fetchFiles();
   };
 
   // Filtra i file: mostra solo quelli degli utenti online (o i propri) e applica la ricerca
@@ -171,7 +180,7 @@ export const SharedFilesView = ({ currentUser, onlineUserIds, onToggleSidebar }:
                       </div>
                       {isMine ? (
                         <button 
-                          onClick={() => removeFile(file.id)}
+                          onClick={() => handleRemoveFile(file.id)}
                           className="p-1.5 text-[#949ba4] hover:text-[#f23f43] hover:bg-[#f23f43]/10 rounded transition-colors"
                           title="Interrompi condivisione"
                         >
