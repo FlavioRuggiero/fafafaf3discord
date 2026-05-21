@@ -932,22 +932,6 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
             </div>
           </button>
 
-          <button
-            onClick={() => onChannelSelect({ id: 'mysingingcanary', name: 'MySingingCanary', type: 'text', category: '', server_id: null })}
-            className={`relative w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors overflow-hidden group ${activeChannelId === 'mysingingcanary' ? 'text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
-          >
-            {/* Sfondo base */}
-            <div className={`absolute inset-0 transition-colors ${activeChannelId === 'mysingingcanary' ? 'bg-[#404249]' : 'group-hover:bg-[#35373c]'}`}></div>
-            
-            {/* Sfumatura viola da destra */}
-            <div className={`absolute inset-0 bg-gradient-to-l from-[#a855f7]/20 to-transparent transition-opacity duration-300 ${activeChannelId === 'mysingingcanary' ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}`}></div>
-            
-            <div className="relative z-10 flex items-center">
-              <Music size={20} className="mr-3 text-[#a855f7]" />
-              <span className="font-medium">MySingingCanary</span>
-            </div>
-          </button>
-
           {dmChannels && dmChannels.length > 0 && (
             <div className="mt-4">
               <div className="flex items-center justify-between px-2 mb-1">
