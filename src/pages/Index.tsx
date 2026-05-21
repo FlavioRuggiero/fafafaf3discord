@@ -1,1665 +1,414 @@
-import React, { useState, useEffect, useRef } from "react";
-import { ServerSidebar } from "@/components/discord/ServerSidebar";
-import { ChannelSidebar } from "@/components/discord/ChannelSidebar";
-import { ChatArea } from "@/components/discord/ChatArea";
-import { MemberList } from "@/components/discord/MemberList";
-import { DiscoverServersModal, CreateServerModal, ServerSettingsModal } from "@/components/discord/ServerModals";
-import { UserSettingsModal } from "@/components/discord/UserSettingsModal";
-import { ShopView } from "@/components/discord/ShopView";
-import { InventoryView } from "@/components/discord/InventoryView";
-import { NotificationsView } from "@/components/discord/NotificationsView";
-import { TradeModal } from "@/components/discord/TradeModal";
-import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
-import { MySingingCanary } from "@/components/discord/MySingingCanary";
-import { Progression } from "@/components/discord/Progression";
-import { FriendsArea } from "@/components/discord/FriendsArea";
-import { SharedFilesView } from "@/components/discord/SharedFilesView";
-import { INITIAL_MESSAGES } from "@/data/mockData";
-import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { showSuccess, showError } from "@/utils/toast";
-import { Menu, Home, MessageSquare, Compass, Plus, Gamepad2 } from "lucide-react";
-import { VoiceChannelProvider } from "@/contexts/VoiceChannelProvider";
-import { UserPanel } from "@/components/discord/UserPanel";
-import { playSound } from "@/utils/sounds";
-import { CustomCursor } from "@/components/discord/CustomCursor";
+"use client";
 
-type NotificationSetting = 'all' | 'mentions' | 'none';
+import React, { useState, useEffect } from 'react';
+import { ChannelSidebar } from '@/components/discord/ChannelSidebar';
+import { ChatArea } from '@/components/discord/ChatArea';
+import { ServerSidebar } from '@/components/discord/ServerSidebar';
+import { FriendsArea } from '@/components/discord/FriendsArea';
+import { WelcomeScreen } from '@/components/discord/WelcomeScreen';
+import { DirectMessageArea } from '@/components/discord/DirectMessageArea';
+import { NotificationsArea } from '@/components/discord/NotificationsArea';
+import { CardiShop } from '@/components/discord/CardiShop';
+import { Inventory } from '@/components/discord/Inventory';
+import { ProgressionArea } from '@/components/discord/ProgressionArea';
+import { DailyMinigame } from '@/components/discord/DailyMinigame';
+import { SharedFilesArea } from '@/components/discord/SharedFilesArea';
+import { PataParty } from '@/components/discord/PataParty'; // IMPORT AGGIUNTO
+import { Server, Channel, User, ServerPermissions } from '@/types/discord';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { ServerSettingsModal } from '@/components/discord/ServerSettingsModal';
+import { UserSettingsModal } from '@/components/discord/UserSettingsModal';
+import { InviteModal } from '@/components/discord/InviteModal';
 
 const Index = () => {
-  const { user, adminId, moderatorIds } = useAuth();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  // Refs per evitare stale closures negli eventi realtime
-  const adminIdRef = useRef(adminId);
-  const moderatorIdsRef = useRef(moderatorIds);
-  const currentUserRef = useRef(currentUser);
-
-  useEffect(() => {
-    adminIdRef.current = adminId;
-  }, [adminId]);
-
-  useEffect(() => {
-    moderatorIdsRef.current = moderatorIds;
-  }, [moderatorIds]);
-
-  useEffect(() => {
-    currentUserRef.current = currentUser;
-  }, [currentUser]);
-
-  // States per Server e Canali dal DB
-  const [servers, setServers] = useState<Server[]>([]);
-  const [publicServers, setPublicServers] = useState<Server[]>([]);
-  const [activeServerId, setActiveServerId] = useState<string>('home');
-  const [allChannels, setAllChannels] = useState<Channel[]>([]);
+  const { user: currentUser } = useAuth();
+  const [activeServer, setActiveServer] = useState<Server | null>(null);
+  const [activeChannelId, setActiveChannelId] = useState<string>('home');
+  const [activeDM, setActiveDM] = useState<Channel | null>(null);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [dmChannels, setDmChannels] = useState<Channel[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  const activeServer = servers.find(s => s.id === activeServerId);
-  const serverChannels = allChannels.filter(c => c.server_id === activeServerId);
-  const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
+  const [showServerSettings, setShowServerSettings] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [serverPermissions, setServerPermissions] = useState<ServerPermissions | undefined>(undefined);
 
-  const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({});
-  
-  // State per gestire la Presence in tempo reale e i profili
-  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-  const [serverProfiles, setServerProfiles] = useState<any[]>([]);
-  
-  // State per i ruoli
-  const [serverRoles, setServerRoles] = useState<ServerRole[]>([]);
-  const [memberRoles, setMemberRoles] = useState<{user_id: string, role_id: string}[]>([]);
+  const [notificationCount, setNotificationCount] = useState(0);
 
-  // States per UI
-  const [showMembers, setShowMembers] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [showDiscoverModal, setShowDiscoverModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showUserSettingsModal, setShowUserSettingsModal] = useState(false);
-  
-  const [isCreatingServer, setIsCreatingServer] = useState(false);
-  const [isUpdatingServer, setIsUpdatingServer] = useState(false);
-
-  // States per Notifiche e Scambi
-  const [notificationSettings, setNotificationSettings] = useState<Record<string, NotificationSetting>>({});
-  const [unreadServers, setUnreadServers] = useState<Set<string>>(new Set());
-  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
-  const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
-  
-  // Calcolo dinamico delle notifiche
-  const [tradeCount, setTradeCount] = useState(0);
-  const [mentionCount, setMentionCount] = useState(0);
-  const [friendRequestCount, setFriendRequestCount] = useState(0);
-  
-  const today = new Date().toISOString().split('T')[0];
-  const dailyRewardCount = currentUser && currentUser.last_reward_date !== today ? 1 : 0;
-  
-  const notificationCount = tradeCount + mentionCount + dailyRewardCount + friendRequestCount;
-  
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-  const prevNotifCountRef = useRef(0);
-
-  // Jumpscare State
-  const [jumpscareActive, setJumpscareActive] = useState(false);
-
-  // Gestione intelligente della scomparsa del badge notifiche
-  useEffect(() => {
-    if (notificationCount === 0) {
-      setHasUnreadNotifications(false);
-    } else if (notificationCount > prevNotifCountRef.current) {
-      if (activeChannel?.id !== 'notifications') {
-        setHasUnreadNotifications(true);
-      }
-    }
-    prevNotifCountRef.current = notificationCount;
-  }, [notificationCount, activeChannel?.id]);
-
-  useEffect(() => {
-    if (activeChannel?.id === 'notifications') {
-      setHasUnreadNotifications(false);
-      setMentionCount(0); // Resetta le menzioni di sessione quando visualizzate
-    }
-  }, [activeChannel?.id]);
-
-  // Carica impostazioni notifiche
-  useEffect(() => {
-    if (user) {
-      const saved = localStorage.getItem(`notification-settings-${user.id}`);
-      if (saved) {
-        try { setNotificationSettings(JSON.parse(saved)); } catch(e) {}
-      }
-    }
-  }, [user]);
-
-  const handleSetNotificationSetting = (serverId: string, setting: NotificationSetting) => {
-    setNotificationSettings(prev => {
-      const next = { ...prev, [serverId]: setting };
-      if (currentUser) {
-        localStorage.setItem(`notification-settings-${currentUser.id}`, JSON.stringify(next));
-      }
-      return next;
-    });
-  };
-
-  // Refs per il listener globale
-  const allChannelsRef = useRef(allChannels);
-  useEffect(() => { allChannelsRef.current = allChannels; }, [allChannels]);
-
-  const dmChannelsRef = useRef(dmChannels);
-  useEffect(() => { dmChannelsRef.current = dmChannels; }, [dmChannels]);
-
-  const activeServerIdRef = useRef(activeServerId);
-  useEffect(() => { activeServerIdRef.current = activeServerId; }, [activeServerId]);
-
-  const activeChannelIdRef = useRef(activeChannel?.id);
-  useEffect(() => { activeChannelIdRef.current = activeChannel?.id; }, [activeChannel?.id]);
-
-  const notificationSettingsRef = useRef(notificationSettings);
-  useEffect(() => { notificationSettingsRef.current = notificationSettings; }, [notificationSettings]);
-
-  // Listener globale per Jumpscare
   useEffect(() => {
     if (!currentUser?.id) return;
-    const sub = supabase.channel('global_jumpscare')
-      .on('broadcast', { event: 'trigger' }, (payload) => {
-        if (payload.payload.targetId === 'all' || payload.payload.targetId === currentUser.id) {
-          setJumpscareActive(true);
-          const audio = new Audio('/jumpscare.mp3');
-          audio.volume = 1.0;
-          audio.play().catch(e => console.error("Audio play failed", e));
-          // Aumentato a 3500ms per compensare il ritardo di 1s dell'animazione
-          setTimeout(() => setJumpscareActive(false), 3500);
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(sub); };
-  }, [currentUser?.id]);
+    
+    let isMounted = true;
+    
+    const fetchFriendsAndDms = async () => {
+      // 1. Prendi tutte le amicizie accettate per questo utente
+      const { data: friendships } = await supabase
+        .from('friendships')
+        .select('*')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
 
-  // Listener globale per le notifiche (Messaggi e Menzioni)
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    const handleNewMessage = (payload: any) => {
-      const newMsg = payload.new;
-      if (newMsg.user_id === currentUser.id) return; // Non notificare i propri messaggi
-
-      // Gestione notifiche DM
-      if (newMsg.dm_channel_id) {
-        let dmChannel = dmChannelsRef.current.find(c => c.id === newMsg.dm_channel_id);
-        
-        if (!dmChannel) {
-          // Se il canale DM non è ancora nello stato, lo recuperiamo
-          const fetchNewDm = async () => {
-            const { data: dmData } = await supabase.from('dm_channels').select('*').eq('id', newMsg.dm_channel_id).single();
-            if (dmData) {
-              const otherId = dmData.user1_id === currentUser.id ? dmData.user2_id : dmData.user1_id;
-              const { data: p } = await supabase.from('profiles').select('*').eq('id', otherId).single();
-              const newDm: Channel = {
-                id: dmData.id,
-                name: p?.first_name || 'Utente',
-                type: 'dm',
-                category: 'DM',
-                server_id: null,
-                unread: true,
-                recipient: {
-                  id: otherId,
-                  name: p?.first_name || 'Utente',
-                  avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
-                  status: 'offline',
-                  avatar_decoration: p?.avatar_decoration
-                } as User
-              };
-              setDmChannels(prev => {
-                if (prev.some(d => d.id === newDm.id)) return prev;
-                return [...prev, newDm];
-              });
-              
-              // Suona solo se non stiamo già guardando questo canale
-              if (activeChannelIdRef.current !== newMsg.dm_channel_id) {
-                playSound('/notifica.mp3');
-                if (activeServerIdRef.current !== 'home') {
-                  setUnreadServers(prev => new Set(prev).add('home'));
-                }
-              }
-            }
-          };
-          fetchNewDm();
-        } else {
-          if (activeChannelIdRef.current !== newMsg.dm_channel_id) {
-            playSound('/notifica.mp3');
-            setDmChannels(prev => prev.map(dm => dm.id === newMsg.dm_channel_id ? { ...dm, unread: true } : dm));
-            if (activeServerIdRef.current !== 'home') {
-              setUnreadServers(prev => new Set(prev).add('home'));
-            }
-          }
-        }
+      if (!friendships || friendships.length === 0) {
+        if (isMounted) setDmChannels([]);
         return;
       }
 
-      // Gestione notifiche Server
-      const channel = allChannelsRef.current.find(c => c.id === newMsg.channel_id);
-      if (!channel || !channel.server_id) return;
+      // Estrai gli ID degli amici
+      const friendIds = friendships.map(f => f.sender_id === currentUser.id ? f.receiver_id : f.sender_id);
 
-      const serverId = channel.server_id;
-      const setting = notificationSettingsRef.current[serverId] || 'mentions'; // Default: solo menzioni
-
-      // Controllo menzione tramite ID univoco o @everyone
-      const isMentioned = newMsg.content.includes(`<@${currentUser.id}>`) || newMsg.content.includes('<@everyone>');
-
-      if (isMentioned) {
-        setMentionCount(prev => prev + 1);
-      }
-
-      if (setting !== 'none') {
-        // Se non stiamo guardando questo server, segnalo come non letto
-        if (activeServerIdRef.current !== serverId) {
-          setUnreadServers(prev => new Set(prev).add(serverId));
-        }
-      }
-
-      let shouldNotify = false;
-      if (setting === 'all') shouldNotify = true;
-      if (setting === 'mentions' && isMentioned) shouldNotify = true;
-
-      if (shouldNotify && activeChannelIdRef.current !== newMsg.channel_id) {
-        playSound('/notifica.mp3');
-      }
-    };
-
-    const sub = supabase.channel('global_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, handleNewMessage)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(sub);
-    };
-  }, [currentUser?.id]);
-
-  // Listener globale per la rimozione istantanea dai server (Kick/Ban)
-  useEffect(() => {
-    if (!user?.id) return;
-    
-    const sub = supabase.channel(`global_server_members_${user.id}`)
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'server_members',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        const removedServerId = payload.old.server_id;
-        
-        setServers(prev => prev.filter(s => s.id !== removedServerId));
-        setAllChannels(prev => prev.filter(c => c.server_id !== removedServerId));
-        
-        if (activeServerIdRef.current === removedServerId) {
-          setActiveServerId('home');
-          showError("Sei stato rimosso dal server.");
-        }
-      })
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'server_members',
-        filter: `user_id=eq.${user.id}`
-      }, async (payload) => {
-        const newServerId = payload.new.server_id;
-        const { data: serverData } = await supabase.from('servers').select('*').eq('id', newServerId).single();
-        if (serverData) {
-          setServers(prev => {
-            if (prev.some(s => s.id === newServerId)) return prev;
-            return [...prev, serverData];
-          });
-          const { data: channelsData } = await supabase.from('channels').select('*').eq('server_id', newServerId);
-          if (channelsData) {
-            setAllChannels(prev => {
-              const existingIds = new Set(prev.map(c => c.id));
-              const newChannels = channelsData.filter(c => !existingIds.has(c.id));
-              return [...prev, ...newChannels];
-            });
-          }
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(sub);
-    };
-  }, [user?.id]);
-
-  // Listener per conteggio scambi attivi e richieste di amicizia
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    
-    const userId = currentUser.id;
-
-    const fetchTradeCount = async () => {
-      const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-      const { count } = await supabase.from('trades')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', userId)
-        .eq('status', 'pending')
-        .gt('created_at', twoMinsAgo); // Solo quelle non scadute
-      setTradeCount(count || 0);
-    };
-
-    const fetchFriendRequestCount = async () => {
-      const { count } = await supabase.from('friendships')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', userId)
-        .eq('status', 'pending');
-      setFriendRequestCount(count || 0);
-    };
-
-    fetchTradeCount();
-    fetchFriendRequestCount();
-    
-    // Controlla ogni 10 secondi se ci sono richieste scadute da rimuovere dal contatore
-    const expireInterval = setInterval(fetchTradeCount, 10000);
-
-    const fetchActiveTrade = async () => {
-      const { data } = await supabase.from('trades')
-        .select('id')
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .eq('status', 'active')
-        .limit(1);
-      if (data && data.length > 0) setActiveTradeId(data[0].id);
-    };
-    fetchActiveTrade();
-
-    const tradeSub = supabase.channel(`active_trades_global_${userId}`)
-      .on('broadcast', { event: 'trade_request' }, () => {
-        fetchTradeCount();
-        playSound('/notifica.mp3');
-        showSuccess("Hai ricevuto una nuova richiesta di scambio!");
-      })
-      .on('broadcast', { event: 'trade_accepted' }, (payload) => {
-        fetchTradeCount();
-        if (payload.payload?.trade_id) {
-          setActiveTradeId(payload.payload.trade_id);
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trades' }, async (payload) => {
-        fetchTradeCount();
-        const { data } = await supabase.from('trades').select('status, sender_id, receiver_id').eq('id', payload.new.id).single();
-        if (data && data.status === 'active' && (data.sender_id === userId || data.receiver_id === userId)) {
-          setActiveTradeId(payload.new.id);
-        }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trades' }, () => {
-        fetchTradeCount();
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'trades' }, () => {
-        fetchTradeCount();
-      })
-      .subscribe();
-
-    const friendSub = supabase.channel(`friend_requests_global_${userId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => {
-        fetchFriendRequestCount();
-        playSound('/notifica.mp3');
-        showSuccess("Hai ricevuto una nuova richiesta di amicizia!");
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => fetchFriendRequestCount())
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${userId}` }, () => fetchFriendRequestCount())
-      // Listener per notificare il mittente quando la sua richiesta viene accettata
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `sender_id=eq.${userId}` }, (payload) => {
-        if (payload.new.status === 'accepted') {
-          playSound('/notifica.mp3');
-          showSuccess("Una tua richiesta di amicizia è stata accettata!");
-        }
-      })
-      .subscribe();
-
-    return () => {
-      clearInterval(expireInterval);
-      supabase.removeChannel(tradeSub);
-      supabase.removeChannel(friendSub);
-    };
-  }, [currentUser?.id]);
-
-  // Event Listener locale per forzare l'apertura istantanea dello scambio
-  useEffect(() => {
-    const handleOpenTrade = (e: CustomEvent) => {
-      setActiveTradeId(e.detail);
-    };
-    window.addEventListener('open_trade', handleOpenTrade as EventListener);
-    return () => window.removeEventListener('open_trade', handleOpenTrade as EventListener);
-  }, []);
-
-  // Calcola dinamicamente la lista dei membri con lo stato in tempo reale
-  const serverMembersList: User[] = serverProfiles.map(p => {
-    const isOnline = onlineUserIds.has(p.id) || p.id === currentUser?.id;
-    const name = p.first_name || "Utente";
-    
-    let role: User['global_role'] = 'USER';
-    if (p.id === adminId) {
-        role = 'CREATOR';
-    } else if (p.role === 'moderator' || moderatorIds.includes(p.id)) {
-        role = 'MODERATOR';
-    }
-
-    const userRoles = memberRoles
-      .filter(mr => mr.user_id === p.id)
-      .map(mr => serverRoles.find(r => r.id === mr.role_id))
-      .filter(Boolean) as ServerRole[];
-
-    return {
-      id: p.id,
-      name: name,
-      avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
-      status: isOnline ? "online" : "offline",
-      global_role: role,
-      bio: p.bio || "",
-      banner_color: p.banner_color || "#5865F2",
-      banner_url: p.banner_url || undefined,
-      level: p.level || 1,
-      digitalcardus: p.digitalcardus ?? 25,
-      xp: p.xp || 0,
-      server_roles: userRoles,
-      avatar_decoration: p.avatar_decoration || null,
-      active_cursor: p.active_cursor || null,
-      purchased_decorations: p.purchased_decorations || [],
-      entrance_audio_url: p.entrance_audio_url || null,
-      claimed_levels: p.claimed_levels || [],
-      standard_chests: p.standard_chests || 0,
-      premium_chests: p.premium_chests || 0,
-      singing_island: p.singing_island || []
-    };
-  });
-
-  // Calcolo dei permessi per l'utente corrente nel server attivo
-  const currentUserMember = serverMembersList.find(m => m.id === currentUser?.id);
-  const isOwner = activeServer?.created_by === currentUser?.id;
-  const isGlobalAdmin = currentUser?.global_role === 'ADMIN' || currentUser?.global_role === 'CREATOR';
-
-  const serverPermissions: ServerPermissions = {
-    isOwner: isOwner || false,
-    can_manage_channels: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_channels) ?? false),
-    can_delete_messages: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_delete_messages) ?? false),
-    can_use_commands: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_use_commands) ?? false),
-    can_manage_server: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_server) ?? false),
-    can_manage_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_manage_roles) ?? false),
-    can_assign_roles: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_assign_roles) ?? false),
-    can_bypass_restrictions: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_bypass_restrictions) ?? false),
-    can_kick_members: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_kick_members) ?? false),
-    can_ban_members: isOwner || isGlobalAdmin || (currentUserMember?.server_roles?.some(r => r.can_ban_members) ?? false),
-  };
-
-  // Gestione Supabase Presence
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase.channel('global_presence', {
-      config: {
-        presence: {
-          key: user.id, 
-        },
-      },
-    });
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const presenceState = channel.presenceState();
-        const onlineIds = new Set<string>();
-        Object.keys(presenceState).forEach(id => onlineIds.add(id));
-        setOnlineUserIds(onlineIds);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ online_at: new Date().toISOString() });
-        }
-      });
-
-    const handleBeforeUnload = () => {
-      channel.untrack();
-      supabase.removeChannel(channel);
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      channel.untrack();
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  // Listener Realtime per la tabella Profiles e Channels
-  useEffect(() => {
-    if (!user?.id) return;
-    
-    const profileSubscription = supabase
-      .channel('public:profiles_index')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
-        const updatedProfile = payload.new;
-
-        setServerProfiles(prev => prev.map(p => p.id === updatedProfile.id ? { ...p, ...updatedProfile } : p));
-
-        setCurrentUser(prev => {
-          if (!prev || prev.id !== updatedProfile.id) return prev;
-          
-          let role: User['global_role'] = 'USER';
-          if (updatedProfile.id === adminIdRef.current) {
-              role = 'CREATOR';
-          } else if (updatedProfile.role === 'moderator' || moderatorIdsRef.current.includes(updatedProfile.id)) {
-              role = 'MODERATOR';
-          }
-
-          return {
-            ...prev,
-            name: updatedProfile.first_name || prev.name,
-            avatar: updatedProfile.avatar_url || prev.avatar,
-            bio: updatedProfile.bio || "",
-            banner_color: updatedProfile.banner_color || "#5865F2",
-            banner_url: updatedProfile.banner_url, // Accetta null
-            level: updatedProfile.level || 1,
-            digitalcardus: updatedProfile.digitalcardus ?? 25,
-            xp: updatedProfile.xp || 0,
-            global_role: role,
-            last_reward_date: updatedProfile.last_reward_date, // Accetta null
-            avatar_decoration: updatedProfile.avatar_decoration, // Accetta null
-            active_cursor: updatedProfile.active_cursor !== undefined ? updatedProfile.active_cursor : prev.active_cursor,
-            purchased_decorations: updatedProfile.purchased_decorations || [],
-            entrance_audio_url: updatedProfile.entrance_audio_url || null,
-            claimed_levels: updatedProfile.claimed_levels || [],
-            standard_chests: updatedProfile.standard_chests || 0,
-            premium_chests: updatedProfile.premium_chests || 0,
-            singing_island: updatedProfile.singing_island || []
-          };
-        });
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'channels' }, (payload) => {
-        setAllChannels(prev => {
-          if (prev.some(c => c.id === payload.new.id)) return prev;
-          return [...prev, payload.new as Channel];
-        });
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'channels' }, (payload) => {
-        setAllChannels(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'channels' }, (payload) => {
-        setAllChannels(prev => prev.filter(c => c.id !== payload.old.id));
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(profileSubscription);
-    };
-  }, [user?.id]);
-
-  // Caricamento dati iniziali e premi giornalieri
-  const hasInitializedRef = useRef(false);
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-      if (!user) return;
-      
-      // Eseguiamo la pulizia solo una volta per sessione
-      if (!hasInitializedRef.current) {
-        hasInitializedRef.current = true;
-        
-        // 1. Aggiorna data ultimo accesso
-        await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id);
-        
-        // 2. Pulisce eventuali "utenti fantasma" bloccati in chat vocali precedenti
-        await supabase.from('server_members').update({ voice_channel_id: null }).eq('user_id', user.id);
-      }
-      
-      const { data: profile } = await supabase
+      // 2. Prendi i profili degli amici
+      const { data: profiles } = await supabase
         .from('profiles')
-        .select('first_name, last_name, avatar_url, bio, banner_color, banner_url, level, digitalcardus, xp, role, avatar_decoration, purchased_decorations, welcome_text, welcome_bg_color, welcome_border_color, active_cursor, entrance_audio_url, claimed_levels, standard_chests, premium_chests, singing_island, last_reward_date')
-        .eq('id', user.id)
-        .single();
-      
-      const userName = profile?.first_name || user.email?.split('@')[0] || "Utente";
-      
-      let role: User['global_role'] = 'USER';
-      if (user.id === adminId) {
-        role = 'CREATOR';
-      } else if (profile?.role === 'moderator' || moderatorIds.includes(user.id)) {
-        role = 'MODERATOR';
-      }
+        .select('id, first_name, avatar_url, avatar_decoration')
+        .in('id', friendIds);
 
-      const loadedUser: User = {
-        id: user.id,
-        name: userName,
-        avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
-        status: "online",
-        global_role: role,
-        bio: profile?.bio || "",
-        banner_color: profile?.banner_color || "#5865F2",
-        banner_url: profile?.banner_url || undefined,
-        level: profile?.level || 1,
-        digitalcardus: profile?.digitalcardus ?? 25,
-        xp: profile?.xp || 0,
-        last_reward_date: profile?.last_reward_date || null,
-        avatar_decoration: profile?.avatar_decoration || null,
-        active_cursor: profile?.active_cursor || null,
-        purchased_decorations: profile?.purchased_decorations || [],
-        entrance_audio_url: profile?.entrance_audio_url || null,
-        claimed_levels: profile?.claimed_levels || [],
-        standard_chests: profile?.standard_chests || 0,
-        premium_chests: profile?.premium_chests || 0,
-        singing_island: profile?.singing_island || []
-      };
-      
-      setCurrentUser(loadedUser);
-
-      const { data: memberData } = await supabase
-        .from('server_members')
-        .select('server_id, position')
-        .eq('user_id', user.id)
-        .order('position', { ascending: true });
-
-      const joinedServerIds = memberData?.map(m => m.server_id) || [];
-
-      if (joinedServerIds.length > 0) {
-        const { data: serversData } = await supabase.from('servers').select('*').in('id', joinedServerIds);
-        if (serversData) {
-          const sortedServers = memberData
-            .map(m => serversData.find(s => s.id === m.server_id))
-            .filter(Boolean) as Server[];
-          setServers(sortedServers);
-        }
-
-        const { data: channelsData } = await supabase.from('channels').select('*').in('server_id', joinedServerIds);
-        if (channelsData) setAllChannels(channelsData);
-      }
-
-      // Fetch DMs
-      const { data: dmsData } = await supabase
+      // 3. Cerca o crea i canali DM per queste amicizie
+      const { data: existingDms } = await supabase
         .from('dm_channels')
         .select('*')
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
-        
-      if (dmsData && dmsData.length > 0) {
-        const otherUserIds = dmsData.map(dm => dm.user1_id === user.id ? dm.user2_id : dm.user1_id);
-        const { data: profiles } = await supabase.from('profiles').select('*').in('id', otherUserIds);
-        
-        const formattedDms: Channel[] = dmsData.map(dm => {
-          const otherId = dm.user1_id === user.id ? dm.user2_id : dm.user1_id;
-          const p = profiles?.find(p => p.id === otherId);
-          return {
-            id: dm.id,
-            name: p?.first_name || 'Utente',
-            type: 'dm',
-            category: 'DM',
-            server_id: null,
-            recipient: {
-              id: otherId,
-              name: p?.first_name || 'Utente',
-              avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
-              status: 'offline', // Verrà aggiornato dinamicamente
-              avatar_decoration: p?.avatar_decoration
-            } as User
-          };
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+
+      const dmsWithProfiles: Channel[] = [];
+
+      for (const friendId of friendIds) {
+        const friendProfile = profiles?.find(p => p.id === friendId);
+        if (!friendProfile) continue;
+
+        // Cerca se esiste già un canale DM con questo amico
+        let dm = existingDms?.find(d => 
+          (d.user1_id === currentUser.id && d.user2_id === friendId) ||
+          (d.user1_id === friendId && d.user2_id === currentUser.id)
+        );
+
+        // Se non esiste, in una vera app lo creeremmo ora, ma per semplicità
+        // qui simuliamo solo l'oggetto Channel se non c'è, per mostrarlo nella UI.
+        // La creazione effettiva del record in `dm_channels` avverrà quando viene inviato il primo messaggio (vedi DirectMessageArea).
+        const channelId = dm?.id || `dm-${friendId}`; 
+
+        dmsWithProfiles.push({
+          id: channelId,
+          name: friendProfile.first_name || 'Utente',
+          type: 'text',
+          category: 'Messaggi Diretti',
+          server_id: null,
+          recipient: {
+            id: friendProfile.id,
+            name: friendProfile.first_name || 'Utente',
+            avatar: friendProfile.avatar_url || '',
+            status: 'online',
+            avatar_decoration: friendProfile.avatar_decoration
+          }
         });
-        setDmChannels(formattedDms);
-      }
-    };
-    
-    loadInitialData();
-  }, [user, adminId, moderatorIds]);
-
-  // Listener per nuovi DM e cancellazioni
-  useEffect(() => {
-    if (!user?.id) return;
-    
-    const dmSub = supabase.channel('dm_channels_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_channels' }, async (payload) => {
-        const dm = payload.new;
-        if (dm.user1_id === user.id || dm.user2_id === user.id) {
-          const otherId = dm.user1_id === user.id ? dm.user2_id : dm.user1_id;
-          const { data: p } = await supabase.from('profiles').select('*').eq('id', otherId).single();
-          const newDm: Channel = {
-            id: dm.id,
-            name: p?.first_name || 'Utente',
-            type: 'dm',
-            category: 'DM',
-            server_id: null,
-            recipient: {
-              id: otherId,
-              name: p?.first_name || 'Utente',
-              avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherId}`,
-              status: 'offline', // Verrà aggiornato dinamicamente
-              avatar_decoration: p?.avatar_decoration
-            } as User
-          };
-          setDmChannels(prev => {
-            if (prev.some(d => d.id === newDm.id)) return prev;
-            return [...prev, newDm];
-          });
-        }
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'dm_channels' }, (payload) => {
-        setDmChannels(prev => prev.filter(dm => dm.id !== payload.old.id));
-        if (activeChannelIdRef.current === payload.old.id) {
-          setActiveChannel({ id: 'friends', name: 'Amici', type: 'text', category: '', server_id: null });
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(dmSub);
-    };
-  }, [user?.id]);
-
-  // Caricamento Membri e Sottoscrizione Realtime
-  useEffect(() => {
-    if (!activeServerId || activeServerId === 'home') {
-      setServerProfiles([]);
-      setServerRoles([]);
-      setMemberRoles([]);
-      return;
-    }
-
-    let isMounted = true;
-
-    const fetchServerData = async () => {
-      const { data: membersData } = await supabase
-        .from('server_members')
-        .select('user_id')
-        .eq('server_id', activeServerId);
-        
-      if (membersData && membersData.length > 0) {
-        const userIds = membersData.map(m => m.user_id);
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
-          
-        if (profilesData && isMounted) {
-          setServerProfiles(profilesData);
-        }
-      } else if (isMounted) {
-        setServerProfiles([]);
       }
 
-      const { data: roles } = await supabase.from('server_roles').select('*').eq('server_id', activeServerId);
-      if (roles && isMounted) setServerRoles(roles);
-
-      const { data: mRoles } = await supabase.from('server_member_roles').select('user_id, role_id').eq('server_id', activeServerId);
-      if (mRoles && isMounted) setMemberRoles(mRoles);
+      if (isMounted) setDmChannels(dmsWithProfiles);
     };
 
-    fetchServerData();
+    fetchFriendsAndDms();
 
-    // Listener per unione/uscita dal server per aggiornare la lista membri in tempo reale
-    const memberSub = supabase.channel(`members_realtime_${activeServerId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'server_members',
-        filter: `server_id=eq.${activeServerId}`
-      }, async (payload) => {
-        if (!isMounted) return;
-
-        if (payload.eventType === 'INSERT') {
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', payload.new.user_id)
-            .single();
-          if (newProfile) {
-            setServerProfiles(prev => {
-              if (prev.some(p => p.id === newProfile.id)) return prev;
-              return [...prev, newProfile];
-            });
-          }
-        } else if (payload.eventType === 'DELETE') {
-          const deletedUserId = payload.old.user_id;
-          setServerProfiles(prev => prev.filter(p => p.id !== deletedUserId));
-          
-          // Se l'utente eliminato è l'utente corrente, riportalo alla home
-          if (deletedUserId === currentUserRef.current?.id) {
-            showError("Sei stato rimosso dal server.");
-            setServers(prev => prev.filter(s => s.id !== activeServerId));
-            setActiveServerId('home');
-          }
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_member_roles', filter: `server_id=eq.${activeServerId}` }, () => fetchServerData())
+    // Sottoscrizione ai cambiamenti delle amicizie per aggiornare i DM in tempo reale
+    const sub = supabase.channel('public:friendships-dm')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, fetchFriendsAndDms)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_channels' }, fetchFriendsAndDms)
       .subscribe();
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(memberSub);
+      supabase.removeChannel(sub);
     };
-  }, [activeServerId]);
-
-  // AGGIORNAMENTO: Sincronizza istantaneamente il canale attivo quando allChannels cambia
-  useEffect(() => {
-    if (activeServerId !== 'home') {
-      const newServerChannels = allChannels.filter(c => c.server_id === activeServerId);
-      if (newServerChannels.length > 0) {
-        setActiveChannel(current => {
-          if (!current || current.server_id !== activeServerId) {
-             return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
-          }
-          // Trova il canale aggiornato per riflettere le nuove impostazioni (cooldown, is_locked)
-          const updatedCurrent = newServerChannels.find(c => c.id === current.id);
-          if (!updatedCurrent) {
-             return newServerChannels.find(c => c.type === 'text') || newServerChannels[0];
-          }
-          return updatedCurrent;
-        });
-      } else {
-        setActiveChannel(null);
-      }
-    } else {
-      // Se siamo in home, non resettare activeChannel se è un DM o un tab speciale
-      if (activeChannel && activeChannel.server_id !== null) {
-        setActiveChannel(null);
-      }
-    }
-  }, [activeServerId, allChannels]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setShowMembers(false);
-      } else {
-        setShowMembers(true);
-      }
+    if (!currentUser?.id) return;
+    
+    let isMounted = true;
+    
+    const fetchNotifications = async () => {
+      const { count } = await supabase
+        .from('friendships')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', currentUser.id)
+        .eq('status', 'pending');
+        
+      if (isMounted) setNotificationCount(count || 0);
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
-  const handleSendMessage = (content: string) => {
-    if (!currentUser || !activeChannel) return;
-    
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      user: currentUser,
-      content,
-      timestamp: `Oggi alle ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+    fetchNotifications();
+
+    const sub = supabase.channel('friendships-count')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'friendships',
+        filter: `receiver_id=eq.${currentUser.id}`
+      }, fetchNotifications)
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(sub);
     };
-    
-    setMessagesByChannel(prev => ({
-      ...prev,
-      [activeChannel.id]: [...(prev[activeChannel.id] || []), newMessage]
-    }));
-  };
+  }, [currentUser?.id]);
 
-  const handleCreateServer = async (name: string, description: string, imageFile: File | null, audioFile: File | Blob | null, serverType: 'public' | 'private' | 'paid', entryFee: number) => {
-    if (!currentUser) return;
-    
-    setIsCreatingServer(true);
-
-    // Controllo di sicurezza in tempo reale dal database
-    const { data: checkProfile } = await supabase.from('profiles').select('role').eq('id', currentUser.id).single();
-    const isReallyAdmin = currentUser.id === adminIdRef.current;
-    const isReallyMod = checkProfile?.role === 'moderator';
-
-    if (!isReallyAdmin && !isReallyMod) {
-      showError("Permesso negato: non sei più un moderatore o admin.");
-      setIsCreatingServer(false);
-      setShowCreateModal(false);
-      // Aggiorniamo lo stato locale per far sparire il pulsante
-      setCurrentUser(prev => prev ? { ...prev, global_role: 'USER' } : null);
-      return;
-    }
-    
-    let icon_url = `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`;
-    let audio_url = null;
-
-    if (imageFile) {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('icons')
-        .upload(filePath, imageFile);
-
-      if (!uploadError) {
-        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-        icon_url = data.publicUrl;
-      }
-    }
-
-    if (audioFile) {
-      const fileExt = audioFile instanceof File ? audioFile.name.split('.').pop() : 'webm';
-      const fileName = `audio_${Math.random()}.${fileExt}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('icons')
-        .upload(filePath, audioFile);
-
-      if (!uploadError) {
-        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-        audio_url = data.publicUrl;
-      }
-    }
-    
-    const { data: newServer, error: serverError } = await supabase
-      .from('servers')
-      .insert({
-        name,
-        created_by: currentUser.id,
-        description: description || "Il tuo nuovo server.",
-        icon_url,
-        audio_url,
-        is_private: serverType === 'private',
-        server_type: serverType,
-        entry_fee: serverType === 'paid' ? entryFee : 0
-      })
-      .select()
-      .single();
-
-    if (serverError || !newServer) {
-      showError("Errore durante la creazione del server");
-      setIsCreatingServer(false);
+  useEffect(() => {
+    if (!activeServer || !currentUser) {
+      setServerPermissions(undefined);
       return;
     }
 
-    const maxPosition = servers.length;
-    await supabase.from('server_members').insert({ 
-      server_id: newServer.id, 
-      user_id: currentUser.id,
-      position: maxPosition
-    });
-
-    const { data: newChannel } = await supabase
-      .from('channels')
-      .insert({
-        server_id: newServer.id,
-        name: "generale",
-        type: "text",
-        category: "Chat Generale"
-      })
-      .select()
-      .single();
-
-    setServers([...servers, newServer]);
-    if (newChannel) setAllChannels([...allChannels, newChannel]);
-    setActiveServerId(newServer.id);
-    
-    showSuccess("Server creato con successo!");
-    setShowCreateModal(false);
-    setIsCreatingServer(false);
-  };
-
-  const handleJoinServer = async (server: Server) => {
-    if (!currentUser) return;
-
-    const { data: isBanned } = await supabase.from('server_bans').select('id').eq('server_id', server.id).eq('user_id', currentUser.id).maybeSingle();
-    if (isBanned) {
-      showError("Sei stato bannato da questo server.");
-      return;
-    }
-
-    if (server.server_type === 'paid') {
-      const fee = server.entry_fee || 0;
-      if ((currentUser.digitalcardus || 0) < fee) {
-        showError(`Non hai abbastanza DigitalCardus. Costo: ${fee} DC`);
-        return;
-      }
-
-      const { data, error } = await supabase.rpc('join_paid_server', {
-        p_server_id: server.id,
-        p_user_id: currentUser.id,
-        p_owner_id: server.created_by,
-        p_fee: fee
-      });
-
-      if (error || (data && !data.success)) {
-        showError(data?.error || "Errore durante il pagamento. Hai eseguito lo script SQL?");
-        return;
-      }
-
-      setCurrentUser(prev => prev ? { ...prev, digitalcardus: (prev.digitalcardus || 0) - fee } : null);
-    } else {
-      const maxPosition = servers.length;
-      const { error } = await supabase.from('server_members').insert({ 
-        server_id: server.id, 
-        user_id: currentUser.id,
-        position: maxPosition
-      });
-
-      if (error) {
-        showError("Errore durante l'unione al server");
-        return;
-      }
-    }
-
-    const { data: newChannels } = await supabase.from('channels').select('*').eq('server_id', server.id);
-    
-    setServers([...servers, server]);
-    if (newChannels) {
-      setAllChannels([...allChannels, ...newChannels]);
+    const checkPermissions = async () => {
+      const isOwner = activeServer.created_by === currentUser.id;
       
-      const welcomeChannel = newChannels.find(c => c.is_welcome_channel && c.type === 'text') || newChannels.find(c => c.type === 'text');
-      if (welcomeChannel) {
-        await supabase.from('messages').insert({
-          channel_id: welcomeChannel.id,
-          user_id: currentUser.id,
-          content: `<system:welcome>`
+      if (isOwner) {
+        setServerPermissions({
+          can_manage_channels: true,
+          can_delete_messages: true,
+          can_use_commands: true,
+          can_manage_server: true,
+          can_manage_roles: true,
+          can_manage_users: true,
+          can_bypass_restrictions: true,
+          can_kick_members: true,
+          can_ban_members: true,
+          can_assign_roles: true
+        });
+        return;
+      }
+
+      const { data: rolesData } = await supabase
+        .from('server_member_roles')
+        .select(`
+          role_id,
+          server_roles (*)
+        `)
+        .eq('server_id', activeServer.id)
+        .eq('user_id', currentUser.id);
+
+      if (rolesData && rolesData.length > 0) {
+        const mergedPerms: ServerPermissions = {
+          can_manage_channels: false,
+          can_delete_messages: false,
+          can_use_commands: false,
+          can_manage_server: false,
+          can_manage_roles: false,
+          can_manage_users: false,
+          can_bypass_restrictions: false,
+          can_kick_members: false,
+          can_ban_members: false,
+          can_assign_roles: false
+        };
+
+        rolesData.forEach((r: any) => {
+          const role = r.server_roles;
+          if (!role) return;
+          
+          Object.keys(mergedPerms).forEach(key => {
+            if (role[key] === true) {
+              (mergedPerms as any)[key] = true;
+            }
+          });
+        });
+
+        setServerPermissions(mergedPerms);
+      } else {
+        setServerPermissions({
+          can_manage_channels: false,
+          can_delete_messages: false,
+          can_use_commands: false,
+          can_manage_server: false,
+          can_manage_roles: false,
+          can_manage_users: false,
+          can_bypass_restrictions: false,
+          can_kick_members: false,
+          can_ban_members: false,
+          can_assign_roles: false
         });
       }
+    };
+
+    checkPermissions();
+  }, [activeServer, currentUser]);
+
+  const handleServerSelect = (server: Server | null) => {
+    setActiveServer(server);
+    setActiveDM(null);
+    if (!server) {
+      setActiveChannelId('home');
+      setChannels([]);
+    } else {
+      setActiveChannelId('');
+      fetchChannels(server.id);
+    }
+  };
+
+  const handleChannelSelect = (channel: Channel) => {
+    if (channel.id === 'home' || channel.id === 'friends' || channel.id === 'shop' || channel.id === 'inventory' || channel.id === 'progression' || channel.id === 'daily-minigame' || channel.id === 'notifications' || channel.id === 'shared-files' || channel.id === 'pataparty') {
+      setActiveServer(null);
+      setActiveChannelId(channel.id);
+      setActiveDM(null);
+    } else if (channel.server_id === null && channel.recipient) {
+      setActiveServer(null);
+      setActiveChannelId(channel.id);
+      setActiveDM(channel);
+    } else {
+      setActiveChannelId(channel.id);
+      setActiveDM(null);
     }
     
-    setActiveServerId(server.id);
-    showSuccess(`Ti sei unito a ${server.name}!`);
-  };
-
-  const handleRequestJoinServer = async (server: Server) => {
-    if (!currentUser) return;
-
-    const { data: isBanned } = await supabase.from('server_bans').select('id').eq('server_id', server.id).eq('user_id', currentUser.id).maybeSingle();
-    if (isBanned) {
-      showError("Sei stato bannato da questo server.");
-      return;
-    }
-
-    const { data: existing } = await supabase
-      .from('server_join_requests')
-      .select('id')
-      .eq('server_id', server.id)
-      .eq('user_id', currentUser.id)
-      .eq('status', 'pending')
-      .maybeSingle();
-
-    if (existing) {
-      showError("Hai già inviato una richiesta per questo server.");
-      return;
-    }
-
-    const { error } = await supabase.from('server_join_requests').insert({
-      server_id: server.id,
-      user_id: currentUser.id,
-      status: 'pending'
-    });
-
-    if (error) {
-      showError("Errore durante l'invio della richiesta.");
-    } else {
-      showSuccess("Richiesta inviata con successo! Attendi l'approvazione.");
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
     }
   };
 
-  const handleLeaveServer = async (serverId: string) => {
-    if (!currentUser) return;
-
+  const fetchChannels = async (serverId: string) => {
     const { data, error } = await supabase
-      .from('server_members')
-      .delete()
-      .eq('server_id', serverId)
-      .eq('user_id', currentUser.id)
-      .select();
-
-    if (error || !data || data.length === 0) {
-      showError("Impossibile uscire dal server. Assicurati di aver eseguito lo script SQL.");
-      return;
-    }
-
-    setServers(servers.filter(s => s.id !== serverId));
-    setAllChannels(allChannels.filter(c => c.server_id !== serverId));
-    setActiveServerId('home');
-    showSuccess("Sei uscito dal server.");
-  };
-
-  const handleKickMember = async (userId: string) => {
-    if (!activeServerId) return;
-    const { error } = await supabase.from('server_members').delete().eq('server_id', activeServerId).eq('user_id', userId);
-    if (error) showError("Errore durante l'espulsione.");
-    else showSuccess("Utente espulso dal server.");
-  };
-
-  const handleBanMember = async (userId: string) => {
-    if (!activeServerId) return;
-    const { error: banError } = await supabase.from('server_bans').insert({ server_id: activeServerId, user_id: userId, created_by: currentUser?.id });
-    if (banError) {
-      showError("Errore durante il ban.");
-      return;
-    }
-    await supabase.from('server_members').delete().eq('server_id', activeServerId).eq('user_id', userId);
-    showSuccess("Utente bannato dal server.");
-  };
-
-  const handleToggleMemberRole = async (userId: string, roleId: string, hasRole: boolean) => {
-    if (!activeServerId) return;
-    if (hasRole) {
-      const { error } = await supabase.from('server_member_roles').delete().eq('server_id', activeServerId).eq('user_id', userId).eq('role_id', roleId);
-      if (error) showError("Errore durante la rimozione del ruolo.");
-      else showSuccess("Ruolo rimosso.");
-    } else {
-      const { error } = await supabase.from('server_member_roles').insert({ server_id: activeServerId, user_id: userId, role_id: roleId });
-      if (error) showError("Errore durante l'assegnazione del ruolo.");
-      else showSuccess("Ruolo assegnato.");
-    }
-  };
-
-  const handleOpenDiscover = async () => {
-    const { data } = await supabase.from('servers').select('*');
-    if (data) setPublicServers(data);
-    setShowDiscoverModal(true);
-  };
-
-  const handleUpdateServer = async (id: string, name: string, description: string, imageFile: File | null, audioFile: File | Blob | null | undefined, serverType: 'public' | 'private' | 'paid', entryFee: number) => {
-    if (!currentUser) return;
-    setIsUpdatingServer(true);
-    
-    let icon_url = servers.find(s => s.id === id)?.icon_url;
-    let audio_url = servers.find(s => s.id === id)?.audio_url;
-
-    if (imageFile) {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('icons')
-        .upload(filePath, imageFile);
-
-      if (!uploadError) {
-        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-        icon_url = data.publicUrl;
-      }
-    }
-
-    if (audioFile !== undefined) {
-      if (audioFile === null) {
-        audio_url = null;
-      } else {
-        const fileExt = audioFile instanceof File ? audioFile.name.split('.').pop() : 'webm';
-        const fileName = `audio_${Math.random()}.${fileExt}`;
-        const filePath = `${currentUser.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('icons')
-          .upload(filePath, audioFile);
-
-        if (!uploadError) {
-          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-          audio_url = data.publicUrl;
-        }
-      }
-    }
-
-    const { error } = await supabase.from('servers').update({ 
-      name, 
-      description, 
-      icon_url, 
-      audio_url, 
-      is_private: serverType === 'private',
-      server_type: serverType,
-      entry_fee: serverType === 'paid' ? entryFee : 0
-    }).eq('id', id);
-    
-    if (error) {
-      showError("Impossibile aggiornare il server");
-      setIsUpdatingServer(false);
-      return;
-    }
-    
-    setServers(servers.map(s => s.id === id ? { ...s, name, description, icon_url: icon_url || s.icon_url, audio_url, is_private: serverType === 'private', server_type: serverType, entry_fee: serverType === 'paid' ? entryFee : 0 } : s));
-    setShowSettingsModal(false);
-    showSuccess("Impostazioni salvate con successo!");
-    setIsUpdatingServer(false);
-  };
-
-  const handleDeleteServer = async (serverId: string) => {
-    if (!currentUser) return;
-    
-    setIsUpdatingServer(true);
-    
-    const { error } = await supabase.from('servers').delete().eq('id', serverId);
-    
-    if (error) {
-      showError("Impossibile eliminare il server. Assicurati di avere i permessi.");
-      setIsUpdatingServer(false);
-      return;
-    }
-    
-    setServers(servers.filter(s => s.id !== serverId));
-    setAllChannels(allChannels.filter(c => c.server_id !== serverId));
-    setActiveServerId('home');
-    setShowSettingsModal(false);
-    showSuccess("Server eliminato con successo!");
-    setIsUpdatingServer(false);
-  };
-
-  const handleUpdateProfile = async (nickname: string, bio: string, avatarFile: File | null, bannerColor: string, bannerFile: File | null | undefined, entranceAudioFile: File | Blob | null | undefined) => {
-    if (!currentUser) return;
-
-    let avatar_url = currentUser.avatar;
-    let banner_url = currentUser.banner_url;
-    let entrance_audio_url = currentUser.entrance_audio_url;
-
-    if (avatarFile) {
-      const fileExt = avatarFile.name.split('.').pop();
-      const filePath = `avatars/${currentUser.id}_${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, avatarFile);
-      if (!uploadError) {
-        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-        avatar_url = data.publicUrl;
-      }
-    }
-
-    if (bannerFile !== undefined) {
-      if (bannerFile === null) {
-        banner_url = undefined;
-      } else {
-        const fileExt = bannerFile.name.split('.').pop();
-        const filePath = `banners/${currentUser.id}_${Math.random()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, bannerFile);
-        if (!uploadError) {
-          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-          banner_url = data.publicUrl;
-        }
-      }
-    }
-
-    if (entranceAudioFile !== undefined) {
-      if (entranceAudioFile === null) {
-        entrance_audio_url = null;
-      } else {
-        const fileExt = entranceAudioFile instanceof File ? entranceAudioFile.name.split('.').pop() : 'webm';
-        const filePath = `entrance_audios/${currentUser.id}_${Math.random()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('icons').upload(filePath, entranceAudioFile);
-        if (!uploadError) {
-          const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
-          entrance_audio_url = data.publicUrl;
-        }
-      }
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ 
-        first_name: nickname, 
-        bio: bio,
-        avatar_url: avatar_url,
-        banner_color: bannerColor,
-        banner_url: banner_url || null,
-        entrance_audio_url: entrance_audio_url || null
-      })
-      .eq('id', currentUser.id);
-
-    if (error) {
-      showError("Impossibile aggiornare il profilo.");
-      return;
-    }
-
-    setCurrentUser({ 
-      ...currentUser, 
-      name: nickname, 
-      bio: bio,
-      avatar: avatar_url,
-      banner_color: bannerColor,
-      banner_url: banner_url,
-      entrance_audio_url: entrance_audio_url
-    });
-    showSuccess("Profilo aggiornato con successo!");
-    setShowUserSettingsModal(false);
-  };
-
-  const handleLogout = async () => {
-    supabase.channel('global_presence').untrack();
-    await supabase.auth.signOut();
-  };
-
-  const handleNavigateToMessage = (serverId: string, channelId: string, messageId: string) => {
-    setActiveServerId(serverId);
-    const channel = allChannels.find(c => c.id === channelId);
-    if (channel) {
-      setActiveChannel(channel);
-    } else {
-      // Se il canale non è ancora caricato, lo impostiamo appena possibile
-      const checkChannel = setInterval(() => {
-        const c = allChannelsRef.current.find(ch => ch.id === channelId);
-        if (c) {
-          setActiveChannel(c);
-          clearInterval(checkChannel);
-        }
-      }, 100);
-      setTimeout(() => clearInterval(checkChannel), 5000);
-    }
-    setTargetMessageId(messageId);
-  };
-
-  const handleStartDM = async (userId: string) => {
-    if (!currentUser) return;
-
-    // Controlla se esiste già un DM
-    const existing = dmChannels.find(dm => dm.recipient?.id === userId);
-    if (existing) {
-      setActiveChannel(existing);
-      return;
-    }
-
-    // Controlla nel DB
-    let { data: existingDb } = await supabase
-      .from('dm_channels')
+      .from('channels')
       .select('*')
-      .eq('user1_id', currentUser.id)
-      .eq('user2_id', userId)
-      .maybeSingle();
-
-    if (!existingDb) {
-      const { data: existingDb2 } = await supabase
-        .from('dm_channels')
-        .select('*')
-        .eq('user1_id', userId)
-        .eq('user2_id', currentUser.id)
-        .maybeSingle();
-      existingDb = existingDb2;
-    }
-
-    if (existingDb) {
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      const newDm: Channel = {
-        id: existingDb.id,
-        name: p?.first_name || 'Utente',
-        type: 'dm',
-        category: 'DM',
-        server_id: null,
-        recipient: {
-          id: userId,
-          name: p?.first_name || 'Utente',
-          avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
-          status: onlineUserIds.has(userId) ? 'online' : 'offline',
-          avatar_decoration: p?.avatar_decoration
-        } as User
-      };
-      setDmChannels(prev => [...prev, newDm]);
-      setActiveChannel(newDm);
-    } else {
-      // Crea nuovo DM
-      const { data, error } = await supabase
-        .from('dm_channels')
-        .insert({ user1_id: currentUser.id, user2_id: userId })
-        .select()
-        .single();
-
-      if (data) {
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        const newDm: Channel = {
-          id: data.id,
-          name: p?.first_name || 'Utente',
-          type: 'dm',
-          category: 'DM',
-          server_id: null,
-          recipient: {
-            id: userId,
-            name: p?.first_name || 'Utente',
-            avatar: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
-            status: onlineUserIds.has(userId) ? 'online' : 'offline',
-            avatar_decoration: p?.avatar_decoration
-          } as User
-        };
-        setDmChannels(prev => [...prev, newDm]);
-        setActiveChannel(newDm);
-      } else {
-        showError("Errore durante la creazione della chat privata.");
+      .eq('server_id', serverId)
+      .order('position', { ascending: true });
+      
+    if (data && data.length > 0) {
+      setChannels(data as Channel[]);
+      const firstTextChannel = data.find(c => c.type === 'text' || c.type === 'minigame');
+      if (firstTextChannel) {
+        setActiveChannelId(firstTextChannel.id);
       }
+    } else {
+      setChannels([]);
+      setActiveChannelId('');
     }
   };
 
-  if (!currentUser) {
-    return <div className="h-screen w-full bg-[#313338] flex items-center justify-center text-[#dbdee1]">Caricamento profilo...</div>;
-  }
+  const activeChannel = activeServer 
+    ? channels.find(c => c.id === activeChannelId) 
+    : undefined;
 
-  const currentMessages = activeChannel ? (messagesByChannel[activeChannel.id] || INITIAL_MESSAGES) : [];
-  const canCreate = currentUser.global_role === 'ADMIN' || currentUser.global_role === 'CREATOR' || currentUser.global_role === 'MODERATOR';
-
-  // Aggiorna lo stato online dei destinatari dei DM
-  const dmChannelsWithStatus = dmChannels.map(dm => ({
-    ...dm,
-    recipient: dm.recipient ? {
-      ...dm.recipient,
-      status: onlineUserIds.has(dm.recipient.id) ? 'online' : 'offline'
-    } : undefined
-  }));
+  if (!currentUser) return null;
 
   return (
-    <VoiceChannelProvider currentUser={currentUser}>
-      <div className={`flex h-screen w-full bg-[#313338] text-[#dbdee1] font-sans overflow-hidden relative ${currentUser.active_cursor ? 'custom-cursor-active' : ''}`}>
-        
-        <CustomCursor activeCursor={currentUser.active_cursor} />
+    <div className="flex h-screen bg-[#1e1f22] overflow-hidden text-[#dbdee1] font-sans">
+      <ServerSidebar 
+        activeServerId={activeServer?.id} 
+        onServerSelect={handleServerSelect} 
+        currentUser={currentUser}
+        notificationCount={notificationCount}
+      />
+      
+      <div className={`
+        fixed inset-y-0 left-[72px] z-40 transform transition-transform duration-300 ease-in-out
+        md:relative md:left-0 md:transform-none
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <ChannelSidebar 
+          activeServer={activeServer} 
+          channels={channels}
+          dmChannels={dmChannels}
+          activeChannelId={activeChannelId}
+          onChannelSelect={handleChannelSelect}
+          currentUser={currentUser}
+          onOpenSettings={() => setShowServerSettings(true)}
+          serverPermissions={serverPermissions}
+          notificationCount={notificationCount}
+          onOpenUserSettings={() => setShowUserSettings(true)}
+        />
+      </div>
 
-        {showSidebar && (
-          <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setShowSidebar(false)} />
-        )}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-        <div className={`fixed inset-y-0 left-0 z-50 flex h-full transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${showSidebar ? "translate-x-0" : "-translate-x-full"}`}>
-          <ServerSidebar 
-            servers={servers}
-            activeServerId={activeServerId}
-            onServerSelect={(id) => { 
-              setActiveServerId(id); 
-              setShowSidebar(false); 
-              setUnreadServers(prev => {
-                const next = new Set(prev);
-                next.delete(id);
-                return next;
-              });
-            }}
-            onOpenCreate={() => setShowCreateModal(true)}
-            onOpenDiscover={handleOpenDiscover}
-            currentUser={currentUser}
-            onLogout={handleLogout}
-            onReorderServers={setServers}
-            notificationSettings={notificationSettings}
-            onSetNotificationSetting={handleSetNotificationSetting}
-            unreadServers={unreadServers}
-          />
-          
-          <ChannelSidebar 
-            activeServer={activeServer || null}
-            channels={allChannels}
-            dmChannels={dmChannelsWithStatus}
-            activeChannelId={activeChannel?.id || ''} 
-            onChannelSelect={(channel) => { 
-              setActiveChannel(channel); 
-              setShowSidebar(false); 
-              if (channel.type === 'dm') {
-                setDmChannels(prev => prev.map(dm => dm.id === channel.id ? { ...dm, unread: false } : dm));
-              }
-            }} 
-            currentUser={currentUser}
-            onOpenSettings={() => setShowSettingsModal(true)}
-            onLeaveServer={() => handleLeaveServer(activeServer!.id)}
-            onOpenUserSettings={() => setShowUserSettingsModal(true)}
-            serverPermissions={serverPermissions}
-            notificationCount={hasUnreadNotifications ? notificationCount : 0}
-          />
+      <main className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
+        <div className="md:hidden flex items-center p-3 border-b border-[#1f2023] bg-[#313338] sticky top-0 z-20">
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="text-[#dbdee1] p-1"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <span className="ml-3 font-semibold truncate">
+            {activeServer ? activeServer.name : 
+             activeDM ? activeDM.name :
+             activeChannelId === 'friends' ? 'Amici' : 
+             activeChannelId === 'shop' ? 'Cardi E-Shop' : 
+             activeChannelId === 'inventory' ? 'Inventario' :
+             activeChannelId === 'progression' ? 'Progressione' :
+             activeChannelId === 'daily-minigame' ? 'Minigioco Giornaliero' :
+             activeChannelId === 'shared-files' ? 'File Condivisi' :
+             activeChannelId === 'pataparty' ? 'PataParty!' :
+             activeChannelId === 'notifications' ? 'Notifiche' : 'Home'}
+          </span>
         </div>
 
-        {activeServerId !== 'home' && activeChannel ? (
-          activeChannel.type === 'minigame' ? (
-            <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-              <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
-                <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
-                  <Menu size={24} />
-                </button>
-                <Gamepad2 size={20} className="text-[#80848e] mr-2" />
-                <h2 className="font-semibold text-white">{activeChannel.name}</h2>
-              </div>
-              <div className="flex-1 w-full h-full bg-[#111214]">
-                {(activeChannel as any).minigame_url ? (
-                  <iframe 
-                    src={(activeChannel as any).minigame_url} 
-                    className="w-full h-full border-none"
-                    title={activeChannel.name}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-[#949ba4]">
-                    Nessun URL configurato per questo minigioco.
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              <ChatArea 
-                channel={activeChannel} 
-                messages={currentMessages} 
-                onSendMessage={handleSendMessage}
-                onToggleMembers={() => setShowMembers(!showMembers)}
-                onToggleSidebar={() => setShowSidebar(true)}
-                showMembers={showMembers}
-                serverCreatorId={activeServer?.created_by}
-                serverMembers={serverMembersList}
-                serverPermissions={serverPermissions}
-              />
-              {showMembers && (
-                <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setShowMembers(false)} />
-              )}
-              <div className={`
-                absolute right-0 top-0 bottom-0 z-30 lg:static lg:block
-                h-full transition-all duration-300
-                ${showMembers ? 'w-[240px] translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'} 
-                overflow-hidden flex-shrink-0 shadow-xl lg:shadow-none bg-[#2b2d31]
-              `}>
-                <MemberList 
-                  users={serverMembersList} 
-                  isOpen={showMembers} 
-                  creatorId={activeServer?.created_by} 
-                  serverPermissions={serverPermissions}
-                  onKickMember={handleKickMember}
-                  onBanMember={handleBanMember}
-                  serverRoles={serverRoles}
-                  onToggleMemberRole={handleToggleMemberRole}
-                />
-              </div>
-            </>
-          )
-        ) : activeServerId === 'home' ? (
-          activeChannel?.id === 'shop' ? (
-            <ShopView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
-          ) : activeChannel?.id === 'inventory' ? (
-            <InventoryView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
-          ) : activeChannel?.id === 'progression' ? (
-            <Progression currentUser={currentUser} />
-          ) : activeChannel?.id === 'daily-minigame' ? (
-            <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
-          ) : activeChannel?.id === 'mysingingcanary' ? (
-            <MySingingCanary currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
-          ) : activeChannel?.id === 'friends' ? (
-            <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
-          ) : activeChannel?.id === 'notifications' ? (
-            <NotificationsView 
-              currentUser={currentUser} 
-              onToggleSidebar={() => setShowSidebar(true)} 
-              onNavigateToShop={() => setActiveChannel({ id: 'shop', name: 'Cardi E-Shop', type: 'text', category: '', server_id: null })}
-              onNavigateToMessage={handleNavigateToMessage}
-              onNavigateToTrade={(id) => setActiveTradeId(id)}
-            />
-          ) : activeChannel?.id === 'shared-files' ? (
-            <SharedFilesView currentUser={currentUser} onlineUserIds={onlineUserIds} onToggleSidebar={() => setShowSidebar(true)} />
-          ) : activeChannel?.type === 'dm' ? (
+        {activeServer ? (
+          activeChannel ? (
             <ChatArea 
               channel={activeChannel} 
-              messages={currentMessages} 
-              onSendMessage={handleSendMessage}
-              onToggleMembers={() => {}}
-              onToggleSidebar={() => setShowSidebar(true)}
-              showMembers={false}
-              serverMembers={[]}
+              currentUser={currentUser} 
+              onOpenInvite={() => setShowInviteModal(true)}
+              serverPermissions={serverPermissions}
             />
           ) : (
-            <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
-              <div className="h-12 border-b border-[#1f2023] shadow-sm flex items-center px-4 flex-shrink-0">
-                <button onClick={() => setShowSidebar(true)} className="md:hidden mr-3 text-[#b5bac1] hover:text-[#dbdee1] transition-colors">
-                  <Menu size={24} />
-                </button>
-                <Home size={20} className="text-[#80848e] mr-2" />
-                <h2 className="font-semibold text-white">Discord Canary 2</h2>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
-                <div className="max-w-xl w-full text-center">
-                  <div className="w-20 h-20 bg-yellow-500 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-lg transform rotate-3">
-                    <MessageSquare size={40} className="text-white" />
-                  </div>
-                  <h1 className="text-3xl font-bold text-white mb-2">Benvenuto, {currentUser.name}!</h1>
-                  <p className="text-[#b5bac1] mb-8 text-lg">
-                    Inizia subito la tua avventura su discord canary 2 official GTX. unisciti a un server esistente o cerca di scalare la vetta diventando admin per crearne uno tuo
-                  </p>
-                  
-                  <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-2' : 'max-w-xs mx-auto'} gap-4`}>
-                    <button onClick={handleOpenDiscover} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                      <div className="w-12 h-12 rounded-full bg-[#23a559]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Compass size={24} className="text-[#23a559]" />
-                      </div>
-                      <h3 className="font-bold text-white mb-1">Esplora Server</h3>
-                      <p className="text-sm text-[#949ba4]">Trova community pubbliche</p>
-                    </button>
-                    
-                    {canCreate && (
-                      <button onClick={() => setShowCreateModal(true)} className="flex flex-col items-center p-6 bg-[#2b2d31] hover:bg-[#35373c] rounded-xl border border-[#1e1f22] transition-all cursor-pointer group">
-                        <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                          <Plus size={24} className="text-brand" />
-                        </div>
-                        <h3 className="font-bold text-white mb-1">Crea un Server</h3>
-                        <p className="text-sm text-[#949ba4]">Avvia il tuo spazio privato</p>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+            <div className="flex-1 flex items-center justify-center text-[#949ba4]">
+              Seleziona un canale per iniziare a chattare
             </div>
           )
-        ) : (
-          <div className="flex-1 flex items-center justify-center">Nessun canale disponibile</div>
-        )}
-
-        <DiscoverServersModal 
-          isOpen={showDiscoverModal} 
-          onClose={() => setShowDiscoverModal(false)} 
-          servers={publicServers}
-          joinedServerIds={servers.map(s => s.id)}
-          onJoin={handleJoinServer}
-          onRequestJoin={handleRequestJoinServer}
-        />
-        
-        <CreateServerModal 
-          isOpen={showCreateModal} 
-          onClose={() => setShowCreateModal(false)} 
-          onCreate={handleCreateServer}
-          isCreating={isCreatingServer}
-        />
-
-        <ServerSettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => setShowSettingsModal(false)}
-          server={activeServer || null}
-          onUpdate={handleUpdateServer}
-          onDelete={handleDeleteServer}
-          isUpdating={isUpdatingServer}
-          serverPermissions={serverPermissions}
-        />
-
-        <UserSettingsModal
-          isOpen={showUserSettingsModal}
-          onClose={() => setShowUserSettingsModal(false)}
-          user={currentUser}
-          onUpdate={handleUpdateProfile}
-        />
-
-        {activeTradeId && (
-          <TradeModal 
-            tradeId={activeTradeId} 
-            currentUser={currentUser} 
-            onClose={() => setActiveTradeId(null)} 
+        ) : activeDM ? (
+          <DirectMessageArea 
+            channel={activeDM}
+            currentUser={currentUser}
           />
+        ) : activeChannelId === 'friends' ? (
+          <FriendsArea currentUser={currentUser} />
+        ) : activeChannelId === 'shop' ? (
+          <CardiShop currentUser={currentUser} />
+        ) : activeChannelId === 'inventory' ? (
+          <Inventory currentUser={currentUser} />
+        ) : activeChannelId === 'progression' ? (
+          <ProgressionArea currentUser={currentUser} />
+        ) : activeChannelId === 'daily-minigame' ? (
+          <DailyMinigame currentUser={currentUser} />
+        ) : activeChannelId === 'shared-files' ? (
+          <SharedFilesArea currentUser={currentUser} />
+        ) : activeChannelId === 'pataparty' ? (
+          <PataParty currentUser={currentUser} />
+        ) : activeChannelId === 'notifications' ? (
+          <NotificationsArea currentUser={currentUser} />
+        ) : (
+          <WelcomeScreen currentUser={currentUser} />
         )}
+      </main>
 
-        {/* Jumpscare Overlay */}
-        {jumpscareActive && (
-          <div className="fixed inset-0 z-[999999] pointer-events-none flex items-center justify-center overflow-hidden">
-            <img src="/jumpscare.png" alt="Jumpscare" className="animate-jumpscare object-cover w-full h-full" />
-          </div>
-        )}
-      </div>
-    </VoiceChannelProvider>
+      {showServerSettings && activeServer && (
+        <ServerSettingsModal 
+          server={activeServer} 
+          onClose={() => setShowServerSettings(false)}
+          currentUser={currentUser}
+        />
+      )}
+
+      {showUserSettings && (
+        <UserSettingsModal
+          currentUser={currentUser}
+          onClose={() => setShowUserSettings(false)}
+        />
+      )}
+
+      {showInviteModal && activeServer && (
+        <InviteModal
+          server={activeServer}
+          onClose={() => setShowInviteModal(false)}
+        />
+      )}
+    </div>
   );
 };
 
