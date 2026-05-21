@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '@/types/discord';
 import { supabase } from '@/integrations/supabase/client';
-import { PartyPopper, Users, Play, Copy, ArrowRight, Dices } from 'lucide-react';
+import { PartyPopper, Users, Play, Copy, ArrowRight, Dices, X } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { Avatar } from './Avatar';
 
