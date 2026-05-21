@@ -10,10 +10,9 @@ import { InventoryView } from "@/components/discord/InventoryView";
 import { NotificationsView } from "@/components/discord/NotificationsView";
 import { TradeModal } from "@/components/discord/TradeModal";
 import { DailyMinigameView } from "@/components/discord/DailyMinigameView";
-import { MySingingCanary } from "@/components/discord/MySingingCanary";
+import { PataPartyView } from "@/components/discord/PataPartyView";
 import { Progression } from "@/components/discord/Progression";
 import { FriendsArea } from "@/components/discord/FriendsArea";
-import { SharedFilesView } from "@/components/discord/SharedFilesView";
 import { INITIAL_MESSAGES } from "@/data/mockData";
 import { Message, User, Server, Channel, ServerRole, ServerPermissions } from "@/types/discord";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1540,8 +1539,8 @@ const Index = () => {
             <Progression currentUser={currentUser} />
           ) : activeChannel?.id === 'daily-minigame' ? (
             <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
-          ) : activeChannel?.id === 'mysingingcanary' ? (
-            <MySingingCanary currentUser={currentUser} onToggleSidebar={() => setShowSidebar(true)} />
+          ) : activeChannel?.id === 'pataparty' ? (
+            <PataPartyView />
           ) : activeChannel?.id === 'friends' ? (
             <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
           ) : activeChannel?.id === 'notifications' ? (
@@ -1552,8 +1551,6 @@ const Index = () => {
               onNavigateToMessage={handleNavigateToMessage}
               onNavigateToTrade={(id) => setActiveTradeId(id)}
             />
-          ) : activeChannel?.id === 'shared-files' ? (
-            <SharedFilesView currentUser={currentUser} onlineUserIds={onlineUserIds} onToggleSidebar={() => setShowSidebar(true)} />
           ) : activeChannel?.type === 'dm' ? (
             <ChatArea 
               channel={activeChannel} 
