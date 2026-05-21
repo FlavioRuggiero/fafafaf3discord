@@ -897,9 +897,9 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
 
           <button
             onClick={() => onChannelSelect({ id: 'pataparty', name: 'PataParty!', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'pataparty' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
+            className={`group w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-all duration-200 active:scale-95 ${activeChannelId === 'pataparty' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-white'}`}
           >
-            <PartyPopper size={20} className="mr-3 text-[#ec4899]" />
+            <PartyPopper size={20} className={`mr-3 text-[#ec4899] transition-transform duration-300 origin-center group-hover:rotate-12 group-hover:scale-125 group-active:scale-75 ${activeChannelId === 'pataparty' ? 'scale-110 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]' : ''}`} />
             <span className="font-medium">PataParty!</span>
           </button>
 
