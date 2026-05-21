@@ -6,14 +6,15 @@ import { ChatArea } from '@/components/discord/ChatArea';
 import { ServerSidebar } from '@/components/discord/ServerSidebar';
 import { FriendsArea } from '@/components/discord/FriendsArea';
 import { WelcomeScreen } from '@/components/discord/WelcomeScreen';
-import { NotificationsView } from '@/components/discord/NotificationsView';
-import { ShopView } from '@/components/discord/ShopView';
-import { InventoryView } from '@/components/discord/InventoryView';
-import { Progression } from '@/components/discord/Progression';
-import { DailyMinigameView } from '@/components/discord/DailyMinigameView';
-import { SharedFilesView } from '@/components/discord/SharedFilesView';
-import { PataParty } from '@/components/discord/PataParty';
-import { Server, Channel, ServerPermissions } from '@/types/discord';
+import { DirectMessageArea } from '@/components/discord/DirectMessageArea';
+import { NotificationsArea } from '@/components/discord/NotificationsArea';
+import { CardiShop } from '@/components/discord/CardiShop';
+import { Inventory } from '@/components/discord/Inventory';
+import { ProgressionArea } from '@/components/discord/ProgressionArea';
+import { DailyMinigame } from '@/components/discord/DailyMinigame';
+import { SharedFilesArea } from '@/components/discord/SharedFilesArea';
+import { PataParty } from '@/components/discord/PataParty'; // IMPORT AGGIUNTO
+import { Server, Channel, User, ServerPermissions } from '@/types/discord';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ServerSettingsModal } from '@/components/discord/ServerSettingsModal';
@@ -28,7 +29,6 @@ const Index = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [dmChannels, setDmChannels] = useState<Channel[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   
   const [showServerSettings, setShowServerSettings] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
@@ -37,31 +37,13 @@ const Index = () => {
 
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // Presence per gli utenti online
   useEffect(() => {
     if (!currentUser?.id) return;
-    const channel = supabase.channel('global_presence', {
-      config: { presence: { key: currentUser.id } }
-    });
     
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState();
-      setOnlineUserIds(new Set(Object.keys(state)));
-    }).subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await channel.track({ status: 'online' });
-      }
-    });
-
-    return () => { supabase.removeChannel(channel); };
-  }, [currentUser?.id]);
-
-  // Gestione DM e Amicizie
-  useEffect(() => {
-    if (!currentUser?.id) return;
     let isMounted = true;
     
     const fetchFriendsAndDms = async () => {
+      // 1. Prendi tutte le amicizie accettate per questo utente
       const { data: friendships } = await supabase
         .from('friendships')
         .select('*')
@@ -73,9 +55,20 @@ const Index = () => {
         return;
       }
 
+      // Estrai gli ID degli amici
       const friendIds = friendships.map(f => f.sender_id === currentUser.id ? f.receiver_id : f.sender_id);
-      const { data: profiles } = await supabase.from('profiles').select('id, first_name, avatar_url, avatar_decoration').in('id', friendIds);
-      const { data: existingDms } = await supabase.from('dm_channels').select('*').or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+
+      // 2. Prendi i profili degli amici
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, avatar_url, avatar_decoration')
+        .in('id', friendIds);
+
+      // 3. Cerca o crea i canali DM per queste amicizie
+      const { data: existingDms } = await supabase
+        .from('dm_channels')
+        .select('*')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
 
       const dmsWithProfiles: Channel[] = [];
 
@@ -83,24 +76,28 @@ const Index = () => {
         const friendProfile = profiles?.find(p => p.id === friendId);
         if (!friendProfile) continue;
 
+        // Cerca se esiste già un canale DM con questo amico
         let dm = existingDms?.find(d => 
           (d.user1_id === currentUser.id && d.user2_id === friendId) ||
           (d.user1_id === friendId && d.user2_id === currentUser.id)
         );
 
+        // Se non esiste, in una vera app lo creeremmo ora, ma per semplicità
+        // qui simuliamo solo l'oggetto Channel se non c'è, per mostrarlo nella UI.
+        // La creazione effettiva del record in `dm_channels` avverrà quando viene inviato il primo messaggio (vedi DirectMessageArea).
         const channelId = dm?.id || `dm-${friendId}`; 
 
         dmsWithProfiles.push({
           id: channelId,
           name: friendProfile.first_name || 'Utente',
-          type: 'dm',
+          type: 'text',
           category: 'Messaggi Diretti',
           server_id: null,
           recipient: {
             id: friendProfile.id,
             name: friendProfile.first_name || 'Utente',
             avatar: friendProfile.avatar_url || '',
-            status: onlineUserIds.has(friendProfile.id) ? 'online' : 'offline',
+            status: 'online',
             avatar_decoration: friendProfile.avatar_decoration
           }
         });
@@ -111,6 +108,7 @@ const Index = () => {
 
     fetchFriendsAndDms();
 
+    // Sottoscrizione ai cambiamenti delle amicizie per aggiornare i DM in tempo reale
     const sub = supabase.channel('public:friendships-dm')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, fetchFriendsAndDms)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_channels' }, fetchFriendsAndDms)
@@ -120,11 +118,11 @@ const Index = () => {
       isMounted = false;
       supabase.removeChannel(sub);
     };
-  }, [currentUser?.id, onlineUserIds]);
+  }, [currentUser?.id]);
 
-  // Gestione Notifiche
   useEffect(() => {
     if (!currentUser?.id) return;
+    
     let isMounted = true;
     
     const fetchNotifications = async () => {
@@ -154,7 +152,6 @@ const Index = () => {
     };
   }, [currentUser?.id]);
 
-  // Gestione Permessi
   useEffect(() => {
     if (!activeServer || !currentUser) {
       setServerPermissions(undefined);
@@ -166,7 +163,6 @@ const Index = () => {
       
       if (isOwner) {
         setServerPermissions({
-          isOwner: true,
           can_manage_channels: true,
           can_delete_messages: true,
           can_use_commands: true,
@@ -183,13 +179,15 @@ const Index = () => {
 
       const { data: rolesData } = await supabase
         .from('server_member_roles')
-        .select(`role_id, server_roles (*)`)
+        .select(`
+          role_id,
+          server_roles (*)
+        `)
         .eq('server_id', activeServer.id)
         .eq('user_id', currentUser.id);
 
       if (rolesData && rolesData.length > 0) {
         const mergedPerms: ServerPermissions = {
-          isOwner: false,
           can_manage_channels: false,
           can_delete_messages: false,
           can_use_commands: false,
@@ -205,6 +203,7 @@ const Index = () => {
         rolesData.forEach((r: any) => {
           const role = r.server_roles;
           if (!role) return;
+          
           Object.keys(mergedPerms).forEach(key => {
             if (role[key] === true) {
               (mergedPerms as any)[key] = true;
@@ -215,7 +214,6 @@ const Index = () => {
         setServerPermissions(mergedPerms);
       } else {
         setServerPermissions({
-          isOwner: false,
           can_manage_channels: false,
           can_delete_messages: false,
           can_use_commands: false,
@@ -246,7 +244,7 @@ const Index = () => {
   };
 
   const handleChannelSelect = (channel: Channel) => {
-    if (['home', 'friends', 'shop', 'inventory', 'progression', 'daily-minigame', 'notifications', 'shared-files', 'pataparty'].includes(channel.id)) {
+    if (channel.id === 'home' || channel.id === 'friends' || channel.id === 'shop' || channel.id === 'inventory' || channel.id === 'progression' || channel.id === 'daily-minigame' || channel.id === 'notifications' || channel.id === 'shared-files' || channel.id === 'pataparty') {
       setActiveServer(null);
       setActiveChannelId(channel.id);
       setActiveDM(null);
@@ -265,7 +263,7 @@ const Index = () => {
   };
 
   const fetchChannels = async (serverId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('channels')
       .select('*')
       .eq('server_id', serverId)
@@ -283,33 +281,19 @@ const Index = () => {
     }
   };
 
-  const activeChannel = activeServer ? channels.find(c => c.id === activeChannelId) : undefined;
-
-  const handleStartDM = (userId: string) => {
-    const dm = dmChannels.find(d => d.recipient?.id === userId);
-    if (dm) {
-      handleChannelSelect(dm);
-    } else {
-      // Fallback
-      handleChannelSelect({ id: `dm-${userId}`, name: 'Utente', type: 'dm', category: 'Messaggi Diretti', server_id: null, recipient: { id: userId, name: 'Utente', avatar: '', status: 'online' } });
-    }
-  };
+  const activeChannel = activeServer 
+    ? channels.find(c => c.id === activeChannelId) 
+    : undefined;
 
   if (!currentUser) return null;
 
   return (
     <div className="flex h-screen bg-[#1e1f22] overflow-hidden text-[#dbdee1] font-sans">
       <ServerSidebar 
-        activeServerId={activeServer?.id || 'home'} 
-        servers={[]} // Props from context
+        activeServerId={activeServer?.id} 
         onServerSelect={handleServerSelect} 
-        onOpenCreate={() => {}} // Handle create server
-        onOpenDiscover={() => {}} // Handle discover
         currentUser={currentUser}
-        onLogout={() => supabase.auth.signOut()}
-        notificationSettings={{}}
-        onSetNotificationSetting={() => {}}
-        unreadServers={new Set()}
+        notificationCount={notificationCount}
       />
       
       <div className={`
@@ -340,8 +324,11 @@ const Index = () => {
 
       <main className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
         <div className="md:hidden flex items-center p-3 border-b border-[#1f2023] bg-[#313338] sticky top-0 z-20">
-          <button onClick={() => setIsSidebarOpen(true)} className="text-[#dbdee1] p-1">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="text-[#dbdee1] p-1"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round">
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -365,10 +352,8 @@ const Index = () => {
           activeChannel ? (
             <ChatArea 
               channel={activeChannel} 
-              messages={[]}
-              onSendMessage={() => {}}
-              onToggleMembers={() => {}}
-              onToggleSidebar={() => setIsSidebarOpen(true)}
+              currentUser={currentUser} 
+              onOpenInvite={() => setShowInviteModal(true)}
               serverPermissions={serverPermissions}
             />
           ) : (
@@ -377,35 +362,26 @@ const Index = () => {
             </div>
           )
         ) : activeDM ? (
-          <ChatArea 
+          <DirectMessageArea 
             channel={activeDM}
-            messages={[]}
-            onSendMessage={() => {}}
-            onToggleMembers={() => {}}
-            onToggleSidebar={() => setIsSidebarOpen(true)}
+            currentUser={currentUser}
           />
         ) : activeChannelId === 'friends' ? (
-          <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
+          <FriendsArea currentUser={currentUser} />
         ) : activeChannelId === 'shop' ? (
-          <ShopView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          <CardiShop currentUser={currentUser} />
         ) : activeChannelId === 'inventory' ? (
-          <InventoryView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          <Inventory currentUser={currentUser} />
         ) : activeChannelId === 'progression' ? (
-          <Progression currentUser={currentUser} />
+          <ProgressionArea currentUser={currentUser} />
         ) : activeChannelId === 'daily-minigame' ? (
-          <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          <DailyMinigame currentUser={currentUser} />
         ) : activeChannelId === 'shared-files' ? (
-          <SharedFilesView currentUser={currentUser} onlineUserIds={onlineUserIds} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          <SharedFilesArea currentUser={currentUser} />
         ) : activeChannelId === 'pataparty' ? (
           <PataParty currentUser={currentUser} />
         ) : activeChannelId === 'notifications' ? (
-          <NotificationsView 
-            currentUser={currentUser} 
-            onToggleSidebar={() => setIsSidebarOpen(true)} 
-            onNavigateToShop={() => setActiveChannelId('shop')}
-            onNavigateToMessage={() => {}}
-            onNavigateToTrade={() => {}}
-          />
+          <NotificationsArea currentUser={currentUser} />
         ) : (
           <WelcomeScreen currentUser={currentUser} />
         )}
@@ -415,18 +391,14 @@ const Index = () => {
         <ServerSettingsModal 
           server={activeServer} 
           onClose={() => setShowServerSettings(false)}
-          onUpdate={() => {}} // Add proper handlers
-          onDelete={() => {}}
-          serverPermissions={serverPermissions}
+          currentUser={currentUser}
         />
       )}
 
       {showUserSettings && (
         <UserSettingsModal
-          isOpen={showUserSettings}
-          user={currentUser}
+          currentUser={currentUser}
           onClose={() => setShowUserSettings(false)}
-          onUpdate={async () => {}} // Handle user update
         />
       )}
 
