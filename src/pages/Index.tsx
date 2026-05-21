@@ -16,7 +16,7 @@ import { PataParty } from '@/components/discord/PataParty';
 import { Server, Channel, ServerPermissions } from '@/types/discord';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ServerSettingsModal } from '@/components/discord/ServerSettingsModal';
+import { ServerSettingsModal } from '@/components/discord/ServerModals'; // Modificato questo import
 import { UserSettingsModal } from '@/components/discord/UserSettingsModal';
 import { InviteModal } from '@/components/discord/InviteModal';
 
@@ -172,11 +172,10 @@ const Index = () => {
           can_use_commands: true,
           can_manage_server: true,
           can_manage_roles: true,
-          can_manage_users: true,
+          can_assign_roles: true,
           can_bypass_restrictions: true,
           can_kick_members: true,
-          can_ban_members: true,
-          can_assign_roles: true
+          can_ban_members: true
         });
         return;
       }
@@ -195,11 +194,10 @@ const Index = () => {
           can_use_commands: false,
           can_manage_server: false,
           can_manage_roles: false,
-          can_manage_users: false,
+          can_assign_roles: false,
           can_bypass_restrictions: false,
           can_kick_members: false,
-          can_ban_members: false,
-          can_assign_roles: false
+          can_ban_members: false
         };
 
         rolesData.forEach((r: any) => {
@@ -221,11 +219,10 @@ const Index = () => {
           can_use_commands: false,
           can_manage_server: false,
           can_manage_roles: false,
-          can_manage_users: false,
+          can_assign_roles: false,
           can_bypass_restrictions: false,
           can_kick_members: false,
-          can_ban_members: false,
-          can_assign_roles: false
+          can_ban_members: false
         });
       }
     };
@@ -246,7 +243,7 @@ const Index = () => {
   };
 
   const handleChannelSelect = (channel: Channel) => {
-    if (['home', 'friends', 'shop', 'inventory', 'progression', 'daily-minigame', 'notifications', 'shared-files', 'pataparty'].includes(channel.id)) {
+    if (['home', 'friends', 'shop', 'inventory', 'progression', 'daily-minigame', 'notifications', 'pataparty'].includes(channel.id)) {
       setActiveServer(null);
       setActiveChannelId(channel.id);
       setActiveDM(null);
@@ -355,7 +352,6 @@ const Index = () => {
              activeChannelId === 'inventory' ? 'Inventario' :
              activeChannelId === 'progression' ? 'Progressione' :
              activeChannelId === 'daily-minigame' ? 'Minigioco Giornaliero' :
-             activeChannelId === 'shared-files' ? 'File Condivisi' :
              activeChannelId === 'pataparty' ? 'PataParty!' :
              activeChannelId === 'notifications' ? 'Notifiche' : 'Home'}
           </span>
@@ -394,8 +390,6 @@ const Index = () => {
           <Progression currentUser={currentUser} />
         ) : activeChannelId === 'daily-minigame' ? (
           <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
-        ) : activeChannelId === 'shared-files' ? (
-          <SharedFilesView currentUser={currentUser} onlineUserIds={onlineUserIds} onToggleSidebar={() => setIsSidebarOpen(true)} />
         ) : activeChannelId === 'pataparty' ? (
           <PataParty currentUser={currentUser} />
         ) : activeChannelId === 'notifications' ? (
