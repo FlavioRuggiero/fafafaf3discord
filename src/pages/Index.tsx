@@ -16,9 +16,10 @@ import { PataParty } from '@/components/discord/PataParty';
 import { Server, Channel, ServerPermissions } from '@/types/discord';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ServerSettingsModal } from '@/components/discord/ServerModals'; // Modificato questo import
+import { ServerSettingsModal } from '@/components/discord/ServerModals';
 import { UserSettingsModal } from '@/components/discord/UserSettingsModal';
 import { InviteModal } from '@/components/discord/InviteModal';
+import { VoiceChannelProvider } from '@/contexts/VoiceChannelProvider';
 
 const Index = () => {
   const { user: currentUser } = useAuth();
@@ -172,10 +173,11 @@ const Index = () => {
           can_use_commands: true,
           can_manage_server: true,
           can_manage_roles: true,
-          can_assign_roles: true,
+          can_manage_users: true,
           can_bypass_restrictions: true,
           can_kick_members: true,
-          can_ban_members: true
+          can_ban_members: true,
+          can_assign_roles: true
         });
         return;
       }
@@ -194,10 +196,11 @@ const Index = () => {
           can_use_commands: false,
           can_manage_server: false,
           can_manage_roles: false,
-          can_assign_roles: false,
+          can_manage_users: false,
           can_bypass_restrictions: false,
           can_kick_members: false,
-          can_ban_members: false
+          can_ban_members: false,
+          can_assign_roles: false
         };
 
         rolesData.forEach((r: any) => {
@@ -219,10 +222,11 @@ const Index = () => {
           can_use_commands: false,
           can_manage_server: false,
           can_manage_roles: false,
-          can_assign_roles: false,
+          can_manage_users: false,
           can_bypass_restrictions: false,
           can_kick_members: false,
-          can_ban_members: false
+          can_ban_members: false,
+          can_assign_roles: false
         });
       }
     };
@@ -243,7 +247,7 @@ const Index = () => {
   };
 
   const handleChannelSelect = (channel: Channel) => {
-    if (['home', 'friends', 'shop', 'inventory', 'progression', 'daily-minigame', 'notifications', 'pataparty'].includes(channel.id)) {
+    if (['home', 'friends', 'shop', 'inventory', 'progression', 'daily-minigame', 'notifications', 'shared-files', 'pataparty'].includes(channel.id)) {
       setActiveServer(null);
       setActiveChannelId(channel.id);
       setActiveDM(null);
@@ -287,7 +291,6 @@ const Index = () => {
     if (dm) {
       handleChannelSelect(dm);
     } else {
-      // Fallback
       handleChannelSelect({ id: `dm-${userId}`, name: 'Utente', type: 'dm', category: 'Messaggi Diretti', server_id: null, recipient: { id: userId, name: 'Utente', avatar: '', status: 'online' } });
     }
   };
@@ -295,142 +298,147 @@ const Index = () => {
   if (!currentUser) return null;
 
   return (
-    <div className="flex h-screen bg-[#1e1f22] overflow-hidden text-[#dbdee1] font-sans">
-      <ServerSidebar 
-        activeServerId={activeServer?.id || 'home'} 
-        servers={[]} // Props from context
-        onServerSelect={handleServerSelect} 
-        onOpenCreate={() => {}} // Handle create server
-        onOpenDiscover={() => {}} // Handle discover
-        currentUser={currentUser}
-        onLogout={() => supabase.auth.signOut()}
-        notificationSettings={{}}
-        onSetNotificationSetting={() => {}}
-        unreadServers={new Set()}
-      />
-      
-      <div className={`
-        fixed inset-y-0 left-[72px] z-40 transform transition-transform duration-300 ease-in-out
-        md:relative md:left-0 md:transform-none
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <ChannelSidebar 
-          activeServer={activeServer} 
-          channels={channels}
-          dmChannels={dmChannels}
-          activeChannelId={activeChannelId}
-          onChannelSelect={handleChannelSelect}
+    <VoiceChannelProvider currentUser={currentUser}>
+      <div className="flex h-screen bg-[#1e1f22] overflow-hidden text-[#dbdee1] font-sans">
+        <ServerSidebar 
+          activeServerId={activeServer?.id || 'home'} 
+          servers={[]} // Le prop servers/ecc vengono gestite all'interno o le passiamo
+          onServerSelect={handleServerSelect} 
+          onOpenCreate={() => {}} //
+          onOpenDiscover={() => {}} //
           currentUser={currentUser}
-          onOpenSettings={() => setShowServerSettings(true)}
-          serverPermissions={serverPermissions}
-          notificationCount={notificationCount}
-          onOpenUserSettings={() => setShowUserSettings(true)}
+          onLogout={() => supabase.auth.signOut()}
+          notificationSettings={{}}
+          onSetNotificationSetting={() => {}}
+          unreadServers={new Set()}
         />
-      </div>
-
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      <main className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
-        <div className="md:hidden flex items-center p-3 border-b border-[#1f2023] bg-[#313338] sticky top-0 z-20">
-          <button onClick={() => setIsSidebarOpen(true)} className="text-[#dbdee1] p-1">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <span className="ml-3 font-semibold truncate">
-            {activeServer ? activeServer.name : 
-             activeDM ? activeDM.name :
-             activeChannelId === 'friends' ? 'Amici' : 
-             activeChannelId === 'shop' ? 'Cardi E-Shop' : 
-             activeChannelId === 'inventory' ? 'Inventario' :
-             activeChannelId === 'progression' ? 'Progressione' :
-             activeChannelId === 'daily-minigame' ? 'Minigioco Giornaliero' :
-             activeChannelId === 'pataparty' ? 'PataParty!' :
-             activeChannelId === 'notifications' ? 'Notifiche' : 'Home'}
-          </span>
+        
+        <div className={`
+          fixed inset-y-0 left-[72px] z-40 transform transition-transform duration-300 ease-in-out
+          md:relative md:left-0 md:transform-none
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
+          <ChannelSidebar 
+            activeServer={activeServer} 
+            channels={channels}
+            dmChannels={dmChannels}
+            activeChannelId={activeChannelId}
+            onChannelSelect={handleChannelSelect}
+            currentUser={currentUser}
+            onOpenSettings={() => setShowServerSettings(true)}
+            serverPermissions={serverPermissions}
+            notificationCount={notificationCount}
+            onOpenUserSettings={() => setShowUserSettings(true)}
+          />
         </div>
 
-        {activeServer ? (
-          activeChannel ? (
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        <main className="flex-1 flex flex-col min-w-0 bg-[#313338] relative">
+          <div className="md:hidden flex items-center p-3 border-b border-[#1f2023] bg-[#313338] sticky top-0 z-20">
+            <button onClick={() => setIsSidebarOpen(true)} className="text-[#dbdee1] p-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <span className="ml-3 font-semibold truncate">
+              {activeServer ? activeServer.name : 
+              activeDM ? activeDM.name :
+              activeChannelId === 'friends' ? 'Amici' : 
+              activeChannelId === 'shop' ? 'Cardi E-Shop' : 
+              activeChannelId === 'inventory' ? 'Inventario' :
+              activeChannelId === 'progression' ? 'Progressione' :
+              activeChannelId === 'daily-minigame' ? 'Minigioco Giornaliero' :
+              activeChannelId === 'shared-files' ? 'File Condivisi' :
+              activeChannelId === 'pataparty' ? 'PataParty!' :
+              activeChannelId === 'notifications' ? 'Notifiche' : 'Home'}
+            </span>
+          </div>
+
+          {activeServer ? (
+            activeChannel ? (
+              <ChatArea 
+                channel={activeChannel} 
+                messages={[]}
+                onSendMessage={() => {}}
+                onToggleMembers={() => {}}
+                onToggleSidebar={() => setIsSidebarOpen(true)}
+                serverPermissions={serverPermissions}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-[#949ba4]">
+                Seleziona un canale per iniziare a chattare
+              </div>
+            )
+          ) : activeDM ? (
             <ChatArea 
-              channel={activeChannel} 
+              channel={activeDM}
               messages={[]}
               onSendMessage={() => {}}
               onToggleMembers={() => {}}
               onToggleSidebar={() => setIsSidebarOpen(true)}
-              serverPermissions={serverPermissions}
+            />
+          ) : activeChannelId === 'friends' ? (
+            <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
+          ) : activeChannelId === 'shop' ? (
+            <ShopView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          ) : activeChannelId === 'inventory' ? (
+            <InventoryView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          ) : activeChannelId === 'progression' ? (
+            <Progression currentUser={currentUser} />
+          ) : activeChannelId === 'daily-minigame' ? (
+            <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          ) : activeChannelId === 'shared-files' ? (
+            <SharedFilesView currentUser={currentUser} onlineUserIds={onlineUserIds} onToggleSidebar={() => setIsSidebarOpen(true)} />
+          ) : activeChannelId === 'pataparty' ? (
+            <PataParty currentUser={currentUser} />
+          ) : activeChannelId === 'notifications' ? (
+            <NotificationsView 
+              currentUser={currentUser} 
+              onToggleSidebar={() => setIsSidebarOpen(true)} 
+              onNavigateToShop={() => setActiveChannelId('shop')}
+              onNavigateToMessage={() => {}}
+              onNavigateToTrade={() => {}}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center text-[#949ba4]">
-              Seleziona un canale per iniziare a chattare
-            </div>
-          )
-        ) : activeDM ? (
-          <ChatArea 
-            channel={activeDM}
-            messages={[]}
-            onSendMessage={() => {}}
-            onToggleMembers={() => {}}
-            onToggleSidebar={() => setIsSidebarOpen(true)}
+            <WelcomeScreen currentUser={currentUser} />
+          )}
+        </main>
+
+        {showServerSettings && activeServer && (
+          <ServerSettingsModal 
+            server={activeServer} 
+            onClose={() => setShowServerSettings(false)}
+            onUpdate={() => {}} 
+            onDelete={() => {}}
+            serverPermissions={serverPermissions}
           />
-        ) : activeChannelId === 'friends' ? (
-          <FriendsArea currentUser={currentUser} onStartDM={handleStartDM} onlineUserIds={onlineUserIds} />
-        ) : activeChannelId === 'shop' ? (
-          <ShopView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
-        ) : activeChannelId === 'inventory' ? (
-          <InventoryView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
-        ) : activeChannelId === 'progression' ? (
-          <Progression currentUser={currentUser} />
-        ) : activeChannelId === 'daily-minigame' ? (
-          <DailyMinigameView currentUser={currentUser} onToggleSidebar={() => setIsSidebarOpen(true)} />
-        ) : activeChannelId === 'pataparty' ? (
-          <PataParty currentUser={currentUser} />
-        ) : activeChannelId === 'notifications' ? (
-          <NotificationsView 
-            currentUser={currentUser} 
-            onToggleSidebar={() => setIsSidebarOpen(true)} 
-            onNavigateToShop={() => setActiveChannelId('shop')}
-            onNavigateToMessage={() => {}}
-            onNavigateToTrade={() => {}}
-          />
-        ) : (
-          <WelcomeScreen currentUser={currentUser} />
         )}
-      </main>
 
-      {showServerSettings && activeServer && (
-        <ServerSettingsModal 
-          server={activeServer} 
-          onClose={() => setShowServerSettings(false)}
-          onUpdate={() => {}} // Add proper handlers
-          onDelete={() => {}}
-          serverPermissions={serverPermissions}
-        />
-      )}
+        {showUserSettings && (
+          <UserSettingsModal
+            isOpen={showUserSettings}
+            user={currentUser}
+            onClose={() => setShowUserSettings(false)}
+            onUpdate={async () => {}}
+          />
+        )}
 
-      {showUserSettings && (
-        <UserSettingsModal
-          isOpen={showUserSettings}
-          user={currentUser}
-          onClose={() => setShowUserSettings(false)}
-          onUpdate={async () => {}} // Handle user update
-        />
-      )}
-
-      {showInviteModal && activeServer && (
-        <InviteModal
-          server={activeServer}
-          onClose={() => setShowInviteModal(false)}
-        />
-      )}
-    </div>
+        {showInviteModal && activeServer && (
+          <InviteModal
+            server={activeServer}
+            onClose={() => setShowInviteModal(false)}
+          />
+        )}
+      </div>
+    </VoiceChannelProvider>
   );
 };
 
