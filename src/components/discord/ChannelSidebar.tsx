@@ -843,14 +843,6 @@ export const ChannelSidebar = ({ activeServer, channels, dmChannels = [], active
               </span>
             )}
           </button>
-
-          <button
-            onClick={() => onChannelSelect({ id: 'shared-files', name: 'File Condivisi', type: 'text', category: '', server_id: null })}
-            className={`w-full flex items-center px-3 py-2 rounded cursor-pointer mb-2 transition-colors ${activeChannelId === 'shared-files' ? 'bg-[#404249] text-white' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}
-          >
-            <FileUp size={20} className="mr-3" />
-            <span className="font-medium">File Condivisi</span>
-          </button>
           
           <div className="h-[1px] bg-[#1e1f22] mx-2 my-2"></div>
           
