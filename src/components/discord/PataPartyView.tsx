@@ -577,28 +577,6 @@ export const PataPartyView = () => {
         </div>
       )}
 
-      {/* OVERLAY IFRAME GLOBALE */}
-      {isIframeActive && iframeUrl && (
-        <div className="absolute inset-0 z-[250] bg-[#111214] flex flex-col animate-in fade-in zoom-in-95 duration-300">
-          {isHost && (
-            <div className="absolute top-6 right-6 z-[300]">
-              <button 
-                onClick={stopIframe} 
-                className="bg-[#f23f43] hover:bg-[#da373c] text-white px-5 py-2.5 rounded-full font-bold shadow-[0_0_20px_rgba(242,63,67,0.5)] flex items-center gap-2 transition-transform hover:scale-105"
-              >
-                <X size={20} /> Chiudi Gioco per tutti
-              </button>
-            </div>
-          )}
-          <iframe 
-            src={iframeUrl} 
-            className="w-full h-full border-none"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-      )}
-
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center border border-brand/50">
@@ -779,71 +757,75 @@ export const PataPartyView = () => {
 
           <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
             
-            {/* Tabellone Centrale */}
+            {/* Tabellone Centrale / Iframe Globale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
-              <div 
-                ref={boardRef}
-                className="relative inline-flex items-center justify-center max-w-full max-h-[85vh]"
-              >
-                <img 
-                  src={boardUrl} 
-                  alt="Board" 
-                  className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border-2 border-[#3f4147] bg-[#fcf6ce]" 
-                  draggable={false} 
-                  onError={(e) => {
-                    e.currentTarget.src = '/pataparty-board.png'; 
-                  }}
-                />
-                
-                {/* Overlay per le pedine */}
-                <div className="absolute inset-0 pointer-events-none rounded-xl">
-                  {players.map(p => {
-                    const isTurn = activePlayerId === p.id;
-                    const isRolling = diceState?.playerId === p.id;
-                    
-                    return (
-                      <div 
-                        key={p.id} 
-                        className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out group pointer-events-auto ${
-                          isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110 z-20 hover:z-50' : 'z-10'
-                        }`}
-                        style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                        onPointerDown={(e) => handlePointerDown(e, p.id)}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
+              {isIframeActive && iframeUrl ? (
+                <div className="w-full h-full relative animate-in fade-in zoom-in-95 duration-300">
+                  {isHost && (
+                    <div className="absolute top-4 right-4 z-[300]">
+                      <button 
+                        onClick={stopIframe} 
+                        className="bg-[#f23f43] hover:bg-[#da373c] text-white px-4 py-2 rounded-full font-bold shadow-[0_0_20px_rgba(242,63,67,0.5)] flex items-center gap-2 transition-transform hover:scale-105"
                       >
-                        {/* BALLOON DEL DADO (ora mostrato solo qui sopra l'utente) */}
-                        {isRolling && diceState && (
-                          <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
-                            <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
-                              {diceState.rolling ? 'Sta tirando...' : 
-                               diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
-                               diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
-                               `${p.name} ha fatto ${diceState.result}!`}
-                            </div>
-                            <div className="relative">
-                              <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
-                              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
-                            </div>
-                          </div>
-                        )}
-
-                        {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
-                        
-                        <Avatar 
-                          src={p.avatar} 
-                          decoration={p.avatar_decoration} 
-                          className={`w-10 h-10 md:w-12 md:h-12 object-cover shadow-xl border-2 ${isTurn ? 'border-[#23a559]' : 'border-white'} bg-[#313338] pointer-events-none select-none relative z-10`} 
-                        />
-                        <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                          {p.name}
-                        </div>
-                      </div>
-                    );
-                  })}
+                        <X size={16} /> Chiudi Gioco per tutti
+                      </button>
+                    </div>
+                  )}
+                  <iframe 
+                    src={iframeUrl} 
+                    className="w-full h-full border-none rounded-xl bg-black shadow-[0_0_30px_rgba(0,0,0,0.5)]"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
                 </div>
-              </div>
+              ) : (
+                <div 
+                  ref={boardRef}
+                  className="relative inline-flex items-center justify-center max-w-full max-h-[85vh] animate-in fade-in zoom-in-95 duration-300"
+                >
+                  <img 
+                    src={boardUrl} 
+                    alt="Board" 
+                    className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border-2 border-[#3f4147] bg-[#fcf6ce]" 
+                    draggable={false} 
+                    onError={(e) => {
+                      e.currentTarget.src = '/pataparty-board.png'; 
+                    }}
+                  />
+                  
+                  {/* Overlay per le pedine */}
+                  <div className="absolute inset-0 pointer-events-none rounded-xl">
+                    {players.map(p => {
+                      const isTurn = activePlayerId === p.id;
+                      
+                      return (
+                        <div 
+                          key={p.id} 
+                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out group pointer-events-auto ${
+                            isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110 z-20 hover:z-50' : 'z-10'
+                          }`}
+                          style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                          onPointerDown={(e) => handlePointerDown(e, p.id)}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
+                        >
+                          {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
+                          
+                          <Avatar 
+                            src={p.avatar} 
+                            decoration={p.avatar_decoration} 
+                            className={`w-10 h-10 md:w-12 md:h-12 object-cover shadow-xl border-2 ${isTurn ? 'border-[#23a559]' : 'border-white'} bg-[#313338] pointer-events-none select-none relative z-10`} 
+                          />
+                          <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                            {p.name}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Pulsante Regole e Suggerimento Host */}
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
@@ -855,7 +837,7 @@ export const PataPartyView = () => {
                   Regole
                 </button>
 
-                {isHost && (
+                {isHost && !isIframeActive && (
                   <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
                     <Info size={16} className="text-yellow-500" />
                     Trascina le pedine dei giocatori per spostarle sul tabellone.
@@ -867,7 +849,7 @@ export const PataPartyView = () => {
               </div>
 
               {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
-              {activePlayerId === user?.id && !isHost && (
+              {activePlayerId === user?.id && !isHost && !isIframeActive && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
                   <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
                     <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
@@ -931,41 +913,43 @@ export const PataPartyView = () => {
             </div>
 
             {/* Sidebar Giocatori e Impostazioni GM (Destra) */}
-            <div className="w-full md:w-72 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10">
+            <div className={`w-full ${isIframeActive ? 'md:w-56' : 'md:w-72'} transition-all duration-300 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10`}>
               
               {isHost && (
                 <>
-                  <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
-                      <ImageIcon size={14} /> Sfondo Tabellone (URL)
-                    </h4>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="https://..."
-                        value={boardUrlInput}
-                        onChange={e => setBoardUrlInput(e.target.value)}
-                        className="flex-1 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
-                      />
-                      <button
-                        onClick={() => {
-                          const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
-                          stateRef.current.boardUrl = finalUrl;
-                          setBoardUrl(finalUrl);
-                          syncState();
-                          showSuccess("Tabellone aggiornato!");
-                          setBoardUrlInput('');
-                        }}
-                        className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
-                      >
-                        Applica
-                      </button>
+                  {!isIframeActive && (
+                    <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                        <ImageIcon size={14} className="flex-shrink-0" /> Sfondo (URL)
+                      </h4>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="https://..."
+                          value={boardUrlInput}
+                          onChange={e => setBoardUrlInput(e.target.value)}
+                          className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                        />
+                        <button
+                          onClick={() => {
+                            const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
+                            stateRef.current.boardUrl = finalUrl;
+                            setBoardUrl(finalUrl);
+                            syncState();
+                            showSuccess("Tabellone aggiornato!");
+                            setBoardUrlInput('');
+                          }}
+                          className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0"
+                        >
+                          Applica
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
-                      <Globe size={14} /> Iframe Globale (Minigioco)
+                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                      <Globe size={14} className="flex-shrink-0" /> Minigioco (Iframe)
                     </h4>
                     <div className="flex flex-col gap-2">
                       <input
@@ -980,7 +964,7 @@ export const PataPartyView = () => {
                           onClick={stopIframe}
                           className="w-full bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
                         >
-                          Interrompi Iframe
+                          Interrompi
                         </button>
                       ) : (
                         <button
@@ -995,8 +979,8 @@ export const PataPartyView = () => {
                 </>
               )}
 
-              <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                <Users size={18} className="text-[#dbdee1]" /> Giocatori in Partita
+              <h3 className="text-white font-bold mb-4 flex items-center gap-2 truncate">
+                <Users size={18} className="text-[#dbdee1] flex-shrink-0" /> <span className="truncate">Giocatori</span>
               </h3>
               
               <div className="space-y-2">
@@ -1005,7 +989,7 @@ export const PataPartyView = () => {
                   
                   return (
                     <React.Fragment key={p.id}>
-                      {isHost ? (
+                      {isHost && !isIframeActive ? (
                         <Popover.Root>
                           <Popover.Trigger asChild>
                             <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147] hover:border-brand'} flex items-center gap-3 transition-colors cursor-pointer relative`}>
