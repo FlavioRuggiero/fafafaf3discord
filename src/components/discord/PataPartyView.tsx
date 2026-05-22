@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe, Megaphone } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -30,6 +30,11 @@ interface GameState {
   iframeUrl?: string | null;
   isIframeActive?: boolean;
   announcement?: string | null;
+  leaderboard?: {
+    title: string;
+    description: string;
+    winners: Player[];
+  } | null;
 }
 
 interface DiceState {
@@ -138,9 +143,16 @@ export const PataPartyView = () => {
   const [isIframeActive, setIsIframeActive] = useState<boolean>(false);
   const [iframeInput, setIframeInput] = useState<string>('');
 
-  // Annunci
+  // Annunci e Classifica
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [announcementInput, setAnnouncementInput] = useState<string>('');
+  const [leaderboard, setLeaderboard] = useState<GameState['leaderboard']>(null);
+
+  // Stati Builder Classifica
+  const [lbTitle, setLbTitle] = useState('Risultati Finali');
+  const [lbDesc, setLbDesc] = useState('Ecco i vincitori di questo minigioco!');
+  const [lbWinners, setLbWinners] = useState<string[]>([]);
+  const [lbPlayerSelect, setLbPlayerSelect] = useState('');
 
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
@@ -155,7 +167,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null });
 
   useEffect(() => {
     if (user) {
@@ -190,6 +202,7 @@ export const PataPartyView = () => {
     setIframeUrl(stateRef.current.iframeUrl || null);
     setIsIframeActive(stateRef.current.isIframeActive || false);
     setAnnouncement(stateRef.current.announcement || null);
+    setLeaderboard(stateRef.current.leaderboard || null);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -201,7 +214,7 @@ export const PataPartyView = () => {
   };
 
   const handleDiceRoll = (playerId: string, result: number | string | number[], diceType?: string) => {
-    playSound('/chest-open.mp3');
+    playSound('/openingsound.mp3');
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
       setDiceState(prev => prev ? { ...prev, rolling: false } : null);
@@ -256,6 +269,7 @@ export const PataPartyView = () => {
       setIframeUrl(state.iframeUrl || null);
       setIsIframeActive(state.isIframeActive || false);
       setAnnouncement(state.announcement || null);
+      setLeaderboard(state.leaderboard || null);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -295,12 +309,13 @@ export const PataPartyView = () => {
     setIframeUrl(null);
     setIsIframeActive(false);
     setAnnouncement(null);
+    setLeaderboard(null);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null };
+    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -339,10 +354,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -351,6 +366,7 @@ export const PataPartyView = () => {
       setIframeUrl(stateRef.current.iframeUrl || null);
       setIsIframeActive(stateRef.current.isIframeActive || false);
       setAnnouncement(stateRef.current.announcement || null);
+      setLeaderboard(stateRef.current.leaderboard || null);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -376,6 +392,7 @@ export const PataPartyView = () => {
     setShowRules(false);
     setIsIframeActive(false);
     setAnnouncement(null);
+    setLeaderboard(null);
   };
 
   const startGame = () => {
@@ -420,6 +437,30 @@ export const PataPartyView = () => {
         syncState();
       }
     }, 6000);
+  };
+
+  const showLeaderboardGlobal = () => {
+    if (!isHost) return;
+    if (lbWinners.length === 0) {
+      showError("Aggiungi almeno un vincitore.");
+      return;
+    }
+    const winnersData = lbWinners.map(id => stateRef.current.players.find(p => p.id === id)).filter(Boolean) as Player[];
+    stateRef.current.leaderboard = {
+      title: lbTitle.trim() || 'Classifica',
+      description: lbDesc.trim(),
+      winners: winnersData
+    };
+    syncState();
+    showSuccess("Classifica mostrata a tutti!");
+    playSound('/openingsound.mp3'); // Effetto sonoro per annunciare la classifica
+  };
+
+  const hideLeaderboardGlobal = () => {
+    if (!isHost) return;
+    stateRef.current.leaderboard = null;
+    syncState();
+    showSuccess("Classifica nascosta.");
   };
 
   const setTurn = (playerId: string) => {
@@ -580,29 +621,6 @@ export const PataPartyView = () => {
           animation: dice-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
       `}</style>
-
-      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro, solo come popup in basso) */}
-      {diceState && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200000] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-[#111214]/90 backdrop-blur-sm px-6 py-4 rounded-2xl border-2 border-[#1e1f22] shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center gap-3">
-            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
-            <div className="text-xl font-black text-white drop-shadow-md text-center mt-1">
-              {diceState.rolling ? (
-                <span className="animate-pulse text-[#b5bac1]">Rotolando...</span>
-              ) : (
-                <span className="text-[#23a559] flex items-center gap-1.5 justify-center">
-                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
-                  {diceState.diceType === 'scambio' ? (
-                    <span className="font-bold text-white ml-0.5">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
-                  ) : (
-                    <span className="font-bold text-white ml-0.5">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
-                  )}!
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
@@ -787,8 +805,38 @@ export const PataPartyView = () => {
             {/* Tabellone Centrale / Iframe Globale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
+              {/* Overlay Classifica Finale */}
+              {leaderboard && (
+                <div className="absolute inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-300 overflow-y-auto">
+                  <div className="bg-[#2b2d31] border-2 border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.3)] rounded-3xl max-w-xl w-full p-8 flex flex-col items-center my-auto">
+                    <Trophy size={80} className="text-yellow-500 mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.8)]" />
+                    <h1 className="text-4xl font-black text-white text-center mb-3 drop-shadow-md">{leaderboard.title}</h1>
+                    {leaderboard.description && <p className="text-[#b5bac1] text-center mb-8 text-lg">{leaderboard.description}</p>}
+                    
+                    <div className="w-full space-y-4">
+                      {leaderboard.winners.map((p, idx) => {
+                        let badge = null;
+                        let bgClass = "bg-[#1e1f22] border-[#3f4147]";
+                        if (idx === 0) { badge = "🥇"; bgClass = "bg-yellow-500/20 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)] transform scale-105 my-2"; }
+                        else if (idx === 1) { badge = "🥈"; bgClass = "bg-gray-300/20 border-gray-300"; }
+                        else if (idx === 2) { badge = "🥉"; bgClass = "bg-orange-700/20 border-orange-700"; }
+                        else { badge = <span className="text-[#b5bac1] text-lg font-bold">{idx + 1}°</span>; }
+                        
+                        return (
+                          <div key={p.id} className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-transform ${bgClass}`}>
+                            <div className="w-10 flex items-center justify-center text-4xl">{badge}</div>
+                            <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-12 h-12 object-cover shadow-lg" />
+                            <span className={`text-xl font-bold flex-1 truncate ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Annuncio Globale a Schermo */}
-              {announcement && (
+              {announcement && !leaderboard && (
                 <div className="absolute inset-0 z-[500] flex items-center justify-center pointer-events-none animate-in fade-in zoom-in duration-300 p-8">
                   <h1
                     className="text-5xl md:text-7xl lg:text-8xl font-black text-white text-center leading-tight drop-shadow-2xl"
@@ -1066,6 +1114,85 @@ export const PataPartyView = () => {
                       >
                         Invia
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Builder Classifica GM */}
+                  <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                      <Trophy size={14} className="flex-shrink-0 text-yellow-500" /> Classifica
+                    </h4>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        placeholder="Titolo (es. Risultati Finali)"
+                        value={lbTitle}
+                        onChange={e => setLbTitle(e.target.value)}
+                        className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Descrizione (opzionale)"
+                        value={lbDesc}
+                        onChange={e => setLbDesc(e.target.value)}
+                        className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
+                      />
+                      
+                      <div className="flex gap-2 mt-1">
+                        <select 
+                          value={lbPlayerSelect} 
+                          onChange={e => setLbPlayerSelect(e.target.value)}
+                          className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none border border-[#3f4147]"
+                        >
+                          <option value="">Aggiungi giocatore...</option>
+                          {players.filter(p => !lbWinners.includes(p.id)).map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => {
+                            if (lbPlayerSelect) {
+                              setLbWinners([...lbWinners, lbPlayerSelect]);
+                              setLbPlayerSelect('');
+                            }
+                          }}
+                          className="bg-[#2b2d31] hover:bg-[#35373c] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0 border border-[#3f4147]"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {lbWinners.length > 0 && (
+                        <div className="mt-1 space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                          {lbWinners.map((id, idx) => {
+                            const p = players.find(x => x.id === id);
+                            return (
+                              <div key={id} className="flex justify-between items-center bg-[#2b2d31] px-2 py-1 rounded text-xs text-[#dbdee1] border border-[#3f4147]">
+                                <span className="truncate flex-1 font-bold"><span className="text-[#949ba4] mr-1">{idx + 1}°</span> {p?.name}</span>
+                                <button onClick={() => setLbWinners(lbWinners.filter(x => x !== id))} className="text-[#f23f43] hover:text-white ml-2"><X size={12}/></button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-2 pt-2 border-t border-[#3f4147]">
+                        {leaderboard ? (
+                          <button
+                            onClick={hideLeaderboardGlobal}
+                            className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                          >
+                            Nascondi
+                          </button>
+                        ) : (
+                          <button
+                            onClick={showLeaderboardGlobal}
+                            className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                          >
+                            Mostra Classifica
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
