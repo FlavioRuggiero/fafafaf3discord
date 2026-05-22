@@ -554,29 +554,6 @@ export const PataPartyView = () => {
         }
       `}</style>
 
-      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro, solo come popup in basso) */}
-      {diceState && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200000] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-[#111214]/90 backdrop-blur-sm px-6 py-4 rounded-2xl border-2 border-[#1e1f22] shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center gap-3">
-            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
-            <div className="text-xl font-black text-white drop-shadow-md text-center mt-1">
-              {diceState.rolling ? (
-                <span className="animate-pulse text-[#b5bac1]">Rotolando...</span>
-              ) : (
-                <span className="text-[#23a559] flex items-center gap-1.5 justify-center">
-                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
-                  {diceState.diceType === 'scambio' ? (
-                    <span className="font-bold text-white ml-0.5">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
-                  ) : (
-                    <span className="font-bold text-white ml-0.5">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
-                  )}!
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center border border-brand/50">
@@ -762,16 +739,6 @@ export const PataPartyView = () => {
               
               {isIframeActive && iframeUrl ? (
                 <div className="w-full h-full relative animate-in fade-in zoom-in-95 duration-300">
-                  {isHost && (
-                    <div className="absolute top-4 right-4 z-[300]">
-                      <button 
-                        onClick={stopIframe} 
-                        className="bg-[#f23f43] hover:bg-[#da373c] text-white px-4 py-2 rounded-full font-bold shadow-[0_0_20px_rgba(242,63,67,0.5)] flex items-center gap-2 transition-transform hover:scale-105"
-                      >
-                        <X size={16} /> Chiudi Gioco per tutti
-                      </button>
-                    </div>
-                  )}
                   <iframe 
                     src={iframeUrl} 
                     className="w-full h-full border-none rounded-xl bg-black shadow-[0_0_30px_rgba(0,0,0,0.5)]"
@@ -798,6 +765,7 @@ export const PataPartyView = () => {
                   <div className="absolute inset-0 pointer-events-none rounded-xl">
                     {players.map(p => {
                       const isTurn = activePlayerId === p.id;
+                      const isRolling = diceState?.playerId === p.id;
                       
                       return (
                         <div 
@@ -810,6 +778,22 @@ export const PataPartyView = () => {
                           onPointerMove={handlePointerMove}
                           onPointerUp={handlePointerUp}
                         >
+                          {/* BALLOON DEL DADO (ora mostrato solo qui sopra l'utente) */}
+                          {isRolling && diceState && (
+                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
+                              <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
+                                {diceState.rolling ? 'Sta tirando...' : 
+                                 diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
+                                 diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
+                                 `${p.name} ha fatto ${diceState.result}!`}
+                              </div>
+                              <div className="relative">
+                                <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
+                                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
+                              </div>
+                            </div>
+                          )}
+
                           {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
                           
                           <Avatar 
@@ -827,26 +811,28 @@ export const PataPartyView = () => {
                 </div>
               )}
 
-              {/* Pulsante Regole e Suggerimento Host */}
-              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
-                <button
-                  onClick={() => setShowRules(true)}
-                  className="bg-[#2b2d31]/90 backdrop-blur-md px-4 py-2 rounded-lg border border-[#1e1f22] text-white font-bold flex items-center gap-2 shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 pointer-events-auto"
-                >
-                  <BookOpen size={20} className="text-[#a855f7]" />
-                  Regole
-                </button>
+              {/* Pulsante Regole e Suggerimento Host (Nascosti durante Iframe per recuperare spazio) */}
+              {!isIframeActive && (
+                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
+                  <button
+                    onClick={() => setShowRules(true)}
+                    className="bg-[#2b2d31]/90 backdrop-blur-md px-4 py-2 rounded-lg border border-[#1e1f22] text-white font-bold flex items-center gap-2 shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 pointer-events-auto"
+                  >
+                    <BookOpen size={20} className="text-[#a855f7]" />
+                    Regole
+                  </button>
 
-                {isHost && !isIframeActive && (
-                  <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
-                    <Info size={16} className="text-yellow-500" />
-                    Trascina le pedine dei giocatori per spostarle sul tabellone.
-                  </div>
-                )}
-                
-                {/* Div vuoto per bilanciare il flex se non c'è il suggerimento */}
-                <div className="w-[100px] hidden md:block"></div>
-              </div>
+                  {isHost && (
+                    <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
+                      <Info size={16} className="text-yellow-500" />
+                      Trascina le pedine dei giocatori per spostarle sul tabellone.
+                    </div>
+                  )}
+                  
+                  {/* Div vuoto per bilanciare il flex se non c'è il suggerimento */}
+                  <div className="w-[100px] hidden md:block"></div>
+                </div>
+              )}
 
               {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
               {activePlayerId === user?.id && !isHost && !isIframeActive && (
@@ -913,7 +899,7 @@ export const PataPartyView = () => {
             </div>
 
             {/* Sidebar Giocatori e Impostazioni GM (Destra) */}
-            <div className={`w-full ${isIframeActive ? 'md:w-56' : 'md:w-72'} transition-all duration-300 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10`}>
+            <div className={`w-full ${isIframeActive ? 'md:w-44' : 'md:w-72'} transition-all duration-300 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10`}>
               
               {isHost && (
                 <>
@@ -949,7 +935,7 @@ export const PataPartyView = () => {
 
                   <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                     <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
-                      <Globe size={14} className="flex-shrink-0" /> Minigioco (Iframe)
+                      <Globe size={14} className="flex-shrink-0" /> Minigioco
                     </h4>
                     <div className="flex flex-col gap-2">
                       <input
@@ -957,7 +943,7 @@ export const PataPartyView = () => {
                         placeholder="https://..."
                         value={iframeInput}
                         onChange={e => setIframeInput(e.target.value)}
-                        className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                        className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
                       />
                       {isIframeActive ? (
                         <button
@@ -971,7 +957,7 @@ export const PataPartyView = () => {
                           onClick={startIframe}
                           className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
                         >
-                          Avvia per tutti
+                          Avvia
                         </button>
                       )}
                     </div>
@@ -980,7 +966,7 @@ export const PataPartyView = () => {
               )}
 
               <h3 className="text-white font-bold mb-4 flex items-center gap-2 truncate">
-                <Users size={18} className="text-[#dbdee1] flex-shrink-0" /> <span className="truncate">Giocatori</span>
+                <Users size={18} className="text-[#dbdee1] flex-shrink-0" /> {!isIframeActive && <span className="truncate">Giocatori</span>}
               </h3>
               
               <div className="space-y-2">
