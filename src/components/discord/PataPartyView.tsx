@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -19,6 +19,14 @@ interface Player {
   y: number;
   lastRoll?: number | string | number[] | null;
   specialDice?: string[];
+}
+
+interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
 }
 
 interface GameState {
@@ -35,6 +43,7 @@ interface GameState {
     description: string;
     winners: Player[];
   } | null;
+  chatMessages?: ChatMessage[];
 }
 
 interface DiceState {
@@ -148,6 +157,13 @@ export const PataPartyView = () => {
   const [announcementInput, setAnnouncementInput] = useState<string>('');
   const [leaderboard, setLeaderboard] = useState<GameState['leaderboard']>(null);
 
+  // Stati Chat
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [unreadChat, setUnreadChat] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
   // Stati Builder Classifica
   const [lbTitle, setLbTitle] = useState('Risultati Finali');
   const [lbDesc, setLbDesc] = useState('Ecco i vincitori di questo minigioco!');
@@ -167,7 +183,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] });
 
   useEffect(() => {
     if (user) {
@@ -181,6 +197,18 @@ export const PataPartyView = () => {
       }
     }
   }, [user]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (showChat && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages, showChat]);
+
+  // Gestione reset pallino notifiche chat
+  useEffect(() => {
+    if (showChat) setUnreadChat(false);
+  }, [showChat]);
 
   const canCreate = user?.id === adminId || (user && moderatorIds.includes(user.id)) || profile?.role === 'moderator';
 
@@ -203,6 +231,8 @@ export const PataPartyView = () => {
     setIsIframeActive(stateRef.current.isIframeActive || false);
     setAnnouncement(stateRef.current.announcement || null);
     setLeaderboard(stateRef.current.leaderboard || null);
+    // Non resettiamo i chatMessages qui per evitare perdite, si sincronizzano con l'intero stato
+    setChatMessages(stateRef.current.chatMessages || []);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -253,6 +283,12 @@ export const PataPartyView = () => {
         syncState();
       }
     });
+    channel.on('broadcast', { event: 'chat_message' }, (payload) => {
+      const msg = payload.payload;
+      stateRef.current.chatMessages = [...(stateRef.current.chatMessages || []), msg];
+      setChatMessages(stateRef.current.chatMessages);
+      if (!showChat) setUnreadChat(true);
+    });
     channel.subscribe();
     channelRef.current = channel;
   };
@@ -270,11 +306,18 @@ export const PataPartyView = () => {
       setIsIframeActive(state.isIframeActive || false);
       setAnnouncement(state.announcement || null);
       setLeaderboard(state.leaderboard || null);
+      setChatMessages(state.chatMessages || []);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
       const { playerId, result, diceType } = payload.payload;
       handleDiceRoll(playerId, result, diceType);
+    });
+    channel.on('broadcast', { event: 'chat_message' }, (payload) => {
+      const msg = payload.payload;
+      stateRef.current.chatMessages = [...(stateRef.current.chatMessages || []), msg];
+      setChatMessages(stateRef.current.chatMessages);
+      if (!showChat) setUnreadChat(true);
     });
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED' && user) {
@@ -310,12 +353,15 @@ export const PataPartyView = () => {
     setIsIframeActive(false);
     setAnnouncement(null);
     setLeaderboard(null);
+    setChatMessages([]);
+    setUnreadChat(false);
+    setShowChat(false);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null };
+    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -334,6 +380,9 @@ export const PataPartyView = () => {
     setGameCode(joinCode);
     setIsHost(false);
     setView('lobby');
+    setChatMessages([]);
+    setUnreadChat(false);
+    setShowChat(false);
 
     const activeObj = { code: joinCode, isHost: false };
     setSavedGame(activeObj);
@@ -347,6 +396,8 @@ export const PataPartyView = () => {
     cleanup();
     setGameCode(savedGame.code);
     setIsHost(savedGame.isHost);
+    setUnreadChat(false);
+    setShowChat(false);
     
     if (savedGame.isHost) {
       const storedState = localStorage.getItem(`pataparty_state_${savedGame.code}`);
@@ -354,10 +405,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -367,6 +418,7 @@ export const PataPartyView = () => {
       setIsIframeActive(stateRef.current.isIframeActive || false);
       setAnnouncement(stateRef.current.announcement || null);
       setLeaderboard(stateRef.current.leaderboard || null);
+      setChatMessages(stateRef.current.chatMessages || []);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -393,6 +445,8 @@ export const PataPartyView = () => {
     setIsIframeActive(false);
     setAnnouncement(null);
     setLeaderboard(null);
+    setChatMessages([]);
+    setShowChat(false);
   };
 
   const startGame = () => {
@@ -453,7 +507,7 @@ export const PataPartyView = () => {
     };
     syncState();
     showSuccess("Classifica mostrata a tutti!");
-    playSound('/openingsound.mp3'); // Effetto sonoro per annunciare la classifica
+    playSound('/openingsound.mp3'); 
   };
 
   const hideLeaderboardGlobal = () => {
@@ -554,6 +608,25 @@ export const PataPartyView = () => {
     showSuccess("Regole aggiornate e condivise!");
   };
 
+  const sendChatMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !user) return;
+    
+    const newMsg: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      senderId: user.id,
+      senderName: profile?.first_name || 'Utente',
+      text: chatInput.trim(),
+      timestamp: Date.now()
+    };
+
+    stateRef.current.chatMessages = [...(stateRef.current.chatMessages || []), newMsg];
+    setChatMessages(stateRef.current.chatMessages);
+    setChatInput('');
+
+    channelRef.current?.send({ type: 'broadcast', event: 'chat_message', payload: newMsg });
+  };
+
   const PlayerListItem = ({ p, isTurn }: { p: Player, isTurn: boolean }) => {
     let rollContent: React.ReactNode = p.lastRoll;
     
@@ -566,7 +639,6 @@ export const PataPartyView = () => {
       }
     }
 
-    // Nascondi il risultato se l'utente sta attualmente rotolando il dado
     const isCurrentlyRolling = diceState?.playerId === p.id && diceState?.rolling;
 
     return (
@@ -621,6 +693,29 @@ export const PataPartyView = () => {
           animation: dice-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
       `}</style>
+
+      {/* OVERLAY DADO 3D */}
+      {diceState && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200000] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-[#111214]/90 backdrop-blur-sm px-6 py-4 rounded-2xl border-2 border-[#1e1f22] shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center gap-3">
+            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
+            <div className="text-xl font-black text-white drop-shadow-md text-center mt-1">
+              {diceState.rolling ? (
+                <span className="animate-pulse text-[#b5bac1]">Rotolando...</span>
+              ) : (
+                <span className="text-[#23a559] flex items-center gap-1.5 justify-center">
+                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
+                  {diceState.diceType === 'scambio' ? (
+                    <span className="font-bold text-white ml-0.5">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
+                  ) : (
+                    <span className="font-bold text-white ml-0.5">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
+                  )}!
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
@@ -878,7 +973,6 @@ export const PataPartyView = () => {
                   <div className="absolute inset-0 pointer-events-none rounded-xl">
                     {players.map(p => {
                       const isTurn = activePlayerId === p.id;
-                      const isRolling = diceState?.playerId === p.id;
                       
                       return (
                         <div 
@@ -891,22 +985,6 @@ export const PataPartyView = () => {
                           onPointerMove={handlePointerMove}
                           onPointerUp={handlePointerUp}
                         >
-                          {/* BALLOON DEL DADO (ora mostrato solo qui sopra l'utente) */}
-                          {isRolling && diceState && (
-                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
-                              <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
-                                {diceState.rolling ? 'Sta tirando...' : 
-                                 diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
-                                 diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
-                                 `${p.name} ha fatto ${diceState.result}!`}
-                              </div>
-                              <div className="relative">
-                                <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
-                                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
-                              </div>
-                            </div>
-                          )}
-
                           {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
                           
                           <Avatar 
@@ -924,10 +1002,10 @@ export const PataPartyView = () => {
                 </div>
               )}
 
-              {/* Pulsante Regole e Suggerimento Host */}
+              {/* Pulsanti Bottom: Regole (Sinistra), Chat (Destra) */}
               <div className={`absolute left-4 right-4 flex justify-between items-end pointer-events-none z-[300] ${isIframeActive ? 'bottom-2' : 'bottom-4'}`}>
                 
-                {/* Contenitore relativo per posizionare il popup regole esattamente sopra al pulsante */}
+                {/* Contenitore Relativo per REGOLE (Sinistra) */}
                 <div className="relative pointer-events-auto">
                   <button
                     onClick={() => setShowRules(!showRules)}
@@ -939,12 +1017,10 @@ export const PataPartyView = () => {
                     Regole
                   </button>
 
-                  {/* Pannello Regole (Popup posizionato sopra il bottone) */}
+                  {/* Pannello Regole (Popup) */}
                   {showRules && (
                     <>
-                      {/* Sfondo invisibile per chiudere cliccando fuori */}
                       <div className="fixed inset-0 z-[390]" onClick={() => setShowRules(false)} />
-                      
                       <div className="absolute bottom-full mb-3 left-0 w-80 md:w-96 bg-[#2b2d31] border border-[#1e1f22] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] z-[400] flex flex-col max-h-[60vh] animate-in slide-in-from-bottom-2 fade-in duration-200">
                         <div className="p-4 border-b border-[#1f2023] flex justify-between items-center bg-[#1e1f22] rounded-t-xl shrink-0">
                           <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -978,7 +1054,6 @@ export const PataPartyView = () => {
                             </div>
                           )}
                         </div>
-                        {/* Triangolino che punta verso il bottone */}
                         <div className="absolute -bottom-2 left-6 w-4 h-4 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45" />
                       </div>
                     </>
@@ -992,8 +1067,67 @@ export const PataPartyView = () => {
                   </div>
                 )}
                 
-                {/* Div vuoto per bilanciare il flex se non c'è il suggerimento */}
-                <div className="w-[100px] hidden md:block"></div>
+                {/* Contenitore Relativo per CHAT (Destra) */}
+                <div className="relative pointer-events-auto">
+                  <button
+                    onClick={() => setShowChat(!showChat)}
+                    className={`relative bg-[#2b2d31]/90 backdrop-blur-md rounded-lg border border-[#1e1f22] text-white font-bold flex items-center shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 ${
+                      isIframeActive ? 'px-2.5 py-1.5 text-xs gap-1.5' : 'px-4 py-2 text-sm gap-2'
+                    }`}
+                  >
+                    <MessageSquare size={isIframeActive ? 16 : 20} className="text-[#0ea5e9]" />
+                    Chat
+                    {unreadChat && !showChat && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#f23f43] rounded-full animate-pulse border border-[#2b2d31]"></span>
+                    )}
+                  </button>
+
+                  {/* Pannello Chat (Popup) */}
+                  {showChat && (
+                    <>
+                      <div className="fixed inset-0 z-[390]" onClick={() => setShowChat(false)} />
+                      <div className="absolute bottom-full mb-3 right-0 w-80 md:w-96 bg-[#2b2d31] border border-[#1e1f22] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] z-[400] flex flex-col h-[50vh] max-h-[400px] animate-in slide-in-from-bottom-2 fade-in duration-200">
+                        <div className="p-4 border-b border-[#1f2023] flex justify-between items-center bg-[#1e1f22] rounded-t-xl shrink-0">
+                          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <MessageSquare size={20} className="text-[#0ea5e9]" />
+                            Chat Partita
+                          </h3>
+                          <button onClick={() => setShowChat(false)} className="text-[#949ba4] hover:text-white transition-colors">
+                            <X size={20} />
+                          </button>
+                        </div>
+                        <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3" ref={chatScrollRef}>
+                          {chatMessages.length === 0 ? (
+                            <div className="text-center text-[#949ba4] m-auto text-sm italic">Nessun messaggio. Scrivi qualcosa!</div>
+                          ) : (
+                            chatMessages.map(msg => (
+                              <div key={msg.id} className={`flex flex-col ${msg.senderId === user?.id ? 'items-end' : 'items-start'}`}>
+                                <span className="text-[10px] text-[#949ba4] mb-0.5 px-1">{msg.senderName}</span>
+                                <div className={`px-3 py-2 rounded-xl max-w-[85%] text-sm break-words ${msg.senderId === user?.id ? 'bg-[#5865F2] text-white rounded-br-sm' : 'bg-[#1e1f22] text-[#dbdee1] border border-[#3f4147] rounded-bl-sm'}`}>
+                                  {msg.text}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <form onSubmit={sendChatMessage} className="p-3 border-t border-[#1f2023] bg-[#1e1f22] rounded-b-xl flex gap-2 shrink-0">
+                          <input
+                            type="text"
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            placeholder="Scrivi un messaggio..."
+                            className="flex-1 min-w-0 bg-[#2b2d31] text-white text-sm px-3 py-2 rounded-lg border border-[#3f4147] focus:border-[#5865F2] outline-none"
+                          />
+                          <button type="submit" disabled={!chatInput.trim()} className="bg-[#5865F2] hover:bg-[#4752C4] text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50">
+                            Invia
+                          </button>
+                        </form>
+                        <div className="absolute -bottom-2 right-6 w-4 h-4 bg-[#1e1f22] border-b border-r border-[#1e1f22] rotate-45" />
+                      </div>
+                    </>
+                  )}
+                </div>
+
               </div>
 
               {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
