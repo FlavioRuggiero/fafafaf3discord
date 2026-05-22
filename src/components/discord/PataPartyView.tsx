@@ -516,29 +516,6 @@ export const PataPartyView = () => {
         }
       `}</style>
 
-      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro) */}
-      {diceState && (
-        <div className="fixed inset-0 z-[200000] flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="flex flex-col items-center">
-            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
-            <div className="mt-8 text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]">
-              {diceState.rolling ? (
-                <span className="animate-pulse">Rotolando...</span>
-              ) : (
-                <span className="animate-bounce-once text-[#23a559] bg-[#111214]/80 px-6 py-2 rounded-full border border-[#23a559]/50 shadow-[0_0_20px_rgba(35,165,89,0.4)] flex items-center gap-2">
-                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
-                  {diceState.diceType === 'scambio' ? (
-                    <span className="font-bold text-white ml-1">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
-                  ) : (
-                    <span className="font-bold text-white ml-1">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
-                  )}!
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center border border-brand/50">
@@ -753,6 +730,22 @@ export const PataPartyView = () => {
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                       >
+                        {/* BALLOON DEL DADO */}
+                        {isRolling && diceState && (
+                          <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
+                            <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
+                              {diceState.rolling ? 'Sta tirando...' : 
+                               diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
+                               diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
+                               `${p.name} ha fatto ${diceState.result}!`}
+                            </div>
+                            <div className="relative">
+                              <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
+                              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
+                            </div>
+                          </div>
+                        )}
+
                         {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
                         
                         <Avatar 
