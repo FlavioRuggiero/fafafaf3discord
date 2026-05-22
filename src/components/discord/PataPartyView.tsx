@@ -63,6 +63,7 @@ const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: numbe
         else if (diceType === 'vigilante') setDisplayValue([3, 4, 5][Math.floor(Math.random() * 3)]);
         else if (diceType === 'frazionario') setDisplayValue([1.5, 2.5, 3.5][Math.floor(Math.random() * 3)]);
         else if (diceType === 'carismatico') setDisplayValue(['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)]);
+        else if (diceType === 'negativo') setDisplayValue(-(Math.floor(Math.random() * 6) + 1));
         else if (diceType === 'scambio' && players && players.length > 0) setDisplayValue(players[Math.floor(Math.random() * players.length)].id);
         else if (diceType === 'doppio') setDisplayValue([Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1]);
         else setDisplayValue(Math.floor(Math.random() * 6) + 1);
@@ -553,6 +554,8 @@ export const PataPartyView = () => {
       result = [1.5, 2.5, 3.5][Math.floor(Math.random() * 3)];
     } else if (diceType === 'carismatico') {
       result = ['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)];
+    } else if (diceType === 'negativo') {
+      result = -(Math.floor(Math.random() * 6) + 1);
     } else if (diceType === 'scambio') {
       const currentPlayers = stateRef.current.players;
       result = currentPlayers[Math.floor(Math.random() * currentPlayers.length)].id;
@@ -693,29 +696,6 @@ export const PataPartyView = () => {
           animation: dice-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
       `}</style>
-
-      {/* OVERLAY DADO 3D */}
-      {diceState && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200000] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-[#111214]/90 backdrop-blur-sm px-6 py-4 rounded-2xl border-2 border-[#1e1f22] shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center gap-3">
-            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
-            <div className="text-xl font-black text-white drop-shadow-md text-center mt-1">
-              {diceState.rolling ? (
-                <span className="animate-pulse text-[#b5bac1]">Rotolando...</span>
-              ) : (
-                <span className="text-[#23a559] flex items-center gap-1.5 justify-center">
-                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
-                  {diceState.diceType === 'scambio' ? (
-                    <span className="font-bold text-white ml-0.5">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
-                  ) : (
-                    <span className="font-bold text-white ml-0.5">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
-                  )}!
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
@@ -973,6 +953,7 @@ export const PataPartyView = () => {
                   <div className="absolute inset-0 pointer-events-none rounded-xl">
                     {players.map(p => {
                       const isTurn = activePlayerId === p.id;
+                      const isRolling = diceState?.playerId === p.id;
                       
                       return (
                         <div 
@@ -985,6 +966,22 @@ export const PataPartyView = () => {
                           onPointerMove={handlePointerMove}
                           onPointerUp={handlePointerUp}
                         >
+                          {/* BALLOON DEL DADO (ora mostrato solo qui sopra l'utente) */}
+                          {isRolling && diceState && (
+                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
+                              <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
+                                {diceState.rolling ? 'Sta tirando...' : 
+                                 diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
+                                 diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
+                                 `${p.name} ha fatto ${diceState.result}!`}
+                              </div>
+                              <div className="relative">
+                                <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
+                                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
+                              </div>
+                            </div>
+                          )}
+
                           {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
                           
                           <Avatar 
@@ -1163,11 +1160,12 @@ export const PataPartyView = () => {
                                       d === 'frazionario' ? 'bg-[#a855f7] border-[#9333ea]' :
                                       d === 'carismatico' ? 'bg-[#f59e0b] border-[#d97706]' :
                                       d === 'doppio' ? 'bg-[#eab308] border-[#ca8a04]' :
+                                      d === 'negativo' ? 'bg-[#6b7280] border-[#4b5563]' :
                                       'bg-[#10b981] border-[#059669]';
                       
-                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : d === 'doppio' ? 'Dado Doppio' : 'Dado di Scambio';
-                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : d === 'doppio' ? 'Tira due dadi da 1 a 4' : 'Può uscire un giocatore a caso';
-                      const shortLabel = d === 'scambio' ? 'S' : d === 'doppio' ? 'D' : d.charAt(0).toUpperCase();
+                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : d === 'doppio' ? 'Dado Doppio' : d === 'negativo' ? 'Dado Negativo' : 'Dado di Scambio';
+                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : d === 'doppio' ? 'Tira due dadi da 1 a 4' : d === 'negativo' ? 'Può uscire da -1 a -6' : 'Può uscire un giocatore a caso';
+                      const shortLabel = d === 'scambio' ? 'S' : d === 'doppio' ? 'D' : d === 'negativo' ? 'N' : d.charAt(0).toUpperCase();
 
                       return (
                         <div key={i} className="group/dice relative">
@@ -1420,6 +1418,12 @@ export const PataPartyView = () => {
                                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
                               >
                                 <Plus size={14} /> Dado Carismatico
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'negativo')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#9ca3af] hover:bg-[#9ca3af] hover:text-[#111214] rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Negativo (-1 a -6)
                               </button>
                               <button 
                                 onClick={() => addSpecialDice(p.id, 'scambio')}
