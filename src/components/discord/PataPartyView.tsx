@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -17,13 +17,14 @@ interface Player {
   x: number;
   y: number;
   lastRoll?: number | null;
-  specialDice?: string[]; // 'ebete', 'vigilante', 'frazionario'
+  specialDice?: string[];
 }
 
 interface GameState {
   status: 'lobby' | 'playing';
   players: Player[];
   activePlayerId?: string | null;
+  boardUrl?: string; // Nuovo stato per l'URL del tabellone
 }
 
 interface DiceState {
@@ -102,20 +103,18 @@ export const PataPartyView = () => {
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
+  const [boardUrl, setBoardUrl] = useState<string>('/pataparty-board.png');
+  const [boardUrlInput, setBoardUrlInput] = useState<string>(''); // Per l'input del GM
   
-  // Stati Dado
   const [diceState, setDiceState] = useState<DiceState | null>(null);
-
-  // Stato persistente per permettere il rientro
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
-  // Drag & Drop States
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' });
 
   useEffect(() => {
     if (user) {
@@ -146,6 +145,8 @@ export const PataPartyView = () => {
   const syncState = () => {
     setPlayers([...stateRef.current.players]);
     setActivePlayerId(stateRef.current.activePlayerId || null);
+    setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
+    
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
       if (codeToSave) {
@@ -159,10 +160,10 @@ export const PataPartyView = () => {
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
       setDiceState(prev => prev ? { ...prev, rolling: false } : null);
-    }, 1500); // tempo di animazione rotolamento
+    }, 1500); 
     setTimeout(() => {
       setDiceState(null);
-    }, 5000); // tempo in cui rimane visibile il risultato
+    }, 5000); 
   };
 
   const setupHostChannel = (code: string) => {
@@ -170,7 +171,7 @@ export const PataPartyView = () => {
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
       const newPlayer = payload.payload;
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
-        stateRef.current.players.push({ ...newPlayer, x: 25, y: 85, lastRoll: null, specialDice: [] });
+        stateRef.current.players.push({ ...newPlayer, x: 50, y: 50, lastRoll: null, specialDice: [] });
         syncState();
         showSuccess(`${newPlayer.name} si è unito!`);
       } else {
@@ -181,19 +182,15 @@ export const PataPartyView = () => {
       const { playerId, result, diceType } = payload.payload;
       handleDiceRoll(playerId, result, diceType);
       
-      // Il GM riceve il tiro, aggiorna lo stato e consuma il dado speciale se usato
       const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
       if (pIndex !== -1) {
         stateRef.current.players[pIndex].lastRoll = result;
-        
         if (diceType) {
           const diceArr = stateRef.current.players[pIndex].specialDice || [];
           const dIndex = diceArr.indexOf(diceType);
           if (dIndex !== -1) diceArr.splice(dIndex, 1);
           stateRef.current.players[pIndex].specialDice = diceArr;
         }
-        
-        // Passa il turno (Fine Turno)
         stateRef.current.activePlayerId = null;
         syncState();
       }
@@ -209,6 +206,7 @@ export const PataPartyView = () => {
       stateRef.current = state;
       setPlayers(state.players);
       setActivePlayerId(state.activePlayerId || null);
+      setBoardUrl(state.boardUrl || '/pataparty-board.png');
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -243,12 +241,13 @@ export const PataPartyView = () => {
     setGameCode(code);
     setIsHost(true);
     setView('lobby');
+    setBoardUrl('/pataparty-board.png');
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null };
+    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -287,13 +286,14 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
+      setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -329,7 +329,6 @@ export const PataPartyView = () => {
     if (!isHost) return;
     stateRef.current.activePlayerId = playerId;
     
-    // Azzera l'ultimo tiro del giocatore che riceve il turno
     const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
     if (pIndex !== -1) {
       stateRef.current.players[pIndex].lastRoll = null;
@@ -366,10 +365,9 @@ export const PataPartyView = () => {
 
     handleDiceRoll(user.id, result, diceType);
     channelRef.current?.send({ type: 'broadcast', event: 'dice_roll', payload: { playerId: user.id, result, diceType } });
-    setActivePlayerId(null); // Fine turno immediato (ottimistico per la UI locale)
+    setActivePlayerId(null);
   };
 
-  // --- DRAG & DROP LOGIC ---
   const handlePointerDown = (e: React.PointerEvent, playerId: string) => {
     if (!isHost) return;
     e.stopPropagation();
@@ -475,7 +473,7 @@ export const PataPartyView = () => {
         </div>
       )}
 
-      {/* Menu Principale (Se c'è una partita attiva, mostra RIENTRA) */}
+      {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center border border-brand/50">
           <h1 className="text-4xl font-black text-white mb-6 flex items-center justify-center gap-3">
@@ -655,7 +653,7 @@ export const PataPartyView = () => {
 
           <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
             
-            {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreto in basso a destra) */}
+            {/* PULSANTI DADI PER IL GIOCATORE ATTIVO */}
             {activePlayerId === user?.id && !isHost && (
               <div className="absolute bottom-6 right-6 z-[150] flex flex-col items-end gap-2 animate-in slide-in-from-bottom-5">
                 <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
@@ -698,49 +696,53 @@ export const PataPartyView = () => {
               </div>
             )}
 
-            {/* Tabellone Centrale (Immagine Sfondo + Drag&Drop libero) */}
+            {/* Tabellone Centrale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
+              
+              {/* Contenitore adattivo per l'immagine */}
               <div 
                 ref={boardRef}
-                className="relative w-full h-full max-w-6xl max-h-[80vh] rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[#3f4147] bg-[#fcf6ce] overflow-hidden"
-                style={{ 
-                  backgroundImage: 'url(/pataparty-board.png)',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat'
-                }}
+                className="relative inline-flex items-center justify-center max-w-full max-h-[85vh]"
               >
-                <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm pointer-events-none opacity-50 z-[5]">
-                  Assicurati di avere 'pataparty-board.png' in /public
-                </div>
-
-                {players.map(p => {
-                  const isTurn = activePlayerId === p.id;
-                  return (
-                    <div 
-                      key={p.id} 
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out group ${
-                        isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110 z-20 hover:z-50' : 'z-10'
-                      }`}
-                      style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                      onPointerDown={(e) => handlePointerDown(e, p.id)}
-                      onPointerMove={handlePointerMove}
-                      onPointerUp={handlePointerUp}
-                    >
-                      {/* Indicatore turno visivo sotto l'avatar */}
-                      {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
-                      
-                      <Avatar 
-                        src={p.avatar} 
-                        decoration={p.avatar_decoration} 
-                        className={`w-10 h-10 md:w-12 md:h-12 object-cover shadow-xl border-2 ${isTurn ? 'border-[#23a559]' : 'border-white'} bg-[#313338] pointer-events-none select-none relative z-10`} 
-                      />
-                      <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                        {p.name}
+                <img 
+                  src={boardUrl} 
+                  alt="Board" 
+                  className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border-2 border-[#3f4147] bg-[#fcf6ce]" 
+                  draggable={false} 
+                  onError={(e) => {
+                    e.currentTarget.src = '/pataparty-board.png'; 
+                  }}
+                />
+                
+                {/* Overlay per le pedine: occupa esattemente lo spazio dell'immagine visibile */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+                  {players.map(p => {
+                    const isTurn = activePlayerId === p.id;
+                    return (
+                      <div 
+                        key={p.id} 
+                        className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out group pointer-events-auto ${
+                          isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110 z-20 hover:z-50' : 'z-10'
+                        }`}
+                        style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                        onPointerDown={(e) => handlePointerDown(e, p.id)}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                      >
+                        {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
+                        
+                        <Avatar 
+                          src={p.avatar} 
+                          decoration={p.avatar_decoration} 
+                          className={`w-10 h-10 md:w-12 md:h-12 object-cover shadow-xl border-2 ${isTurn ? 'border-[#23a559]' : 'border-white'} bg-[#313338] pointer-events-none select-none relative z-10`} 
+                        />
+                        <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                          {p.name}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {isHost && (
@@ -751,8 +753,39 @@ export const PataPartyView = () => {
               )}
             </div>
 
-            {/* Sidebar Giocatori (Destra) */}
+            {/* Sidebar Giocatori e Impostazioni GM (Destra) */}
             <div className="w-full md:w-72 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10">
+              
+              {isHost && (
+                <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                  <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
+                    <ImageIcon size={14} /> Sfondo Tabellone (URL)
+                  </h4>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="https://..."
+                      value={boardUrlInput}
+                      onChange={e => setBoardUrlInput(e.target.value)}
+                      className="flex-1 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                    />
+                    <button
+                      onClick={() => {
+                        const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
+                        stateRef.current.boardUrl = finalUrl;
+                        setBoardUrl(finalUrl);
+                        syncState();
+                        showSuccess("Tabellone aggiornato!");
+                        setBoardUrlInput('');
+                      }}
+                      className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                    >
+                      Applica
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                 <Users size={18} className="text-[#dbdee1]" /> Giocatori in Partita
               </h3>
