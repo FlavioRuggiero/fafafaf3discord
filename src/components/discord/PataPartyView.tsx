@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -25,6 +25,7 @@ interface GameState {
   players: Player[];
   activePlayerId?: string | null;
   boardUrl?: string;
+  rules?: string;
 }
 
 interface DiceState {
@@ -132,11 +133,16 @@ export const PataPartyView = () => {
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  
+  // Regole State
+  const [showRules, setShowRules] = useState(false);
+  const [rulesText, setRulesText] = useState("");
+
   const boardRef = useRef<HTMLDivElement>(null);
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' });
 
   useEffect(() => {
     if (user) {
@@ -229,6 +235,7 @@ export const PataPartyView = () => {
       setPlayers(state.players);
       setActivePlayerId(state.activePlayerId || null);
       setBoardUrl(state.boardUrl || '/pataparty-board.png');
+      setRulesText(state.rules || '');
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -264,12 +271,13 @@ export const PataPartyView = () => {
     setIsHost(true);
     setView('lobby');
     setBoardUrl('/pataparty-board.png');
+    setRulesText('');
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' };
+    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -308,14 +316,15 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png' };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
       setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
+      setRulesText(stateRef.current.rules || '');
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -338,6 +347,7 @@ export const PataPartyView = () => {
     setJoinCode('');
     setPlayers([]);
     setActivePlayerId(null);
+    setShowRules(false);
   };
 
   const startGame = () => {
@@ -430,6 +440,12 @@ export const PataPartyView = () => {
       setDraggingId(null);
       syncState(); 
     }
+  };
+
+  const handleSaveRules = () => {
+    stateRef.current.rules = rulesText;
+    syncState();
+    showSuccess("Regole aggiornate e condivise!");
   };
 
   const PlayerListItem = ({ p, isTurn }: { p: Player, isTurn: boolean }) => {
@@ -690,7 +706,6 @@ export const PataPartyView = () => {
                   className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border-2 border-[#3f4147] bg-[#fcf6ce]" 
                   draggable={false} 
                   onError={(e) => {
-                    // Fallback all'immagine di default se l'URL non è valido
                     e.currentTarget.src = '/pataparty-board.png'; 
                   }}
                 />
@@ -744,12 +759,26 @@ export const PataPartyView = () => {
                 </div>
               </div>
 
-              {isHost && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10">
-                  <Info size={16} className="text-yellow-500" />
-                  Trascina le pedine dei giocatori per spostarle sul tabellone.
-                </div>
-              )}
+              {/* Pulsante Regole e Suggerimento Host */}
+              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
+                <button
+                  onClick={() => setShowRules(true)}
+                  className="bg-[#2b2d31]/90 backdrop-blur-md px-4 py-2 rounded-lg border border-[#1e1f22] text-white font-bold flex items-center gap-2 shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 pointer-events-auto"
+                >
+                  <BookOpen size={20} className="text-[#a855f7]" />
+                  Regole
+                </button>
+
+                {isHost && (
+                  <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
+                    <Info size={16} className="text-yellow-500" />
+                    Trascina le pedine dei giocatori per spostarle sul tabellone.
+                  </div>
+                )}
+                
+                {/* Div vuoto per bilanciare il flex se non c'è il suggerimento */}
+                <div className="w-[100px] hidden md:block"></div>
+              </div>
 
               {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
               {activePlayerId === user?.id && !isHost && (
@@ -933,6 +962,43 @@ export const PataPartyView = () => {
             </div>
             
           </div>
+
+          {/* Pannello Regole (Slide da sinistra) */}
+          <div className={`absolute top-0 bottom-0 left-0 w-80 md:w-96 bg-[#2b2d31] border-r border-[#1e1f22] shadow-[20px_0_50px_rgba(0,0,0,0.5)] z-[200] transition-transform duration-300 flex flex-col ${showRules ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="p-4 border-b border-[#1f2023] flex justify-between items-center bg-[#1e1f22]">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <BookOpen size={20} className="text-[#a855f7]" />
+                Regole della Partita
+              </h3>
+              <button onClick={() => setShowRules(false)} className="text-[#949ba4] hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+              {isHost ? (
+                <div className="flex flex-col h-full">
+                  <p className="text-xs text-[#949ba4] mb-3 uppercase font-bold">Modifica Regole (Solo GM)</p>
+                  <textarea
+                    value={rulesText}
+                    onChange={(e) => setRulesText(e.target.value)}
+                    placeholder="Scrivi qui le regole della partita..."
+                    className="flex-1 bg-[#1e1f22] text-[#dbdee1] p-3 rounded-lg border border-[#3f4147] focus:border-[#a855f7] outline-none resize-none custom-scrollbar"
+                  />
+                  <button
+                    onClick={handleSaveRules}
+                    className="mt-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded transition-colors"
+                  >
+                    Salva e Condividi
+                  </button>
+                </div>
+              ) : (
+                <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed">
+                  {stateRef.current.rules || <span className="text-[#949ba4] italic">Il Game Master non ha ancora impostato le regole.</span>}
+                </div>
+              )}
+            </div>
+          </div>
+          
         </div>
       )}
     </div>
