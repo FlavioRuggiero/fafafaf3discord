@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -26,6 +26,8 @@ interface GameState {
   activePlayerId?: string | null;
   boardUrl?: string;
   rules?: string;
+  iframeUrl?: string | null;
+  isIframeActive?: boolean;
 }
 
 interface DiceState {
@@ -129,6 +131,11 @@ export const PataPartyView = () => {
   const [boardUrl, setBoardUrl] = useState<string>('/pataparty-board.png');
   const [boardUrlInput, setBoardUrlInput] = useState<string>('');
   
+  // Iframe Globale
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [isIframeActive, setIsIframeActive] = useState<boolean>(false);
+  const [iframeInput, setIframeInput] = useState<string>('');
+
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
@@ -142,7 +149,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false });
 
   useEffect(() => {
     if (user) {
@@ -174,6 +181,8 @@ export const PataPartyView = () => {
     setPlayers([...stateRef.current.players]);
     setActivePlayerId(stateRef.current.activePlayerId || null);
     setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
+    setIframeUrl(stateRef.current.iframeUrl || null);
+    setIsIframeActive(stateRef.current.isIframeActive || false);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -236,6 +245,8 @@ export const PataPartyView = () => {
       setActivePlayerId(state.activePlayerId || null);
       setBoardUrl(state.boardUrl || '/pataparty-board.png');
       setRulesText(state.rules || '');
+      setIframeUrl(state.iframeUrl || null);
+      setIsIframeActive(state.isIframeActive || false);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -272,12 +283,14 @@ export const PataPartyView = () => {
     setView('lobby');
     setBoardUrl('/pataparty-board.png');
     setRulesText('');
+    setIframeUrl(null);
+    setIsIframeActive(false);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' };
+    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -316,15 +329,17 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '' };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
       setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
       setRulesText(stateRef.current.rules || '');
+      setIframeUrl(stateRef.current.iframeUrl || null);
+      setIsIframeActive(stateRef.current.isIframeActive || false);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -348,6 +363,7 @@ export const PataPartyView = () => {
     setPlayers([]);
     setActivePlayerId(null);
     setShowRules(false);
+    setIsIframeActive(false);
   };
 
   const startGame = () => {
@@ -355,6 +371,28 @@ export const PataPartyView = () => {
     stateRef.current.status = 'playing';
     syncState();
     setView('playing');
+  };
+
+  const startIframe = () => {
+    if (!isHost) return;
+    if (!iframeInput.trim()) {
+      showError("Inserisci un URL valido.");
+      return;
+    }
+    stateRef.current.iframeUrl = iframeInput.trim();
+    stateRef.current.isIframeActive = true;
+    setIframeUrl(iframeInput.trim());
+    setIsIframeActive(true);
+    syncState();
+    showSuccess("Iframe avviato per tutti i giocatori!");
+  };
+
+  const stopIframe = () => {
+    if (!isHost) return;
+    stateRef.current.isIframeActive = false;
+    setIsIframeActive(false);
+    syncState();
+    showSuccess("Iframe interrotto.");
   };
 
   const setTurn = (playerId: string) => {
@@ -515,6 +553,51 @@ export const PataPartyView = () => {
           animation: dice-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
       `}</style>
+
+      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro, solo come popup in basso) */}
+      {diceState && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200000] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-[#111214]/90 backdrop-blur-sm px-6 py-4 rounded-2xl border-2 border-[#1e1f22] shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center gap-3">
+            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
+            <div className="text-xl font-black text-white drop-shadow-md text-center mt-1">
+              {diceState.rolling ? (
+                <span className="animate-pulse text-[#b5bac1]">Rotolando...</span>
+              ) : (
+                <span className="text-[#23a559] flex items-center gap-1.5 justify-center">
+                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
+                  {diceState.diceType === 'scambio' ? (
+                    <span className="font-bold text-white ml-0.5">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
+                  ) : (
+                    <span className="font-bold text-white ml-0.5">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
+                  )}!
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY IFRAME GLOBALE */}
+      {isIframeActive && iframeUrl && (
+        <div className="absolute inset-0 z-[250] bg-[#111214] flex flex-col animate-in fade-in zoom-in-95 duration-300">
+          {isHost && (
+            <div className="absolute top-6 right-6 z-[300]">
+              <button 
+                onClick={stopIframe} 
+                className="bg-[#f23f43] hover:bg-[#da373c] text-white px-5 py-2.5 rounded-full font-bold shadow-[0_0_20px_rgba(242,63,67,0.5)] flex items-center gap-2 transition-transform hover:scale-105"
+              >
+                <X size={20} /> Chiudi Gioco per tutti
+              </button>
+            </div>
+          )}
+          <iframe 
+            src={iframeUrl} 
+            className="w-full h-full border-none"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      )}
 
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
@@ -730,7 +813,7 @@ export const PataPartyView = () => {
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                       >
-                        {/* BALLOON DEL DADO */}
+                        {/* BALLOON DEL DADO (ora mostrato solo qui sopra l'utente) */}
                         {isRolling && diceState && (
                           <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
                             <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
@@ -851,33 +934,65 @@ export const PataPartyView = () => {
             <div className="w-full md:w-72 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10">
               
               {isHost && (
-                <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                  <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
-                    <ImageIcon size={14} /> Sfondo Tabellone (URL)
-                  </h4>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="https://..."
-                      value={boardUrlInput}
-                      onChange={e => setBoardUrlInput(e.target.value)}
-                      className="flex-1 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
-                    />
-                    <button
-                      onClick={() => {
-                        const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
-                        stateRef.current.boardUrl = finalUrl;
-                        setBoardUrl(finalUrl);
-                        syncState();
-                        showSuccess("Tabellone aggiornato!");
-                        setBoardUrlInput('');
-                      }}
-                      className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
-                    >
-                      Applica
-                    </button>
+                <>
+                  <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
+                      <ImageIcon size={14} /> Sfondo Tabellone (URL)
+                    </h4>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="https://..."
+                        value={boardUrlInput}
+                        onChange={e => setBoardUrlInput(e.target.value)}
+                        className="flex-1 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                      />
+                      <button
+                        onClick={() => {
+                          const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
+                          stateRef.current.boardUrl = finalUrl;
+                          setBoardUrl(finalUrl);
+                          syncState();
+                          showSuccess("Tabellone aggiornato!");
+                          setBoardUrlInput('');
+                        }}
+                        className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                      >
+                        Applica
+                      </button>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
+                      <Globe size={14} /> Iframe Globale (Minigioco)
+                    </h4>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={iframeInput}
+                        onChange={e => setIframeInput(e.target.value)}
+                        className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                      />
+                      {isIframeActive ? (
+                        <button
+                          onClick={stopIframe}
+                          className="w-full bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                        >
+                          Interrompi Iframe
+                        </button>
+                      ) : (
+                        <button
+                          onClick={startIframe}
+                          className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                        >
+                          Avvia per tutti
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
 
               <h3 className="text-white font-bold mb-4 flex items-center gap-2">
