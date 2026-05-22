@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -19,6 +19,7 @@ interface Player {
   y: number;
   lastRoll?: number | string | number[] | null;
   specialDice?: string[];
+  money?: number;
 }
 
 interface ChatMessage {
@@ -44,6 +45,7 @@ interface GameState {
     winners: Player[];
   } | null;
   chatMessages?: ChatMessage[];
+  isCommercial?: boolean;
 }
 
 interface DiceState {
@@ -142,6 +144,8 @@ export const PataPartyView = () => {
   const [isHost, setIsHost] = useState(false);
   const [gameCode, setGameCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const [isCommercialMode, setIsCommercialMode] = useState(false);
+  const [isCommercial, setIsCommercial] = useState(false);
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
@@ -165,11 +169,12 @@ export const PataPartyView = () => {
   const [unreadChat, setUnreadChat] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Stati Builder Classifica
+  // Stati Builder Classifica e Soldi
   const [lbTitle, setLbTitle] = useState('Risultati Finali');
   const [lbDesc, setLbDesc] = useState('Ecco i vincitori di questo minigioco!');
   const [lbWinners, setLbWinners] = useState<string[]>([]);
   const [lbPlayerSelect, setLbPlayerSelect] = useState('');
+  const [moneyAmounts, setMoneyAmounts] = useState<Record<string, string>>({});
 
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
@@ -184,7 +189,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false });
 
   useEffect(() => {
     if (user) {
@@ -232,8 +237,8 @@ export const PataPartyView = () => {
     setIsIframeActive(stateRef.current.isIframeActive || false);
     setAnnouncement(stateRef.current.announcement || null);
     setLeaderboard(stateRef.current.leaderboard || null);
-    // Non resettiamo i chatMessages qui per evitare perdite, si sincronizzano con l'intero stato
     setChatMessages(stateRef.current.chatMessages || []);
+    setIsCommercial(stateRef.current.isCommercial || false);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -255,12 +260,29 @@ export const PataPartyView = () => {
     }, 5000); 
   };
 
+  const handleUpdateMoney = (playerId: string, amount: number) => {
+    if (!isHost) return;
+    const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
+    if (pIndex !== -1) {
+      const current = stateRef.current.players[pIndex].money || 0;
+      stateRef.current.players[pIndex].money = current + amount;
+      syncState();
+    }
+  };
+
   const setupHostChannel = (code: string) => {
     const channel = supabase.channel(`pataparty_${code}`);
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
       const newPlayer = payload.payload;
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
-        stateRef.current.players.push({ ...newPlayer, x: 50, y: 50, lastRoll: null, specialDice: [] });
+        stateRef.current.players.push({ 
+          ...newPlayer, 
+          x: 50, 
+          y: 50, 
+          lastRoll: null, 
+          specialDice: [],
+          money: stateRef.current.isCommercial ? 0 : undefined 
+        });
         syncState();
         showSuccess(`${newPlayer.name} si è unito!`);
       } else {
@@ -308,6 +330,7 @@ export const PataPartyView = () => {
       setAnnouncement(state.announcement || null);
       setLeaderboard(state.leaderboard || null);
       setChatMessages(state.chatMessages || []);
+      setIsCommercial(state.isCommercial || false);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -357,12 +380,25 @@ export const PataPartyView = () => {
     setChatMessages([]);
     setUnreadChat(false);
     setShowChat(false);
+    setIsCommercial(isCommercialMode);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] };
+    stateRef.current = { 
+      status: 'lobby', 
+      players: [], 
+      activePlayerId: null, 
+      boardUrl: '/pataparty-board.png', 
+      rules: '', 
+      iframeUrl: null, 
+      isIframeActive: false, 
+      announcement: null, 
+      leaderboard: null, 
+      chatMessages: [],
+      isCommercial: isCommercialMode 
+    };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -406,10 +442,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [] };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -420,6 +456,7 @@ export const PataPartyView = () => {
       setAnnouncement(stateRef.current.announcement || null);
       setLeaderboard(stateRef.current.leaderboard || null);
       setChatMessages(stateRef.current.chatMessages || []);
+      setIsCommercial(stateRef.current.isCommercial || false);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -448,6 +485,8 @@ export const PataPartyView = () => {
     setLeaderboard(null);
     setChatMessages([]);
     setShowChat(false);
+    setIsCommercialMode(false);
+    setIsCommercial(false);
   };
 
   const startGame = () => {
@@ -651,8 +690,13 @@ export const PataPartyView = () => {
         <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
           {p.name}
         </span>
+        {isCommercial && (
+          <span className="text-[#23a559] font-bold text-xs bg-[#23a559]/10 border border-[#23a559]/20 px-1.5 py-0.5 rounded whitespace-nowrap">
+            {p.money || 0}€
+          </span>
+        )}
         {p.lastRoll !== null && p.lastRoll !== undefined && !isCurrentlyRolling && !isIframeActive && (
-          <div className="ml-auto flex items-center justify-center w-max px-1.5 min-w-[28px] h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3 overflow-hidden">
+          <div className="ml-auto flex items-center justify-center w-max px-1.5 min-w-[28px] h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3 overflow-hidden ml-2">
             <span className="text-[#111214] font-black text-xs md:text-sm flex items-center justify-center w-full h-full whitespace-nowrap">{rollContent}</span>
           </div>
         )}
@@ -741,7 +785,13 @@ export const PataPartyView = () => {
                 <h2 className="text-white font-bold mb-2 flex items-center justify-center gap-2">
                   <Crown size={18} className="text-yellow-500" /> Crea una nuova partita
                 </h2>
-                <p className="text-xs text-[#949ba4] mb-4">Diventa il Game Master e controlla il tabellone.</p>
+                <p className="text-xs text-[#949ba4] mb-3">Diventa il Game Master e controlla il tabellone.</p>
+                
+                <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm text-[#dbdee1] justify-center bg-[#2b2d31] py-2 rounded-lg border border-[#3f4147]">
+                  <input type="checkbox" checked={isCommercialMode} onChange={e => setIsCommercialMode(e.target.checked)} className="accent-brand w-4 h-4" />
+                  Modalità Commerciale (Soldi)
+                </label>
+
                 <button 
                   onClick={createGame}
                   className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-medium py-2 px-4 rounded transition-colors"
@@ -901,7 +951,10 @@ export const PataPartyView = () => {
                           <div key={p.id} className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-transform ${bgClass}`}>
                             <div className="w-10 flex items-center justify-center text-4xl">{badge}</div>
                             <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-12 h-12 object-cover shadow-lg" />
-                            <span className={`text-xl font-bold flex-1 truncate ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                            <div className="flex-1 flex justify-between items-center overflow-hidden gap-4">
+                              <span className={`text-xl font-bold truncate ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                              {isCommercial && <span className="text-[#23a559] font-bold text-lg">{p.money || 0}€</span>}
+                            </div>
                           </div>
                         )
                       })}
@@ -959,14 +1012,14 @@ export const PataPartyView = () => {
                         <div 
                           key={p.id} 
                           className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out group pointer-events-auto ${
-                            isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110 z-20 hover:z-50' : 'z-10'
-                          }`}
+                            isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110' : ''
+                          } ${isTurn ? 'z-[60] scale-110' : 'z-10 hover:z-50'}`}
                           style={{ left: `${p.x}%`, top: `${p.y}%` }}
                           onPointerDown={(e) => handlePointerDown(e, p.id)}
                           onPointerMove={handlePointerMove}
                           onPointerUp={handlePointerUp}
                         >
-                          {/* BALLOON DEL DADO (ora mostrato solo qui sopra l'utente) */}
+                          {/* BALLOON DEL DADO */}
                           {isRolling && diceState && (
                             <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
                               <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
@@ -982,15 +1035,16 @@ export const PataPartyView = () => {
                             </div>
                           )}
 
-                          {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
+                          {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0 pointer-events-none"></div>}
                           
                           <Avatar 
                             src={p.avatar} 
                             decoration={p.avatar_decoration} 
                             className={`w-10 h-10 md:w-12 md:h-12 object-cover shadow-xl border-2 ${isTurn ? 'border-[#23a559]' : 'border-white'} bg-[#313338] pointer-events-none select-none relative z-10`} 
                           />
-                          <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                            {p.name}
+                          <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg flex flex-col items-center ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                            <span>{p.name}</span>
+                            {isCommercial && <span className="text-[#23a559] mt-0.5">{p.money || 0}€</span>}
                           </div>
                         </div>
                       );
@@ -1127,7 +1181,7 @@ export const PataPartyView = () => {
 
               </div>
 
-              {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
+              {/* PULSANTI DADI PER IL GIOCATORE ATTIVO */}
               {activePlayerId === user?.id && !isHost && !isIframeActive && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
                   <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
@@ -1431,6 +1485,25 @@ export const PataPartyView = () => {
                               >
                                 <Plus size={14} /> Dado di Scambio
                               </button>
+
+                              {isCommercial && (
+                                <>
+                                  <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
+                                  <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Gestione Soldi</div>
+                                  <div className="flex items-center gap-1.5 px-2 py-1">
+                                    <input
+                                      type="number"
+                                      value={moneyAmounts[p.id] || ''}
+                                      onChange={(e) => setMoneyAmounts({...moneyAmounts, [p.id]: e.target.value})}
+                                      placeholder="Importo..."
+                                      className="w-16 bg-[#1e1f22] text-white text-xs px-2 py-1.5 rounded border border-[#3f4147] focus:border-[#23a559] outline-none"
+                                    />
+                                    <button onClick={() => { handleUpdateMoney(p.id, parseInt(moneyAmounts[p.id] || '0')); setMoneyAmounts({...moneyAmounts, [p.id]: ''}); }} className="flex-1 p-1.5 bg-[#23a559] hover:bg-[#1a7c43] text-white rounded flex items-center justify-center transition-colors"><Plus size={14}/></button>
+                                    <button onClick={() => { handleUpdateMoney(p.id, -parseInt(moneyAmounts[p.id] || '0')); setMoneyAmounts({...moneyAmounts, [p.id]: ''}); }} className="flex-1 p-1.5 bg-[#f23f43] hover:bg-[#da373c] text-white rounded flex items-center justify-center transition-colors"><Minus size={14}/></button>
+                                  </div>
+                                </>
+                              )}
+
                             </Popover.Content>
                           </Popover.Portal>
                         </Popover.Root>
