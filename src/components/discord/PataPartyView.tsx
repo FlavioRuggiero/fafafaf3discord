@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, RefreshCw } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -17,7 +17,7 @@ interface Player {
   avatar_decoration: string | null;
   x: number;
   y: number;
-  lastRoll?: number | string | number[] | null;
+  lastRoll?: number | string | number[] | string[] | null;
   specialDice?: string[];
   money?: number;
 }
@@ -46,17 +46,18 @@ interface GameState {
   } | null;
   chatMessages?: ChatMessage[];
   isCommercial?: boolean;
+  autoTurn?: boolean;
 }
 
 interface DiceState {
   playerId: string;
-  result: number | string | number[];
+  result: number | string | number[] | string[];
   rolling: boolean;
   diceType?: string;
 }
 
-const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: number | string | number[], rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[] }) => {
-  const [displayValue, setDisplayValue] = useState<number | string | number[]>(value);
+const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: number | string | number[] | string[], rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[] }) => {
+  const [displayValue, setDisplayValue] = useState<number | string | number[] | string[]>(value);
   
   useEffect(() => {
     if (rolling) {
@@ -66,6 +67,12 @@ const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: numbe
         else if (diceType === 'frazionario') setDisplayValue([1.5, 2.5, 3.5][Math.floor(Math.random() * 3)]);
         else if (diceType === 'carismatico') setDisplayValue(['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)]);
         else if (diceType === 'negativo') setDisplayValue(-(Math.floor(Math.random() * 6) + 1));
+        else if (diceType === 'scintilla') setDisplayValue(Math.floor(Math.random() * 5) + 6); // 6 to 10
+        else if (diceType === 'triplo') setDisplayValue([Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1]);
+        else if (diceType === 'alfabetico') {
+          const getChar = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
+          setDisplayValue([getChar(), getChar(), getChar()]);
+        }
         else if (diceType === 'scambio' && players && players.length > 0) setDisplayValue(players[Math.floor(Math.random() * players.length)].id);
         else if (diceType === 'doppio') setDisplayValue([Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1]);
         else setDisplayValue(Math.floor(Math.random() * 6) + 1);
@@ -146,6 +153,7 @@ export const PataPartyView = () => {
   const [joinCode, setJoinCode] = useState('');
   const [isCommercialMode, setIsCommercialMode] = useState(false);
   const [isCommercial, setIsCommercial] = useState(false);
+  const [autoTurn, setAutoTurn] = useState(false);
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
@@ -189,7 +197,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, autoTurn: false });
 
   useEffect(() => {
     if (user) {
@@ -239,6 +247,7 @@ export const PataPartyView = () => {
     setLeaderboard(stateRef.current.leaderboard || null);
     setChatMessages(stateRef.current.chatMessages || []);
     setIsCommercial(stateRef.current.isCommercial || false);
+    setAutoTurn(stateRef.current.autoTurn || false);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -249,7 +258,7 @@ export const PataPartyView = () => {
     channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
 
-  const handleDiceRoll = (playerId: string, result: number | string | number[], diceType?: string) => {
+  const handleDiceRoll = (playerId: string, result: number | string | number[] | string[], diceType?: string) => {
     playSound('/openingsound.mp3');
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
@@ -302,8 +311,33 @@ export const PataPartyView = () => {
           if (dIndex !== -1) diceArr.splice(dIndex, 1);
           stateRef.current.players[pIndex].specialDice = diceArr;
         }
-        stateRef.current.activePlayerId = null;
-        syncState();
+
+        if (stateRef.current.autoTurn) {
+          const nextIndex = (pIndex + 1) % stateRef.current.players.length;
+          const nextPlayerId = stateRef.current.players[nextIndex].id;
+          
+          stateRef.current.activePlayerId = null;
+          syncState();
+
+          setTimeout(() => {
+            if (stateRef.current.autoTurn) {
+              const stillExists = stateRef.current.players.some(p => p.id === nextPlayerId);
+              if (stillExists) {
+                stateRef.current.activePlayerId = nextPlayerId;
+                const pIdx = stateRef.current.players.findIndex(p => p.id === nextPlayerId);
+                if (pIdx !== -1) stateRef.current.players[pIdx].lastRoll = null;
+                syncState();
+              } else if (stateRef.current.players.length > 0) {
+                stateRef.current.activePlayerId = stateRef.current.players[0].id;
+                stateRef.current.players[0].lastRoll = null;
+                syncState();
+              }
+            }
+          }, 2500); // 1.5s animazione + 1s pausa
+        } else {
+          stateRef.current.activePlayerId = null;
+          syncState();
+        }
       }
     });
     channel.on('broadcast', { event: 'chat_message' }, (payload) => {
@@ -331,6 +365,7 @@ export const PataPartyView = () => {
       setLeaderboard(state.leaderboard || null);
       setChatMessages(state.chatMessages || []);
       setIsCommercial(state.isCommercial || false);
+      setAutoTurn(state.autoTurn || false);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -381,6 +416,7 @@ export const PataPartyView = () => {
     setUnreadChat(false);
     setShowChat(false);
     setIsCommercial(isCommercialMode);
+    setAutoTurn(false);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
@@ -397,7 +433,8 @@ export const PataPartyView = () => {
       announcement: null, 
       leaderboard: null, 
       chatMessages: [],
-      isCommercial: isCommercialMode 
+      isCommercial: isCommercialMode,
+      autoTurn: false
     };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
@@ -442,10 +479,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, autoTurn: false };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, autoTurn: false };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -457,6 +494,7 @@ export const PataPartyView = () => {
       setLeaderboard(stateRef.current.leaderboard || null);
       setChatMessages(stateRef.current.chatMessages || []);
       setIsCommercial(stateRef.current.isCommercial || false);
+      setAutoTurn(stateRef.current.autoTurn || false);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -487,6 +525,7 @@ export const PataPartyView = () => {
     setShowChat(false);
     setIsCommercialMode(false);
     setIsCommercial(false);
+    setAutoTurn(false);
   };
 
   const startGame = () => {
@@ -577,14 +616,14 @@ export const PataPartyView = () => {
       const currentDice = stateRef.current.players[pIndex].specialDice || [];
       stateRef.current.players[pIndex].specialDice = [...currentDice, type];
       syncState();
-      showSuccess(`Dado ${type} assegnato!`);
+      showSuccess(`Dado assegnato!`);
     }
   };
 
   const rollDice = (diceType?: string) => {
     if (activePlayerId !== user?.id || diceState?.rolling) return;
     
-    let result: number | string | number[] = 0;
+    let result: number | string | number[] | string[] = 0;
     if (diceType === 'ebete') {
       result = [1, 1, 6][Math.floor(Math.random() * 3)];
     } else if (diceType === 'vigilante') {
@@ -595,6 +634,13 @@ export const PataPartyView = () => {
       result = ['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)];
     } else if (diceType === 'negativo') {
       result = -(Math.floor(Math.random() * 6) + 1);
+    } else if (diceType === 'scintilla') {
+      result = Math.floor(Math.random() * 5) + 6;
+    } else if (diceType === 'triplo') {
+      result = [Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1];
+    } else if (diceType === 'alfabetico') {
+      const getChar = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
+      result = [getChar(), getChar(), getChar()];
     } else if (diceType === 'scambio') {
       const currentPlayers = stateRef.current.players;
       result = currentPlayers[Math.floor(Math.random() * currentPlayers.length)].id;
@@ -606,7 +652,11 @@ export const PataPartyView = () => {
 
     handleDiceRoll(user.id, result, diceType);
     channelRef.current?.send({ type: 'broadcast', event: 'dice_roll', payload: { playerId: user.id, result, diceType } });
-    setActivePlayerId(null);
+    
+    // Rimuoviamo il turno locale solo se NON è auto-turno (altrimenti lo gestisce l'host)
+    if (!stateRef.current.autoTurn) {
+      setActivePlayerId(null);
+    }
   };
 
   const handlePointerDown = (e: React.PointerEvent, playerId: string) => {
@@ -673,8 +723,9 @@ export const PataPartyView = () => {
     let rollContent: React.ReactNode = p.lastRoll;
     
     if (Array.isArray(p.lastRoll)) {
-      rollContent = `${p.lastRoll[0]} + ${p.lastRoll[1]}`;
-    } else if (typeof p.lastRoll === 'string') {
+      rollContent = p.lastRoll.join(' + ');
+    } else if (typeof p.lastRoll === 'string' && p.lastRoll.length > 2) {
+      // Se è un ID (lungo), renderizza l'avatar per il dado scambio
       const rolledPlayer = players.find(pl => pl.id === p.lastRoll);
       if (rolledPlayer) {
         rollContent = <Avatar src={rolledPlayer.avatar} decoration={rolledPlayer.avatar_decoration} className="w-5 h-5 object-cover" />;
@@ -1026,6 +1077,8 @@ export const PataPartyView = () => {
                                 {diceState.rolling ? 'Sta tirando...' : 
                                  diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
                                  diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
+                                 diceState.diceType === 'triplo' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result.join(', ')}!` :
+                                 diceState.diceType === 'alfabetico' && Array.isArray(diceState.result) ? `${p.name} ha trovato ${diceState.result.join(', ')}!` :
                                  `${p.name} ha fatto ${diceState.result}!`}
                               </div>
                               <div className="relative">
@@ -1190,9 +1243,9 @@ export const PataPartyView = () => {
                     <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
                   </div>
                   
-                  <div className="flex gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl">
+                  <div className="flex gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl overflow-x-auto max-w-full">
                     {/* Dado Normale */}
-                    <div className="group/dice relative">
+                    <div className="group/dice relative flex-shrink-0">
                       <button
                         onClick={() => rollDice()}
                         disabled={diceState?.rolling}
@@ -1215,14 +1268,47 @@ export const PataPartyView = () => {
                                       d === 'carismatico' ? 'bg-[#f59e0b] border-[#d97706]' :
                                       d === 'doppio' ? 'bg-[#eab308] border-[#ca8a04]' :
                                       d === 'negativo' ? 'bg-[#6b7280] border-[#4b5563]' :
-                                      'bg-[#10b981] border-[#059669]';
+                                      d === 'scintilla' ? 'bg-[#06b6d4] border-[#0891b2]' :
+                                      d === 'triplo' ? 'bg-[#ec4899] border-[#db2777]' :
+                                      d === 'alfabetico' ? 'bg-[#6366f1] border-[#4f46e5]' :
+                                      'bg-[#10b981] border-[#059669]'; // scambio
                       
-                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : d === 'doppio' ? 'Dado Doppio' : d === 'negativo' ? 'Dado Negativo' : 'Dado di Scambio';
-                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : d === 'doppio' ? 'Tira due dadi da 1 a 4' : d === 'negativo' ? 'Può uscire da -1 a -6' : 'Può uscire un giocatore a caso';
-                      const shortLabel = d === 'scambio' ? 'S' : d === 'doppio' ? 'D' : d === 'negativo' ? 'N' : d.charAt(0).toUpperCase();
+                      const label = d === 'ebete' ? 'Dado Ebete' : 
+                                    d === 'vigilante' ? 'Dado Vigilante' : 
+                                    d === 'frazionario' ? 'Dado Frazionario' : 
+                                    d === 'carismatico' ? 'Dado Carismatico' : 
+                                    d === 'doppio' ? 'Dado Doppio' : 
+                                    d === 'negativo' ? 'Dado Negativo' : 
+                                    d === 'scintilla' ? 'Dado Scintilla' :
+                                    d === 'triplo' ? 'Dado Triplo' :
+                                    d === 'alfabetico' ? 'Dado Alfabetico' :
+                                    'Dado di Scambio';
+                      
+                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : 
+                                   d === 'vigilante' ? 'Può uscire 3, 4 o 5' : 
+                                   d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : 
+                                   d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : 
+                                   d === 'doppio' ? 'Tira due dadi da 1 a 4' : 
+                                   d === 'negativo' ? 'Può uscire da -1 a -6' : 
+                                   d === 'scintilla' ? 'Può uscire da 6 a 10' :
+                                   d === 'triplo' ? 'Tira tre dadi da 1 a 3' :
+                                   d === 'alfabetico' ? '3 lettere a caso' :
+                                   'Può uscire un giocatore a caso';
+                      
+                      const shortLabel = d === 'ebete' ? 'E' :
+                                         d === 'vigilante' ? 'V' :
+                                         d === 'frazionario' ? 'F' :
+                                         d === 'carismatico' ? 'C' :
+                                         d === 'doppio' ? 'D2' :
+                                         d === 'negativo' ? 'N' :
+                                         d === 'scambio' ? 'S' :
+                                         d === 'scintilla' ? 'SC' :
+                                         d === 'triplo' ? 'T3' :
+                                         d === 'alfabetico' ? 'A' :
+                                         d.charAt(0).toUpperCase();
 
                       return (
-                        <div key={i} className="group/dice relative">
+                        <div key={i} className="group/dice relative flex-shrink-0">
                           <button
                             onClick={() => rollDice(d)}
                             disabled={diceState?.rolling}
@@ -1251,6 +1337,19 @@ export const PataPartyView = () => {
               
               {isHost && (
                 <>
+                  <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147] flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white uppercase flex items-center gap-1">
+                        <RefreshCw size={14} className="text-brand" /> Turni Automatici
+                      </span>
+                      <span className="text-[10px] text-[#949ba4]">Passa al prossimo dopo il tiro</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" checked={!!autoTurn} onChange={(e) => { stateRef.current.autoTurn = e.target.checked; syncState(); }} className="sr-only peer" />
+                      <div className="w-9 h-5 bg-[#80848e] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#23a559]"></div>
+                    </label>
+                  </div>
+
                   {!isIframeActive && (
                     <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                       <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
@@ -1462,22 +1561,40 @@ export const PataPartyView = () => {
                                 <Plus size={14} /> Dado Fraz. (1.5, 2.5, 3.5)
                               </button>
                               <button 
-                                onClick={() => addSpecialDice(p.id, 'doppio')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#eab308] hover:bg-[#eab308] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Doppio (1-4, 1-4)
-                              </button>
-                              <button 
                                 onClick={() => addSpecialDice(p.id, 'carismatico')}
                                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
                               >
                                 <Plus size={14} /> Dado Carismatico
                               </button>
                               <button 
+                                onClick={() => addSpecialDice(p.id, 'doppio')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#eab308] hover:bg-[#eab308] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Doppio (1-4, 1-4)
+                              </button>
+                              <button 
                                 onClick={() => addSpecialDice(p.id, 'negativo')}
                                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#9ca3af] hover:bg-[#9ca3af] hover:text-[#111214] rounded w-full text-left transition-colors font-medium mb-0.5"
                               >
                                 <Plus size={14} /> Dado Negativo (-1 a -6)
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'scintilla')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#06b6d4] hover:bg-[#06b6d4] hover:text-[#111214] rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Scintilla (6 a 10)
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'triplo')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#ec4899] hover:bg-[#ec4899] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Triplo (x3: 1 a 3)
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'alfabetico')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#6366f1] hover:bg-[#6366f1] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Alfabetico (A-Z)
                               </button>
                               <button 
                                 onClick={() => addSpecialDice(p.id, 'scambio')}
