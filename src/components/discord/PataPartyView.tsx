@@ -148,12 +148,38 @@ export const PataPartyView = () => {
 
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar">
+      <style>{`
+        @keyframes wave-text {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        .animate-wave-text {
+          display: inline-block;
+          animation: wave-text 1s infinite ease-in-out;
+        }
+        @keyframes beat {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.15); }
+        }
+        .animate-beat {
+          display: inline-block;
+          animation: beat 1s infinite;
+        }
+      `}</style>
+
       {view === 'menu' && (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center">
           <h1 className="text-3xl font-black text-white mb-2 flex items-center justify-center gap-3">
             <span className="text-[#ec4899]">PataParty!</span>
           </h1>
-          <p className="text-[#949ba4] mb-8">Il gioco dell'oca ufficiale del server.</p>
+          
+          <p className="text-[#dbdee1] mb-8 text-[15px] leading-relaxed max-w-[90%] mx-auto">
+            Gioca gli eventi <span className="text-red-500 font-black animate-beat mx-1 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]">UFFICIALI</span> e Vinci per ricevere a casa un pacco di <span className="text-yellow-400 font-black inline-flex mx-1 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]">
+              {"PATATINE".split('').map((char, i) => (
+                <span key={i} className="animate-wave-text" style={{ animationDelay: `${i * 0.1}s` }}>{char}</span>
+              ))}
+            </span> a caso di amazon!
+          </p>
 
           <div className="space-y-6">
             <div className="bg-[#1e1f22] p-4 rounded-lg">
