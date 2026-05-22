@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -17,6 +17,7 @@ interface Player {
   x: number;
   y: number;
   lastRoll?: number | null;
+  specialDice?: string[]; // 'ebete', 'vigilante', 'frazionario'
 }
 
 interface GameState {
@@ -25,19 +26,29 @@ interface GameState {
   activePlayerId?: string | null;
 }
 
-const Dice = ({ value, rolling }: { value: number, rolling: boolean }) => {
+interface DiceState {
+  playerId: string;
+  result: number;
+  rolling: boolean;
+  diceType?: string;
+}
+
+const Dice = ({ value, rolling, diceType }: { value: number, rolling: boolean, diceType?: string }) => {
   const [displayValue, setDisplayValue] = useState(value);
   
   useEffect(() => {
     if (rolling) {
       const interval = setInterval(() => {
-        setDisplayValue(Math.floor(Math.random() * 6) + 1);
+        if (diceType === 'ebete') setDisplayValue([1, 1, 6][Math.floor(Math.random() * 3)]);
+        else if (diceType === 'vigilante') setDisplayValue([3, 4, 5][Math.floor(Math.random() * 3)]);
+        else if (diceType === 'frazionario') setDisplayValue([1.5, 2.5, 3.5][Math.floor(Math.random() * 3)]);
+        else setDisplayValue(Math.floor(Math.random() * 6) + 1);
       }, 100);
       return () => clearInterval(interval);
     } else {
       setDisplayValue(value);
     }
-  }, [rolling, value]);
+  }, [rolling, value, diceType]);
 
   const dotPositions: Record<number, string[]> = {
     1: ['center'],
@@ -61,11 +72,19 @@ const Dice = ({ value, rolling }: { value: number, rolling: boolean }) => {
     }
   };
 
+  const isInteger1to6 = Number.isInteger(displayValue) && displayValue >= 1 && displayValue <= 6;
+
   return (
-    <div className={`w-32 h-32 bg-white rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] border-4 border-gray-200 p-4 grid grid-cols-3 grid-rows-3 gap-2 ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
-      {dotPositions[displayValue]?.map((pos, i) => (
-        <div key={i} className={`w-6 h-6 bg-[#111214] rounded-full place-self-center shadow-inner ${getDotClass(pos)}`} />
-      ))}
+    <div className={`w-32 h-32 bg-white rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] border-4 border-gray-200 p-4 flex items-center justify-center ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
+      {isInteger1to6 ? (
+        <div className="w-full h-full grid grid-cols-3 grid-rows-3 gap-2">
+          {dotPositions[displayValue]?.map((pos, i) => (
+            <div key={i} className={`w-6 h-6 bg-[#111214] rounded-full place-self-center shadow-inner ${getDotClass(pos)}`} />
+          ))}
+        </div>
+      ) : (
+        <span className="text-5xl font-black text-[#111214]">{displayValue}</span>
+      )}
     </div>
   );
 };
@@ -85,7 +104,7 @@ export const PataPartyView = () => {
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   
   // Stati Dado
-  const [diceState, setDiceState] = useState<{playerId: string, result: number, rolling: boolean} | null>(null);
+  const [diceState, setDiceState] = useState<DiceState | null>(null);
 
   // Stato persistente per permettere il rientro
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
@@ -136,8 +155,8 @@ export const PataPartyView = () => {
     channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
 
-  const handleDiceRoll = (playerId: string, result: number) => {
-    setDiceState({ playerId, result, rolling: true });
+  const handleDiceRoll = (playerId: string, result: number, diceType?: string) => {
+    setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
       setDiceState(prev => prev ? { ...prev, rolling: false } : null);
     }, 1500); // tempo di animazione rotolamento
@@ -151,7 +170,7 @@ export const PataPartyView = () => {
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
       const newPlayer = payload.payload;
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
-        stateRef.current.players.push({ ...newPlayer, x: 25, y: 85, lastRoll: null });
+        stateRef.current.players.push({ ...newPlayer, x: 25, y: 85, lastRoll: null, specialDice: [] });
         syncState();
         showSuccess(`${newPlayer.name} si è unito!`);
       } else {
@@ -159,13 +178,23 @@ export const PataPartyView = () => {
       }
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
-      const { playerId, result } = payload.payload;
-      handleDiceRoll(playerId, result);
+      const { playerId, result, diceType } = payload.payload;
+      handleDiceRoll(playerId, result, diceType);
       
-      // Il GM riceve il tiro, aggiorna lo stato del giocatore e sincronizza
+      // Il GM riceve il tiro, aggiorna lo stato e consuma il dado speciale se usato
       const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
       if (pIndex !== -1) {
         stateRef.current.players[pIndex].lastRoll = result;
+        
+        if (diceType) {
+          const diceArr = stateRef.current.players[pIndex].specialDice || [];
+          const dIndex = diceArr.indexOf(diceType);
+          if (dIndex !== -1) diceArr.splice(dIndex, 1);
+          stateRef.current.players[pIndex].specialDice = diceArr;
+        }
+        
+        // Passa il turno (Fine Turno)
+        stateRef.current.activePlayerId = null;
         syncState();
       }
     });
@@ -183,7 +212,8 @@ export const PataPartyView = () => {
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
-      handleDiceRoll(payload.payload.playerId, payload.payload.result);
+      const { playerId, result, diceType } = payload.payload;
+      handleDiceRoll(playerId, result, diceType);
     });
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED' && user) {
@@ -309,11 +339,34 @@ export const PataPartyView = () => {
     showSuccess("Turno impostato!");
   };
 
-  const rollDice = () => {
+  const addSpecialDice = (playerId: string, type: string) => {
+    if (!isHost) return;
+    const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
+    if (pIndex !== -1) {
+      const currentDice = stateRef.current.players[pIndex].specialDice || [];
+      stateRef.current.players[pIndex].specialDice = [...currentDice, type];
+      syncState();
+      showSuccess(`Dado ${type} assegnato!`);
+    }
+  };
+
+  const rollDice = (diceType?: string) => {
     if (activePlayerId !== user?.id || diceState?.rolling) return;
-    const result = Math.floor(Math.random() * 6) + 1;
-    handleDiceRoll(user.id, result);
-    channelRef.current?.send({ type: 'broadcast', event: 'dice_roll', payload: { playerId: user.id, result } });
+    
+    let result = 0;
+    if (diceType === 'ebete') {
+      result = [1, 1, 6][Math.floor(Math.random() * 3)];
+    } else if (diceType === 'vigilante') {
+      result = [3, 4, 5][Math.floor(Math.random() * 3)];
+    } else if (diceType === 'frazionario') {
+      result = [1.5, 2.5, 3.5][Math.floor(Math.random() * 3)];
+    } else {
+      result = Math.floor(Math.random() * 6) + 1;
+    }
+
+    handleDiceRoll(user.id, result, diceType);
+    channelRef.current?.send({ type: 'broadcast', event: 'dice_roll', payload: { playerId: user.id, result, diceType } });
+    setActivePlayerId(null); // Fine turno immediato (ottimistico per la UI locale)
   };
 
   // --- DRAG & DROP LOGIC ---
@@ -352,7 +405,6 @@ export const PataPartyView = () => {
     }
   };
 
-  // Sotto-componente per renderizzare le info del giocatore (evita duplicazioni)
   const PlayerListItem = ({ p, isTurn }: { p: Player, isTurn: boolean }) => (
     <>
       {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
@@ -361,8 +413,8 @@ export const PataPartyView = () => {
         {p.name}
       </span>
       {p.lastRoll && (
-        <div className="ml-auto flex items-center justify-center w-6 h-6 bg-white rounded shadow-sm border border-gray-300">
-          <span className="text-[#111214] font-black text-xs">{p.lastRoll}</span>
+        <div className="ml-auto flex items-center justify-center w-7 h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3">
+          <span className="text-[#111214] font-black text-sm">{p.lastRoll}</span>
         </div>
       )}
     </>
@@ -409,7 +461,7 @@ export const PataPartyView = () => {
       {diceState && (
         <div className="fixed inset-0 z-[200000] flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="flex flex-col items-center">
-            <Dice value={diceState.result} rolling={diceState.rolling} />
+            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} />
             <div className="mt-8 text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]">
               {diceState.rolling ? (
                 <span className="animate-pulse">Rotolando...</span>
@@ -603,29 +655,51 @@ export const PataPartyView = () => {
 
           <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
             
+            {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreto in basso a destra) */}
+            {activePlayerId === user?.id && !isHost && (
+              <div className="absolute bottom-6 right-6 z-[150] flex flex-col items-end gap-2 animate-in slide-in-from-bottom-5">
+                <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
+                  È il tuo turno!
+                  <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
+                </div>
+                
+                <div className="flex gap-2">
+                  {/* Dado Normale */}
+                  <button
+                    onClick={() => rollDice()}
+                    disabled={diceState?.rolling}
+                    className="w-14 h-14 bg-white hover:bg-gray-100 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 border-gray-300 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative group"
+                    title="Dado Normale (1-6)"
+                  >
+                    <Dices size={28} className="text-[#111214]" />
+                  </button>
+
+                  {/* Dadi Speciali */}
+                  {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => (
+                    <button
+                      key={i}
+                      onClick={() => rollDice(d)}
+                      disabled={diceState?.rolling}
+                      className={`w-14 h-14 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative group ${
+                        d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
+                        d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
+                        'bg-[#a855f7] border-[#9333ea]'
+                      }`}
+                      title={d === 'ebete' ? 'Dado Ebete (1, 1, 6)' : d === 'vigilante' ? 'Dado Vigilante (3, 4, 5)' : 'Dado Frazionario (1.5, 2.5, 3.5)'}
+                    >
+                      <Dices size={28} className="text-white" />
+                      <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
+                        {d.charAt(0)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Tabellone Centrale (Immagine Sfondo + Drag&Drop libero) */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
-              
-              {/* TASTO TIRA IL DADO PER IL GIOCATORE ATTIVO (Discreto in basso a destra del tabellone) */}
-              {activePlayerId === user?.id && !isHost && (
-                <div className="absolute bottom-6 right-6 z-[150] flex flex-col items-end gap-2 animate-in slide-in-from-bottom-5">
-                  <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative">
-                    È il tuo turno!
-                    <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
-                  </div>
-                  <button
-                    onClick={rollDice}
-                    disabled={diceState?.rolling}
-                    className="w-16 h-16 bg-white hover:bg-gray-100 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-4 border-gray-200 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 group relative"
-                    title="Tira il dado"
-                  >
-                    <Dices size={32} className="text-[#111214]" />
-                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-[#23a559] rounded-full animate-ping"></span>
-                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-[#23a559] rounded-full border-2 border-[#111214]"></span>
-                  </button>
-                </div>
-              )}
-
               <div 
                 ref={boardRef}
                 className="relative w-full h-full max-w-6xl max-h-[80vh] rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[#3f4147] bg-[#fcf6ce] overflow-hidden"
@@ -697,12 +771,34 @@ export const PataPartyView = () => {
                             </div>
                           </Popover.Trigger>
                           <Popover.Portal>
-                            <Popover.Content className="z-[99999] bg-[#111214] border border-[#1e1f22] p-1.5 rounded-md shadow-xl" side="left" align="center" sideOffset={10}>
+                            <Popover.Content className="z-[99999] bg-[#111214] border border-[#1e1f22] p-1.5 rounded-md shadow-xl min-w-[200px]" side="left" align="start" sideOffset={10}>
                               <button 
                                 onClick={() => setTurn(p.id)}
-                                className="flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-[#5865F2] rounded w-full text-left transition-colors font-medium"
+                                className="flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-[#5865F2] rounded w-full text-left transition-colors font-medium mb-1"
                               >
                                 <Play size={14} /> Imposta Turno
+                              </button>
+                              
+                              <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
+                              <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Aggiungi Dado Monouso</div>
+                              
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'ebete')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Ebete (1,1,6)
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'vigilante')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Vigilante (3,4,5)
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'frazionario')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#a855f7] hover:bg-[#a855f7] hover:text-white rounded w-full text-left transition-colors font-medium"
+                              >
+                                <Plus size={14} /> Dado Fraz. (1.5, 2.5, 3.5)
                               </button>
                             </Popover.Content>
                           </Popover.Portal>
