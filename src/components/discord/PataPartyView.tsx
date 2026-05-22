@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Crown, Users, Play, ArrowRight, ArrowLeft, Minimize2, LogOut } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
 
@@ -13,7 +13,8 @@ interface Player {
   name: string;
   avatar: string;
   avatar_decoration: string | null;
-  position: number;
+  x: number;
+  y: number;
 }
 
 interface GameState {
@@ -38,10 +39,14 @@ export const PataPartyView = () => {
   // Stato persistente per permettere il rientro
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
+  // Drag & Drop States
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const lastSyncRef = useRef<number>(0);
+
   const channelRef = useRef<any>(null);
   const stateRef = useRef<GameState>({ status: 'lobby', players: [] });
 
-  // Carica il profilo e controlla se esiste una partita salvata
   useEffect(() => {
     if (user) {
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({data}) => setProfile(data));
@@ -85,11 +90,12 @@ export const PataPartyView = () => {
       const newPlayer = payload.payload;
       // Il GM non viene aggiunto ai giocatori
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
-        stateRef.current.players.push({ ...newPlayer, position: 0 });
+        // Posiziona i nuovi giocatori all'inizio del tabellone in basso a sinistra (Casella 01)
+        stateRef.current.players.push({ ...newPlayer, x: 25, y: 85 });
         syncState();
         showSuccess(`${newPlayer.name} si è unito!`);
       } else {
-        // Se un giocatore rientra, forziamo il reinvio dello stato per sincronizzarlo
+        // Se un giocatore rientra, forziamo il reinvio dello stato
         channel.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
       }
     });
@@ -135,12 +141,10 @@ export const PataPartyView = () => {
     setIsHost(true);
     setView('lobby');
     
-    // Salva l'attività della partita per il RIENTRO
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    // Il GameMaster NON è tra i giocatori giocanti
     stateRef.current = { status: 'lobby', players: [] };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
@@ -189,7 +193,7 @@ export const PataPartyView = () => {
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
-      setView('lobby'); // Passerà a 'playing' quando il GM invia lo state_update
+      setView('lobby'); 
       setupPlayerChannel(savedGame.code);
     }
   };
@@ -216,17 +220,44 @@ export const PataPartyView = () => {
     setView('playing');
   };
 
-  const movePlayer = (playerId: string, steps: number) => {
+  // --- DRAG & DROP LOGIC ---
+  const handlePointerDown = (e: React.PointerEvent, playerId: string) => {
     if (!isHost) return;
-    const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
-    if (pIndex !== -1) {
-      const newPos = Math.max(0, Math.min(63, stateRef.current.players[pIndex].position + steps));
-      stateRef.current.players[pIndex].position = newPos;
-      syncState();
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDraggingId(playerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!draggingId || !isHost || !boardRef.current) return;
+    
+    const rect = boardRef.current.getBoundingClientRect();
+    let x = ((e.clientX - rect.left) / rect.width) * 100;
+    let y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Limiti del tabellone
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
+
+    // Aggiornamento locale rapido
+    setPlayers(prev => prev.map(p => p.id === draggingId ? { ...p, x, y } : p));
+    stateRef.current.players = stateRef.current.players.map(p => p.id === draggingId ? { ...p, x, y } : p);
+
+    // Sync in tempo reale verso gli altri utenti (limitato a 1 volta ogni 50ms)
+    const now = Date.now();
+    if (now - lastSyncRef.current > 50) {
+      channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
+      lastSyncRef.current = now;
     }
   };
 
-  const BOARD_SIZE = 64; // Da 0 a 63
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (draggingId && isHost) {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      setDraggingId(null);
+      syncState(); // Sync finale
+    }
+  };
 
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
@@ -358,7 +389,6 @@ export const PataPartyView = () => {
               Giocatori ({players.length})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
-              {/* Il GameMaster non è un pedone giocante, ma lo mostriamo in lobby per far capire chi è l'host */}
               {isHost && (
                 <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
                   <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
@@ -405,6 +435,7 @@ export const PataPartyView = () => {
       {/* FULLSCREEN PER LA PARTITA ATTIVA */}
       {view === 'playing' && (
         <div className="fixed inset-0 z-[99999] bg-[#111214] w-full h-full flex flex-col animate-in fade-in duration-300">
+          {/* Header Partita */}
           <div className="flex items-center justify-between bg-[#2b2d31] p-4 border-b border-[#1e1f22] shrink-0 shadow-md">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -414,7 +445,7 @@ export const PataPartyView = () => {
             </div>
             <div className="flex items-center gap-3">
               <button 
-                onClick={() => setView('menu')} // Minimizza il tabellone tornando al menu "Rientra"
+                onClick={() => setView('menu')} 
                 className="flex items-center gap-2 bg-[#4e5058] hover:bg-[#6d6f78] text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
               >
                 <Minimize2 size={16} /> Riduci a Icona
@@ -428,106 +459,79 @@ export const PataPartyView = () => {
             </div>
           </div>
 
-          <div className="flex gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338]">
-            {/* Tabellone Centrale */}
-            <div className="flex-1 bg-[#2b2d31] rounded-lg p-6 overflow-y-auto custom-scrollbar relative shadow-inner">
-              <div className="flex flex-wrap gap-3 justify-center max-w-5xl mx-auto">
-                {Array.from({length: BOARD_SIZE}).map((_, i) => {
-                  const isStart = i === 0;
-                  const isEnd = i === BOARD_SIZE - 1;
-                  const playersHere = players.filter(p => p.position === i);
-                  
-                  return (
-                    <div 
-                      key={i} 
-                      className={`w-20 h-20 md:w-24 md:h-24 rounded-xl relative flex flex-col items-center justify-center transition-all ${
-                        isStart ? 'bg-[#23a559]/20 border-2 border-[#23a559] shadow-[0_0_15px_rgba(35,165,89,0.3)]' : 
-                        isEnd ? 'bg-yellow-500/20 border-2 border-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.3)]' : 
-                        'bg-[#1e1f22] border border-[#3f4147]'
-                      }`}
-                    >
-                      <span className={`absolute top-1 left-1.5 text-[10px] font-bold ${isStart ? 'text-[#23a559]' : isEnd ? 'text-yellow-500' : 'text-[#949ba4]'}`}>
-                        {isStart ? 'START' : isEnd ? 'FINISH' : i}
-                      </span>
-                      
-                      <div className="flex flex-wrap gap-1 items-center justify-center mt-3 p-1">
-                        {playersHere.map(p => (
-                          <div key={p.id} className="relative group hover:z-50 transition-all">
-                            <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 object-cover bg-[#313338]" />
-                            <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                              {p.name}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+          <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338]">
+            
+            {/* Tabellone Centrale (Immagine Sfondo + Drag&Drop) */}
+            <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
+              
+              <div 
+                ref={boardRef}
+                className="relative w-full max-w-6xl aspect-[4/3] rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[#3f4147] bg-[#fcf6ce] overflow-hidden"
+                style={{ 
+                  backgroundImage: 'url(/pataparty-board.png)',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat'
+                }}
+              >
+                {/* Se l'immagine non è presente, mostra un avviso temporaneo */}
+                <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm pointer-events-none opacity-50">
+                  Assicurati di avere 'pataparty-board.png' in /public
+                </div>
+
+                {players.map(p => (
+                  <div 
+                    key={p.id} 
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out group ${
+                      isHost ? 'cursor-grab active:cursor-grabbing hover:scale-110 z-20 hover:z-50' : 'z-10'
+                    }`}
+                    style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                    onPointerDown={(e) => handlePointerDown(e, p.id)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                  >
+                    <Avatar 
+                      src={p.avatar} 
+                      decoration={p.avatar_decoration} 
+                      className="w-10 h-10 md:w-12 md:h-12 object-cover shadow-xl border-2 border-white bg-[#313338] pointer-events-none select-none" 
+                    />
+                    <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold shadow-lg ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                      {p.name}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
+
+              {/* Informazione per il GM */}
+              {isHost && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none">
+                  <Info size={16} className="text-yellow-500" />
+                  Trascina le pedine dei giocatori per spostarle sul tabellone.
+                </div>
+              )}
             </div>
 
-            {/* Colonna Destra (Controlli GM o Classifica) */}
-            {isHost ? (
-              <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                  <Crown size={18} className="text-yellow-500" /> Controlli GM
-                </h3>
-                
-                <div className="space-y-4">
-                  {players.map(p => (
-                    <div key={p.id} className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
-                        <span className={`text-sm font-medium truncate ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
-                        <span className="ml-auto text-xs bg-[#2b2d31] px-2 py-0.5 rounded text-[#949ba4] font-bold">
-                          Casella {p.position}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={() => movePlayer(p.id, -1)}
-                          className="bg-[#4e5058] hover:bg-[#6d6f78] text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors"
-                        >
-                          <ArrowLeft size={12} /> Indietro
-                        </button>
-                        <button 
-                          onClick={() => movePlayer(p.id, 1)}
-                          className="bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors"
-                        >
-                          Avanti <ArrowRight size={12} />
-                        </button>
-                        <button 
-                          onClick={() => movePlayer(p.id, 3)}
-                          className="col-span-2 bg-[#23a559] hover:bg-[#1a7f44] text-white text-xs py-1.5 rounded transition-colors"
-                        >
-                          +3 Caselle
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {players.length === 0 && (
-                    <div className="text-center text-[#949ba4] text-sm py-8 border border-dashed border-[#3f4147] rounded-lg">
-                      Tutti i giocatori hanno abbandonato
-                    </div>
-                  )}
-                </div>
+            {/* Sidebar Giocatori (Destra) */}
+            <div className="w-full md:w-72 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner">
+              <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                <Users size={18} className="text-[#dbdee1]" /> Giocatori in Partita
+              </h3>
+              
+              <div className="space-y-2">
+                {players.map((p, i) => (
+                  <div key={p.id} className="bg-[#1e1f22] p-2 rounded-lg border border-[#3f4147] flex items-center gap-3 hover:border-brand transition-colors">
+                    <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
+                    <span className={`text-sm font-medium truncate ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                  </div>
+                ))}
+                {players.length === 0 && (
+                  <div className="text-center text-[#949ba4] text-sm py-8 border border-dashed border-[#3f4147] rounded-lg">
+                    Tutti i giocatori hanno abbandonato
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 shadow-inner">
-                 <h3 className="text-white font-bold mb-4">Classifica</h3>
-                 <div className="space-y-2">
-                   {[...players].sort((a, b) => b.position - a.position).map((p, i) => (
-                     <div key={p.id} className="flex items-center gap-2 bg-[#1e1f22] p-2 rounded">
-                       <span className="text-[#949ba4] font-bold w-4 text-center">{i + 1}</span>
-                       <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
-                       <span className={`text-sm truncate flex-1 font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
-                       <span className="text-xs text-[#23a559] font-bold bg-[#2b2d31] px-2 py-0.5 rounded">{p.position}</span>
-                     </div>
-                   ))}
-                 </div>
-               </div>
-            )}
+            </div>
+            
           </div>
         </div>
       )}
