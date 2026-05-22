@@ -16,6 +16,7 @@ interface Player {
   avatar_decoration: string | null;
   x: number;
   y: number;
+  lastRoll?: number | null;
 }
 
 interface GameState {
@@ -150,7 +151,7 @@ export const PataPartyView = () => {
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
       const newPlayer = payload.payload;
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
-        stateRef.current.players.push({ ...newPlayer, x: 25, y: 85 });
+        stateRef.current.players.push({ ...newPlayer, x: 25, y: 85, lastRoll: null });
         syncState();
         showSuccess(`${newPlayer.name} si è unito!`);
       } else {
@@ -158,7 +159,15 @@ export const PataPartyView = () => {
       }
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
-      handleDiceRoll(payload.payload.playerId, payload.payload.result);
+      const { playerId, result } = payload.payload;
+      handleDiceRoll(playerId, result);
+      
+      // Il GM riceve il tiro, aggiorna lo stato del giocatore e sincronizza
+      const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
+      if (pIndex !== -1) {
+        stateRef.current.players[pIndex].lastRoll = result;
+        syncState();
+      }
     });
     channel.subscribe();
     channelRef.current = channel;
@@ -289,6 +298,13 @@ export const PataPartyView = () => {
   const setTurn = (playerId: string) => {
     if (!isHost) return;
     stateRef.current.activePlayerId = playerId;
+    
+    // Azzera l'ultimo tiro del giocatore che riceve il turno
+    const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
+    if (pIndex !== -1) {
+      stateRef.current.players[pIndex].lastRoll = null;
+    }
+    
     syncState();
     showSuccess("Turno impostato!");
   };
@@ -335,6 +351,22 @@ export const PataPartyView = () => {
       syncState(); 
     }
   };
+
+  // Sotto-componente per renderizzare le info del giocatore (evita duplicazioni)
+  const PlayerListItem = ({ p, isTurn }: { p: Player, isTurn: boolean }) => (
+    <>
+      {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
+      <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
+      <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+        {p.name}
+      </span>
+      {p.lastRoll && (
+        <div className="ml-auto flex items-center justify-center w-6 h-6 bg-white rounded shadow-sm border border-gray-300">
+          <span className="text-[#111214] font-black text-xs">{p.lastRoll}</span>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
@@ -571,25 +603,29 @@ export const PataPartyView = () => {
 
           <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
             
-            {/* TASTO TIRA IL DADO PER IL GIOCATORE ATTIVO */}
-            {activePlayerId === user?.id && !isHost && (
-              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-[#2b2d31]/90 backdrop-blur-md p-6 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.6)] border border-[#1e1f22] flex flex-col items-center z-[150] animate-in slide-in-from-bottom-10">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-lg">
-                  <Dices className="text-[#23a559]" size={24} /> È il tuo turno!
-                </h3>
-                <button
-                  onClick={rollDice}
-                  disabled={diceState?.rolling}
-                  className="bg-[#23a559] hover:bg-[#1a7f44] text-white font-black py-4 px-12 rounded-xl transition-all shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 text-xl tracking-widest border border-transparent hover:border-[#4ade80]"
-                >
-                  TIRA IL DADO
-                </button>
-              </div>
-            )}
-
             {/* Tabellone Centrale (Immagine Sfondo + Drag&Drop libero) */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
+              {/* TASTO TIRA IL DADO PER IL GIOCATORE ATTIVO (Discreto in basso a destra del tabellone) */}
+              {activePlayerId === user?.id && !isHost && (
+                <div className="absolute bottom-6 right-6 z-[150] flex flex-col items-end gap-2 animate-in slide-in-from-bottom-5">
+                  <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative">
+                    È il tuo turno!
+                    <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
+                  </div>
+                  <button
+                    onClick={rollDice}
+                    disabled={diceState?.rolling}
+                    className="w-16 h-16 bg-white hover:bg-gray-100 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-4 border-gray-200 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 group relative"
+                    title="Tira il dado"
+                  >
+                    <Dices size={32} className="text-[#111214]" />
+                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-[#23a559] rounded-full animate-ping"></span>
+                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-[#23a559] rounded-full border-2 border-[#111214]"></span>
+                  </button>
+                </div>
+              )}
+
               <div 
                 ref={boardRef}
                 className="relative w-full h-full max-w-6xl max-h-[80vh] rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[#3f4147] bg-[#fcf6ce] overflow-hidden"
@@ -657,9 +693,7 @@ export const PataPartyView = () => {
                         <Popover.Root>
                           <Popover.Trigger asChild>
                             <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147] hover:border-brand'} flex items-center gap-3 transition-colors cursor-pointer relative`}>
-                              {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
-                              <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
-                              <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                              <PlayerListItem p={p} isTurn={isTurn} />
                             </div>
                           </Popover.Trigger>
                           <Popover.Portal>
@@ -675,9 +709,7 @@ export const PataPartyView = () => {
                         </Popover.Root>
                       ) : (
                         <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147]'} flex items-center gap-3 transition-colors relative`}>
-                          {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
-                          <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
-                          <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                          <PlayerListItem p={p} isTurn={isTurn} />
                         </div>
                       )}
                     </React.Fragment>
