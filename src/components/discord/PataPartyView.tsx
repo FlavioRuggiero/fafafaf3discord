@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { playSound } from "@/utils/sounds";
 import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
@@ -194,6 +195,7 @@ export const PataPartyView = () => {
   };
 
   const handleDiceRoll = (playerId: string, result: number | string | number[], diceType?: string) => {
+    playSound('/pullcommon.mp3');
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
       setDiceState(prev => prev ? { ...prev, rolling: false } : null);
@@ -508,7 +510,7 @@ export const PataPartyView = () => {
         <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
           {p.name}
         </span>
-        {p.lastRoll !== null && p.lastRoll !== undefined && !isCurrentlyRolling && (
+        {p.lastRoll !== null && p.lastRoll !== undefined && !isCurrentlyRolling && !isIframeActive && (
           <div className="ml-auto flex items-center justify-center w-max px-1.5 min-w-[28px] h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3 overflow-hidden">
             <span className="text-[#111214] font-black text-xs md:text-sm flex items-center justify-center w-full h-full whitespace-nowrap">{rollContent}</span>
           </div>
@@ -553,6 +555,29 @@ export const PataPartyView = () => {
           animation: dice-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
       `}</style>
+
+      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro, solo come popup in basso) */}
+      {diceState && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200000] pointer-events-none flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-[#111214]/90 backdrop-blur-sm px-6 py-4 rounded-2xl border-2 border-[#1e1f22] shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center gap-3">
+            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
+            <div className="text-xl font-black text-white drop-shadow-md text-center mt-1">
+              {diceState.rolling ? (
+                <span className="animate-pulse text-[#b5bac1]">Rotolando...</span>
+              ) : (
+                <span className="text-[#23a559] flex items-center gap-1.5 justify-center">
+                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
+                  {diceState.diceType === 'scambio' ? (
+                    <span className="font-bold text-white ml-0.5">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
+                  ) : (
+                    <span className="font-bold text-white ml-0.5">{Array.isArray(diceState.result) ? `${diceState.result[0]} e ${diceState.result[1]}` : diceState.result}</span>
+                  )}!
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
@@ -811,28 +836,28 @@ export const PataPartyView = () => {
                 </div>
               )}
 
-              {/* Pulsante Regole e Suggerimento Host (Nascosti durante Iframe per recuperare spazio) */}
-              {!isIframeActive && (
-                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
-                  <button
-                    onClick={() => setShowRules(true)}
-                    className="bg-[#2b2d31]/90 backdrop-blur-md px-4 py-2 rounded-lg border border-[#1e1f22] text-white font-bold flex items-center gap-2 shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 pointer-events-auto"
-                  >
-                    <BookOpen size={20} className="text-[#a855f7]" />
-                    Regole
-                  </button>
+              {/* Pulsante Regole e Suggerimento Host */}
+              <div className={`absolute left-4 right-4 flex justify-between items-end pointer-events-none z-[300] ${isIframeActive ? 'bottom-2' : 'bottom-4'}`}>
+                <button
+                  onClick={() => setShowRules(true)}
+                  className={`bg-[#2b2d31]/90 backdrop-blur-md rounded-lg border border-[#1e1f22] text-white font-bold flex items-center shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 pointer-events-auto ${
+                    isIframeActive ? 'px-2.5 py-1.5 text-xs gap-1.5' : 'px-4 py-2 text-sm gap-2'
+                  }`}
+                >
+                  <BookOpen size={isIframeActive ? 16 : 20} className="text-[#a855f7]" />
+                  Regole
+                </button>
 
-                  {isHost && (
-                    <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
-                      <Info size={16} className="text-yellow-500" />
-                      Trascina le pedine dei giocatori per spostarle sul tabellone.
-                    </div>
-                  )}
-                  
-                  {/* Div vuoto per bilanciare il flex se non c'è il suggerimento */}
-                  <div className="w-[100px] hidden md:block"></div>
-                </div>
-              )}
+                {isHost && !isIframeActive && (
+                  <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
+                    <Info size={16} className="text-yellow-500" />
+                    Trascina le pedine dei giocatori per spostarle sul tabellone.
+                  </div>
+                )}
+                
+                {/* Div vuoto per bilanciare il flex se non c'è il suggerimento */}
+                <div className="w-[100px] hidden md:block"></div>
+              </div>
 
               {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
               {activePlayerId === user?.id && !isHost && !isIframeActive && (
@@ -966,7 +991,7 @@ export const PataPartyView = () => {
               )}
 
               <h3 className="text-white font-bold mb-4 flex items-center gap-2 truncate">
-                <Users size={18} className="text-[#dbdee1] flex-shrink-0" /> {!isIframeActive && <span className="truncate">Giocatori</span>}
+                <Users size={18} className="text-[#dbdee1] flex-shrink-0" /> <span className="truncate">Giocatori</span>
               </h3>
               
               <div className="space-y-2">
