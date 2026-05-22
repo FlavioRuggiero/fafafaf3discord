@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Image as ImageIcon, BookOpen, X, Globe, Megaphone } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -29,6 +29,7 @@ interface GameState {
   rules?: string;
   iframeUrl?: string | null;
   isIframeActive?: boolean;
+  announcement?: string | null;
 }
 
 interface DiceState {
@@ -137,6 +138,10 @@ export const PataPartyView = () => {
   const [isIframeActive, setIsIframeActive] = useState<boolean>(false);
   const [iframeInput, setIframeInput] = useState<string>('');
 
+  // Annunci
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [announcementInput, setAnnouncementInput] = useState<string>('');
+
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
@@ -150,7 +155,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null });
 
   useEffect(() => {
     if (user) {
@@ -184,6 +189,7 @@ export const PataPartyView = () => {
     setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
     setIframeUrl(stateRef.current.iframeUrl || null);
     setIsIframeActive(stateRef.current.isIframeActive || false);
+    setAnnouncement(stateRef.current.announcement || null);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -195,7 +201,7 @@ export const PataPartyView = () => {
   };
 
   const handleDiceRoll = (playerId: string, result: number | string | number[], diceType?: string) => {
-    playSound('/pullcommon.mp3');
+    playSound('/chest-open.mp3');
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
       setDiceState(prev => prev ? { ...prev, rolling: false } : null);
@@ -249,6 +255,7 @@ export const PataPartyView = () => {
       setRulesText(state.rules || '');
       setIframeUrl(state.iframeUrl || null);
       setIsIframeActive(state.isIframeActive || false);
+      setAnnouncement(state.announcement || null);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -287,12 +294,13 @@ export const PataPartyView = () => {
     setRulesText('');
     setIframeUrl(null);
     setIsIframeActive(false);
+    setAnnouncement(null);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
-    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false };
+    stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
     setActivePlayerId(null);
@@ -331,10 +339,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -342,6 +350,7 @@ export const PataPartyView = () => {
       setRulesText(stateRef.current.rules || '');
       setIframeUrl(stateRef.current.iframeUrl || null);
       setIsIframeActive(stateRef.current.isIframeActive || false);
+      setAnnouncement(stateRef.current.announcement || null);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -366,6 +375,7 @@ export const PataPartyView = () => {
     setActivePlayerId(null);
     setShowRules(false);
     setIsIframeActive(false);
+    setAnnouncement(null);
   };
 
   const startGame = () => {
@@ -395,6 +405,21 @@ export const PataPartyView = () => {
     setIsIframeActive(false);
     syncState();
     showSuccess("Iframe interrotto.");
+  };
+
+  const sendAnnouncement = () => {
+    if (!isHost || !announcementInput.trim()) return;
+    stateRef.current.announcement = announcementInput.trim();
+    syncState();
+    setAnnouncementInput('');
+
+    // Rimuove l'annuncio dopo 6 secondi automaticamente
+    setTimeout(() => {
+      if (stateRef.current.announcement) {
+        stateRef.current.announcement = null;
+        syncState();
+      }
+    }, 6000);
   };
 
   const setTurn = (playerId: string) => {
@@ -762,6 +787,21 @@ export const PataPartyView = () => {
             {/* Tabellone Centrale / Iframe Globale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
+              {/* Annuncio Globale a Schermo */}
+              {announcement && (
+                <div className="absolute inset-0 z-[500] flex items-center justify-center pointer-events-none animate-in fade-in zoom-in duration-300 p-8">
+                  <h1
+                    className="text-5xl md:text-7xl lg:text-8xl font-black text-white text-center leading-tight drop-shadow-2xl"
+                    style={{
+                      WebkitTextStroke: '3px black',
+                      textShadow: '0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)'
+                    }}
+                  >
+                    {announcement}
+                  </h1>
+                </div>
+              )}
+
               {isIframeActive && iframeUrl ? (
                 <div className="w-full h-full relative animate-in fade-in zoom-in-95 duration-300">
                   <iframe 
@@ -838,15 +878,64 @@ export const PataPartyView = () => {
 
               {/* Pulsante Regole e Suggerimento Host */}
               <div className={`absolute left-4 right-4 flex justify-between items-end pointer-events-none z-[300] ${isIframeActive ? 'bottom-2' : 'bottom-4'}`}>
-                <button
-                  onClick={() => setShowRules(true)}
-                  className={`bg-[#2b2d31]/90 backdrop-blur-md rounded-lg border border-[#1e1f22] text-white font-bold flex items-center shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 pointer-events-auto ${
-                    isIframeActive ? 'px-2.5 py-1.5 text-xs gap-1.5' : 'px-4 py-2 text-sm gap-2'
-                  }`}
-                >
-                  <BookOpen size={isIframeActive ? 16 : 20} className="text-[#a855f7]" />
-                  Regole
-                </button>
+                
+                {/* Contenitore relativo per posizionare il popup regole esattamente sopra al pulsante */}
+                <div className="relative pointer-events-auto">
+                  <button
+                    onClick={() => setShowRules(!showRules)}
+                    className={`bg-[#2b2d31]/90 backdrop-blur-md rounded-lg border border-[#1e1f22] text-white font-bold flex items-center shadow-lg hover:bg-[#35373c] transition-transform hover:scale-105 ${
+                      isIframeActive ? 'px-2.5 py-1.5 text-xs gap-1.5' : 'px-4 py-2 text-sm gap-2'
+                    }`}
+                  >
+                    <BookOpen size={isIframeActive ? 16 : 20} className="text-[#a855f7]" />
+                    Regole
+                  </button>
+
+                  {/* Pannello Regole (Popup posizionato sopra il bottone) */}
+                  {showRules && (
+                    <>
+                      {/* Sfondo invisibile per chiudere cliccando fuori */}
+                      <div className="fixed inset-0 z-[390]" onClick={() => setShowRules(false)} />
+                      
+                      <div className="absolute bottom-full mb-3 left-0 w-80 md:w-96 bg-[#2b2d31] border border-[#1e1f22] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] z-[400] flex flex-col max-h-[60vh] animate-in slide-in-from-bottom-2 fade-in duration-200">
+                        <div className="p-4 border-b border-[#1f2023] flex justify-between items-center bg-[#1e1f22] rounded-t-xl shrink-0">
+                          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <BookOpen size={20} className="text-[#a855f7]" />
+                            Regole della Partita
+                          </h3>
+                          <button onClick={() => setShowRules(false)} className="text-[#949ba4] hover:text-white transition-colors">
+                            <X size={20} />
+                          </button>
+                        </div>
+                        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                          {isHost ? (
+                            <div className="flex flex-col h-full">
+                              <p className="text-xs text-[#949ba4] mb-3 uppercase font-bold">Modifica Regole (Solo GM)</p>
+                              <textarea
+                                value={rulesText}
+                                onChange={(e) => setRulesText(e.target.value)}
+                                placeholder="Scrivi qui le regole della partita..."
+                                className="w-full min-h-[150px] bg-[#1e1f22] text-[#dbdee1] p-3 rounded-lg border border-[#3f4147] focus:border-[#a855f7] outline-none resize-none custom-scrollbar mb-4"
+                              />
+                              <button
+                                onClick={handleSaveRules}
+                                className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded transition-colors w-full"
+                              >
+                                Salva e Condividi
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed text-sm">
+                              {stateRef.current.rules || <span className="text-[#949ba4] italic">Il Game Master non ha ancora impostato le regole.</span>}
+                            </div>
+                          )}
+                        </div>
+                        {/* Triangolino che punta verso il bottone */}
+                        <div className="absolute -bottom-2 left-6 w-4 h-4 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45" />
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {isHost && !isIframeActive && (
                   <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
@@ -957,6 +1046,28 @@ export const PataPartyView = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                      <Megaphone size={14} className="flex-shrink-0 text-yellow-500" /> Annuncio
+                    </h4>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Messaggio a schermo..."
+                        value={announcementInput}
+                        onChange={e => setAnnouncementInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendAnnouncement()}
+                        className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
+                      />
+                      <button
+                        onClick={sendAnnouncement}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0 shadow-sm"
+                      >
+                        Invia
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                     <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
@@ -1074,50 +1185,6 @@ export const PataPartyView = () => {
               </div>
             </div>
             
-          </div>
-
-          {/* Overlay per chiudere le regole cliccando fuori */}
-          {showRules && (
-            <div 
-              className="absolute inset-0 z-[190] bg-transparent" 
-              onClick={() => setShowRules(false)}
-            />
-          )}
-
-          {/* Pannello Regole (Slide da sinistra) */}
-          <div className={`absolute top-0 bottom-0 left-0 w-80 md:w-96 bg-[#2b2d31] border-r border-[#1e1f22] shadow-[20px_0_50px_rgba(0,0,0,0.5)] z-[200] transition-transform duration-300 flex flex-col ${showRules ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="p-4 border-b border-[#1f2023] flex justify-between items-center bg-[#1e1f22]">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <BookOpen size={20} className="text-[#a855f7]" />
-                Regole della Partita
-              </h3>
-              <button onClick={() => setShowRules(false)} className="text-[#949ba4] hover:text-white transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-              {isHost ? (
-                <div className="flex flex-col h-full">
-                  <p className="text-xs text-[#949ba4] mb-3 uppercase font-bold">Modifica Regole (Solo GM)</p>
-                  <textarea
-                    value={rulesText}
-                    onChange={(e) => setRulesText(e.target.value)}
-                    placeholder="Scrivi qui le regole della partita..."
-                    className="flex-1 bg-[#1e1f22] text-[#dbdee1] p-3 rounded-lg border border-[#3f4147] focus:border-[#a855f7] outline-none resize-none custom-scrollbar"
-                  />
-                  <button
-                    onClick={handleSaveRules}
-                    className="mt-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded transition-colors"
-                  >
-                    Salva e Condividi
-                  </button>
-                </div>
-              ) : (
-                <div className="text-[#dbdee1] whitespace-pre-wrap leading-relaxed">
-                  {stateRef.current.rules || <span className="text-[#949ba4] italic">Il Game Master non ha ancora impostato le regole.</span>}
-                </div>
-              )}
-            </div>
           </div>
           
         </div>
