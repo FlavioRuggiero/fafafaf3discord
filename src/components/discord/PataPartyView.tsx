@@ -34,7 +34,7 @@ interface DiceState {
   diceType?: string;
 }
 
-const Dice = ({ value, rolling, diceType }: { value: number, rolling: boolean, diceType?: string }) => {
+const Dice = ({ value, rolling, diceType, size = 'md' }: { value: number, rolling: boolean, diceType?: string, size?: 'md' | 'sm' }) => {
   const [displayValue, setDisplayValue] = useState(value);
   
   useEffect(() => {
@@ -74,17 +74,21 @@ const Dice = ({ value, rolling, diceType }: { value: number, rolling: boolean, d
   };
 
   const isInteger1to6 = Number.isInteger(displayValue) && displayValue >= 1 && displayValue <= 6;
+  const isSm = size === 'sm';
+  const containerClasses = isSm 
+    ? 'w-14 h-14 bg-white rounded-xl border-2 border-gray-200 p-1.5' 
+    : 'w-32 h-32 bg-white rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] border-4 border-gray-200 p-4';
 
   return (
-    <div className={`w-32 h-32 bg-white rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] border-4 border-gray-200 p-4 flex items-center justify-center ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
+    <div className={`${containerClasses} flex items-center justify-center ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
       {isInteger1to6 ? (
-        <div className="w-full h-full grid grid-cols-3 grid-rows-3 gap-2">
+        <div className="w-full h-full grid grid-cols-3 grid-rows-3 gap-[2px]">
           {dotPositions[displayValue]?.map((pos, i) => (
-            <div key={i} className={`w-6 h-6 bg-[#111214] rounded-full place-self-center shadow-inner ${getDotClass(pos)}`} />
+            <div key={i} className={`${isSm ? 'w-2.5 h-2.5' : 'w-6 h-6'} bg-[#111214] rounded-full place-self-center shadow-inner ${getDotClass(pos)}`} />
           ))}
         </div>
       ) : (
-        <span className="text-5xl font-black text-[#111214]">{displayValue}</span>
+        <span className={`${isSm ? 'text-2xl' : 'text-5xl'} font-black text-[#111214]`}>{displayValue}</span>
       )}
     </div>
   );
@@ -455,24 +459,6 @@ export const PataPartyView = () => {
         }
       `}</style>
 
-      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro) */}
-      {diceState && (
-        <div className="fixed inset-0 z-[200000] flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="flex flex-col items-center">
-            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} />
-            <div className="mt-8 text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]">
-              {diceState.rolling ? (
-                <span className="animate-pulse">Rotolando...</span>
-              ) : (
-                <span className="animate-bounce-once text-[#23a559] bg-[#111214]/80 px-6 py-2 rounded-full border border-[#23a559]/50 shadow-[0_0_20px_rgba(35,165,89,0.4)]">
-                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato {diceState.result}!
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center border border-brand/50">
@@ -653,62 +639,6 @@ export const PataPartyView = () => {
 
           <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
             
-            {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Ora in basso al centro) */}
-            {activePlayerId === user?.id && !isHost && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
-                <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
-                  <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
-                  È il tuo turno!
-                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
-                </div>
-                
-                <div className="flex gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl">
-                  {/* Dado Normale */}
-                  <div className="group/dice relative">
-                    <button
-                      onClick={() => rollDice()}
-                      disabled={diceState?.rolling}
-                      className="w-14 h-14 bg-white hover:bg-gray-100 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 border-gray-300 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                    >
-                      <Dices size={28} className="text-[#111214]" />
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                      Dado Normale<br/>
-                      <span className="text-[#949ba4] font-normal">Può uscire da 1 a 6</span>
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
-                    </div>
-                  </div>
-
-                  {/* Dadi Speciali */}
-                  {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => (
-                    <div key={i} className="group/dice relative">
-                      <button
-                        onClick={() => rollDice(d)}
-                        disabled={diceState?.rolling}
-                        className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
-                          d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
-                          d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
-                          'bg-[#a855f7] border-[#9333ea]'
-                        }`}
-                      >
-                        <Dices size={28} className="text-white" />
-                        <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
-                          {d.charAt(0)}
-                        </span>
-                      </button>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                        {d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : 'Dado Frazionario'}<br/>
-                        <span className="text-[#949ba4] font-normal">
-                          {d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : 'Può uscire 1.5, 2.5 o 3.5'}
-                        </span>
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Tabellone Centrale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
@@ -727,10 +657,12 @@ export const PataPartyView = () => {
                   }}
                 />
                 
-                {/* Overlay per le pedine */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+                {/* Overlay per le pedine: rimosso overflow-hidden per evitare il taglio del balloon */}
+                <div className="absolute inset-0 pointer-events-none rounded-xl">
                   {players.map(p => {
                     const isTurn = activePlayerId === p.id;
+                    const isRolling = diceState?.playerId === p.id;
+                    
                     return (
                       <div 
                         key={p.id} 
@@ -742,6 +674,19 @@ export const PataPartyView = () => {
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                       >
+                        {/* BALLOON DEL DADO */}
+                        {isRolling && diceState && (
+                          <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
+                            <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
+                              {diceState.rolling ? 'Sta tirando...' : `${p.name} ha fatto ${diceState.result}!`}
+                            </div>
+                            <div className="relative">
+                              <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" />
+                              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
+                            </div>
+                          </div>
+                        )}
+
                         {isTurn && <div className="absolute inset-[-6px] bg-[#23a559] rounded-full animate-ping opacity-60 z-0"></div>}
                         
                         <Avatar 
@@ -762,6 +707,62 @@ export const PataPartyView = () => {
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10">
                   <Info size={16} className="text-yellow-500" />
                   Trascina le pedine dei giocatori per spostarle sul tabellone.
+                </div>
+              )}
+
+              {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
+              {activePlayerId === user?.id && !isHost && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
+                  <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
+                    <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
+                    È il tuo turno!
+                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
+                  </div>
+                  
+                  <div className="flex gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl">
+                    {/* Dado Normale */}
+                    <div className="group/dice relative">
+                      <button
+                        onClick={() => rollDice()}
+                        disabled={diceState?.rolling}
+                        className="w-14 h-14 bg-white hover:bg-gray-100 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 border-gray-300 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                      >
+                        <Dices size={28} className="text-[#111214]" />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                        Dado Normale<br/>
+                        <span className="text-[#949ba4] font-normal">Può uscire da 1 a 6</span>
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                      </div>
+                    </div>
+
+                    {/* Dadi Speciali */}
+                    {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => (
+                      <div key={i} className="group/dice relative">
+                        <button
+                          onClick={() => rollDice(d)}
+                          disabled={diceState?.rolling}
+                          className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
+                            d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
+                            d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
+                            'bg-[#a855f7] border-[#9333ea]'
+                          }`}
+                        >
+                          <Dices size={28} className="text-white" />
+                          <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
+                            {d.charAt(0)}
+                          </span>
+                        </button>
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                          {d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : 'Dado Frazionario'}<br/>
+                          <span className="text-[#949ba4] font-normal">
+                            {d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : 'Può uscire 1.5, 2.5 o 3.5'}
+                          </span>
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
