@@ -6,11 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { Crown, Users, Play, ArrowRight, ArrowLeft } from "lucide-react";
 import { Avatar } from "./Avatar";
+import { useShop } from "@/contexts/ShopContext";
 
 interface Player {
   id: string;
   name: string;
   avatar: string;
+  avatar_decoration: string | null;
   position: number;
 }
 
@@ -20,7 +22,11 @@ interface GameState {
 }
 
 export const PataPartyView = () => {
-  const { user } = useAuth();
+  const { user, adminId, moderatorIds } = useAuth();
+  const { getThemeClass, getThemeStyle } = useShop();
+  
+  const [profile, setProfile] = useState<any>(null);
+  
   const [view, setView] = useState<'menu' | 'lobby' | 'playing'>('menu');
   const [isHost, setIsHost] = useState(false);
   const [gameCode, setGameCode] = useState('');
@@ -31,6 +37,14 @@ export const PataPartyView = () => {
   
   const channelRef = useRef<any>(null);
   const stateRef = useRef<GameState>({ status: 'lobby', players: [] });
+
+  useEffect(() => {
+    if (user) {
+      supabase.from('profiles').select('*').eq('id', user.id).single().then(({data}) => setProfile(data));
+    }
+  }, [user]);
+
+  const canCreate = user?.id === adminId || (user && moderatorIds.includes(user.id)) || profile?.role === 'moderator';
 
   const cleanup = () => {
     if (channelRef.current) {
@@ -44,28 +58,26 @@ export const PataPartyView = () => {
   }, []);
 
   const createGame = () => {
+    if (!canCreate) {
+      showError("Solo i Moderatori possono creare una partita.");
+      return;
+    }
+
     cleanup();
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGameCode(code);
     setIsHost(true);
     setView('lobby');
     
-    if (!user) return;
-
-    const hostPlayer: Player = {
-      id: user.id,
-      name: user.name || 'Game Master',
-      avatar: user.avatar || '',
-      position: 0
-    };
-    
-    setPlayers([hostPlayer]);
-    stateRef.current = { status: 'lobby', players: [hostPlayer] };
+    // Il GameMaster non è più un giocatore
+    setPlayers([]);
+    stateRef.current = { status: 'lobby', players: [] };
 
     const channel = supabase.channel(`pataparty_${code}`);
     
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
       const newPlayer = payload.payload;
+      // Inserisce il giocatore se non è già presente
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
         stateRef.current.players.push({ ...newPlayer, position: 0 });
         setPlayers([...stateRef.current.players]);
@@ -74,11 +86,7 @@ export const PataPartyView = () => {
       }
     });
 
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        // Ready
-      }
-    });
+    channel.subscribe();
     channelRef.current = channel;
   };
 
@@ -108,7 +116,12 @@ export const PataPartyView = () => {
         channel.send({
           type: 'broadcast',
           event: 'join_request',
-          payload: { id: user.id, name: user.name || 'Giocatore', avatar: user.avatar || '' }
+          payload: { 
+            id: user.id, 
+            name: profile?.first_name || 'Giocatore', 
+            avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+            avatar_decoration: profile?.avatar_decoration || null
+          }
         });
       } else if (status === 'CLOSED') {
         showError("Disconnesso dalla partita");
@@ -182,18 +195,27 @@ export const PataPartyView = () => {
           </p>
 
           <div className="space-y-6">
-            <div className="bg-[#1e1f22] p-4 rounded-lg">
-              <h2 className="text-white font-bold mb-2 flex items-center justify-center gap-2">
-                <Crown size={18} className="text-yellow-500" /> Crea una nuova partita
-              </h2>
-              <p className="text-xs text-[#949ba4] mb-4">Diventa il Game Master e controlla il tabellone.</p>
-              <button 
-                onClick={createGame}
-                className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-medium py-2 px-4 rounded transition-colors"
-              >
-                Crea Partita
-              </button>
-            </div>
+            {canCreate ? (
+              <div className="bg-[#1e1f22] p-4 rounded-lg">
+                <h2 className="text-white font-bold mb-2 flex items-center justify-center gap-2">
+                  <Crown size={18} className="text-yellow-500" /> Crea una nuova partita
+                </h2>
+                <p className="text-xs text-[#949ba4] mb-4">Diventa il Game Master e controlla il tabellone.</p>
+                <button 
+                  onClick={createGame}
+                  className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-medium py-2 px-4 rounded transition-colors"
+                >
+                  Crea Partita
+                </button>
+              </div>
+            ) : (
+              <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#f23f43]/30">
+                <h2 className="text-[#f23f43] font-bold mb-2 flex items-center justify-center gap-2">
+                  <Crown size={18} /> Crea una nuova partita
+                </h2>
+                <p className="text-xs text-[#949ba4] mb-2">Solo i Moderatori possono creare la partita.</p>
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -240,20 +262,27 @@ export const PataPartyView = () => {
           <div className="text-left mb-6">
             <h3 className="text-[#dbdee1] font-bold mb-3 flex items-center justify-between">
               Giocatori ({players.length})
-              {isHost && <span className="text-xs font-normal text-[#949ba4]">Tu sei il Game Master</span>}
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
+              {isHost && (
+                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2">
+                  <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
+                  <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
+                    {profile?.first_name || 'Tu'} (Game Master)
+                  </span>
+                  <Crown size={14} className="text-yellow-500 ml-auto" />
+                </div>
+              )}
               {players.map(p => (
                 <div key={p.id} className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded">
-                  <Avatar src={p.avatar} className="w-8 h-8" />
-                  <span className="text-white font-medium">{p.name}</span>
-                  {p.id === stateRef.current.players[0]?.id && (
-                    <Crown size={14} className="text-yellow-500 ml-auto" />
-                  )}
+                  <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
+                  <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                    {p.name}
+                  </span>
                 </div>
               ))}
-              {players.length === 1 && !isHost && (
-                <div className="text-[#949ba4] text-sm text-center py-4">In attesa degli altri giocatori...</div>
+              {players.length === 0 && (
+                <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
               )}
             </div>
           </div>
@@ -278,9 +307,10 @@ export const PataPartyView = () => {
         </div>
       )}
 
+      {/* FULLSCREEN PER LA PARTITA ATTIVA */}
       {view === 'playing' && (
-        <div className="w-full h-full flex flex-col">
-          <div className="flex items-center justify-between bg-[#2b2d31] p-4 rounded-lg shadow-sm mb-4 shrink-0">
+        <div className="fixed inset-0 z-[99999] bg-[#111214] w-full h-full flex flex-col animate-in fade-in duration-300">
+          <div className="flex items-center justify-between bg-[#2b2d31] p-4 border-b border-[#1e1f22] shrink-0">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <span className="text-[#ec4899]">PataParty!</span>
@@ -291,14 +321,14 @@ export const PataPartyView = () => {
               onClick={leaveGame}
               className="bg-[#da373c] hover:bg-[#a12828] text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
             >
-              Esci
+              Esci Dalla Partita
             </button>
           </div>
 
-          <div className="flex gap-4 flex-1 overflow-hidden">
+          <div className="flex gap-4 flex-1 overflow-hidden p-6 bg-[#313338]">
             {/* Tabellone */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-6 overflow-y-auto custom-scrollbar relative shadow-inner">
-              <div className="flex flex-wrap gap-2 justify-center max-w-4xl mx-auto">
+              <div className="flex flex-wrap gap-2 justify-center max-w-5xl mx-auto">
                 {Array.from({length: BOARD_SIZE}).map((_, i) => {
                   const isStart = i === 0;
                   const isEnd = i === BOARD_SIZE - 1;
@@ -307,7 +337,7 @@ export const PataPartyView = () => {
                   return (
                     <div 
                       key={i} 
-                      className={`w-20 h-20 rounded-xl relative flex flex-col items-center justify-center transition-all ${
+                      className={`w-24 h-24 rounded-xl relative flex flex-col items-center justify-center transition-all ${
                         isStart ? 'bg-[#23a559]/20 border-2 border-[#23a559]' : 
                         isEnd ? 'bg-yellow-500/20 border-2 border-yellow-500' : 
                         'bg-[#1e1f22] border border-[#3f4147]'
@@ -319,9 +349,9 @@ export const PataPartyView = () => {
                       
                       <div className="flex flex-wrap gap-1 items-center justify-center mt-3 p-1">
                         {playersHere.map(p => (
-                          <div key={p.id} className="relative group">
-                            <img src={p.avatar} className="w-6 h-6 rounded-full border border-white shadow-md bg-[#313338]" alt={p.name} />
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10 pointer-events-none">
+                          <div key={p.id} className="relative group hover:z-50 transition-all">
+                            <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 object-cover bg-[#313338]" />
+                            <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none font-bold ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
                               {p.name}
                             </div>
                           </div>
@@ -335,7 +365,7 @@ export const PataPartyView = () => {
 
             {/* Controlli Game Master */}
             {isHost && (
-              <div className="w-72 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner">
+              <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                   <Crown size={18} className="text-yellow-500" /> Controlli GM
                 </h3>
@@ -344,8 +374,8 @@ export const PataPartyView = () => {
                   {players.map(p => (
                     <div key={p.id} className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                       <div className="flex items-center gap-2 mb-3">
-                        <img src={p.avatar} className="w-6 h-6 rounded-full bg-[#313338]" />
-                        <span className="text-sm font-medium text-white truncate">{p.name}</span>
+                        <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
+                        <span className={`text-sm font-medium truncate ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
                         <span className="ml-auto text-xs bg-[#2b2d31] px-2 py-0.5 rounded text-[#949ba4] font-bold">
                           Casella {p.position}
                         </span>
@@ -373,21 +403,26 @@ export const PataPartyView = () => {
                       </div>
                     </div>
                   ))}
+                  {players.length === 0 && (
+                    <div className="text-center text-[#949ba4] text-sm py-8 border border-dashed border-[#3f4147] rounded-lg">
+                      Tutti i giocatori hanno abbandonato
+                    </div>
+                  )}
                 </div>
               </div>
             )}
             
             {/* Visualizzazione classifica per i Giocatori Normali */}
             {!isHost && (
-               <div className="w-64 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 shadow-inner">
+               <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 shadow-inner">
                  <h3 className="text-white font-bold mb-4">Classifica</h3>
                  <div className="space-y-2">
                    {[...players].sort((a, b) => b.position - a.position).map((p, i) => (
                      <div key={p.id} className="flex items-center gap-2 bg-[#1e1f22] p-2 rounded">
                        <span className="text-[#949ba4] font-bold w-4 text-center">{i + 1}</span>
-                       <img src={p.avatar} className="w-6 h-6 rounded-full bg-[#313338]" />
-                       <span className="text-sm text-white truncate flex-1">{p.name}</span>
-                       <span className="text-xs text-[#23a559] font-bold">{p.position}</span>
+                       <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
+                       <span className={`text-sm truncate flex-1 font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>{p.name}</span>
+                       <span className="text-xs text-[#23a559] font-bold bg-[#2b2d31] px-2 py-0.5 rounded">{p.position}</span>
                      </div>
                    ))}
                  </div>
