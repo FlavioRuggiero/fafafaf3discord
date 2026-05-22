@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Crown, Users, Play, ArrowRight, ArrowLeft } from "lucide-react";
+import { Crown, Users, Play, ArrowRight, ArrowLeft, Minimize2, LogOut } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
 
@@ -35,12 +35,23 @@ export const PataPartyView = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameStatus, setGameStatus] = useState<'lobby' | 'playing'>('lobby');
   
+  // Stato persistente per permettere il rientro
+  const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
+
   const channelRef = useRef<any>(null);
   const stateRef = useRef<GameState>({ status: 'lobby', players: [] });
 
+  // Carica il profilo e controlla se esiste una partita salvata
   useEffect(() => {
     if (user) {
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({data}) => setProfile(data));
+      
+      const stored = localStorage.getItem(`pataparty_active_game_${user.id}`);
+      if (stored) {
+        try {
+          setSavedGame(JSON.parse(stored));
+        } catch(e) {}
+      }
     }
   }, [user]);
 
@@ -57,37 +68,84 @@ export const PataPartyView = () => {
     return () => cleanup();
   }, []);
 
+  const syncState = () => {
+    setPlayers([...stateRef.current.players]);
+    if (isHost || (savedGame && savedGame.isHost)) {
+      const codeToSave = gameCode || savedGame?.code;
+      if (codeToSave) {
+        localStorage.setItem(`pataparty_state_${codeToSave}`, JSON.stringify(stateRef.current));
+      }
+    }
+    channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
+  };
+
+  const setupHostChannel = (code: string) => {
+    const channel = supabase.channel(`pataparty_${code}`);
+    channel.on('broadcast', { event: 'join_request' }, (payload) => {
+      const newPlayer = payload.payload;
+      // Il GM non viene aggiunto ai giocatori
+      if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
+        stateRef.current.players.push({ ...newPlayer, position: 0 });
+        syncState();
+        showSuccess(`${newPlayer.name} si è unito!`);
+      } else {
+        // Se un giocatore rientra, forziamo il reinvio dello stato per sincronizzarlo
+        channel.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
+      }
+    });
+    channel.subscribe();
+    channelRef.current = channel;
+  };
+
+  const setupPlayerChannel = (code: string) => {
+    const channel = supabase.channel(`pataparty_${code}`);
+    channel.on('broadcast', { event: 'state_update' }, (payload) => {
+      const state = payload.payload as GameState;
+      stateRef.current = state;
+      setPlayers(state.players);
+      setGameStatus(state.status);
+      if (state.status === 'playing') setView('playing');
+    });
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED' && user) {
+        channel.send({
+          type: 'broadcast',
+          event: 'join_request',
+          payload: { 
+            id: user.id, 
+            name: profile?.first_name || 'Giocatore', 
+            avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+            avatar_decoration: profile?.avatar_decoration || null
+          }
+        });
+      }
+    });
+    channelRef.current = channel;
+  };
+
   const createGame = () => {
     if (!canCreate) {
       showError("Solo i Moderatori possono creare una partita.");
       return;
     }
-
     cleanup();
+    
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGameCode(code);
     setIsHost(true);
     setView('lobby');
     
-    // Il GameMaster non è più un giocatore
-    setPlayers([]);
+    // Salva l'attività della partita per il RIENTRO
+    const activeObj = { code, isHost: true };
+    setSavedGame(activeObj);
+    localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
+
+    // Il GameMaster NON è tra i giocatori giocanti
     stateRef.current = { status: 'lobby', players: [] };
+    localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
+    setPlayers([]);
 
-    const channel = supabase.channel(`pataparty_${code}`);
-    
-    channel.on('broadcast', { event: 'join_request' }, (payload) => {
-      const newPlayer = payload.payload;
-      // Inserisce il giocatore se non è già presente
-      if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
-        stateRef.current.players.push({ ...newPlayer, position: 0 });
-        setPlayers([...stateRef.current.players]);
-        channel.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
-        showSuccess(`${newPlayer.name} si è unito!`);
-      }
-    });
-
-    channel.subscribe();
-    channelRef.current = channel;
+    setupHostChannel(code);
   };
 
   const joinGame = () => {
@@ -102,40 +160,60 @@ export const PataPartyView = () => {
     setIsHost(false);
     setView('lobby');
 
-    const channel = supabase.channel(`pataparty_${joinCode}`);
-    
-    channel.on('broadcast', { event: 'state_update' }, (payload) => {
-      const state = payload.payload as GameState;
-      setPlayers(state.players);
-      setGameStatus(state.status);
-      if (state.status === 'playing') setView('playing');
-    });
+    const activeObj = { code: joinCode, isHost: false };
+    setSavedGame(activeObj);
+    localStorage.setItem(`pataparty_active_game_${user.id}`, JSON.stringify(activeObj));
 
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channel.send({
-          type: 'broadcast',
-          event: 'join_request',
-          payload: { 
-            id: user.id, 
-            name: profile?.first_name || 'Giocatore', 
-            avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
-            avatar_decoration: profile?.avatar_decoration || null
-          }
-        });
-      } else if (status === 'CLOSED') {
-        showError("Disconnesso dalla partita");
+    setupPlayerChannel(joinCode);
+  };
+
+  const rejoinGame = () => {
+    if (!savedGame || !user) return;
+    cleanup();
+    setGameCode(savedGame.code);
+    setIsHost(savedGame.isHost);
+    
+    if (savedGame.isHost) {
+      const storedState = localStorage.getItem(`pataparty_state_${savedGame.code}`);
+      if (storedState) {
+        try {
+          stateRef.current = JSON.parse(storedState);
+        } catch(e) {
+          stateRef.current = { status: 'lobby', players: [] };
+        }
+      } else {
+        stateRef.current = { status: 'lobby', players: [] };
       }
-    });
-    channelRef.current = channel;
+      setPlayers(stateRef.current.players);
+      setGameStatus(stateRef.current.status);
+      setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
+      setupHostChannel(savedGame.code);
+    } else {
+      setView('lobby'); // Passerà a 'playing' quando il GM invia lo state_update
+      setupPlayerChannel(savedGame.code);
+    }
+  };
+
+  const abandonSavedGame = () => {
+    if (savedGame?.isHost) {
+      localStorage.removeItem(`pataparty_state_${savedGame.code}`);
+    }
+    if (user) {
+      localStorage.removeItem(`pataparty_active_game_${user.id}`);
+    }
+    setSavedGame(null);
+    cleanup();
+    setView('menu');
+    setGameCode('');
+    setJoinCode('');
+    setPlayers([]);
   };
 
   const startGame = () => {
     if (!isHost) return;
     stateRef.current.status = 'playing';
-    setGameStatus('playing');
+    syncState();
     setView('playing');
-    channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
 
   const movePlayer = (playerId: string, steps: number) => {
@@ -144,23 +222,14 @@ export const PataPartyView = () => {
     if (pIndex !== -1) {
       const newPos = Math.max(0, Math.min(63, stateRef.current.players[pIndex].position + steps));
       stateRef.current.players[pIndex].position = newPos;
-      setPlayers([...stateRef.current.players]);
-      channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
+      syncState();
     }
   };
 
-  const leaveGame = () => {
-    cleanup();
-    setView('menu');
-    setGameCode('');
-    setJoinCode('');
-    setPlayers([]);
-  };
-
-  const BOARD_SIZE = 64; // 0 to 63
+  const BOARD_SIZE = 64; // Da 0 a 63
 
   return (
-    <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar">
+    <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
       <style>{`
         @keyframes wave-text {
           0%, 100% { transform: translateY(0); }
@@ -180,7 +249,31 @@ export const PataPartyView = () => {
         }
       `}</style>
 
-      {view === 'menu' && (
+      {/* Menu Principale (Se c'è una partita attiva, mostra RIENTRA) */}
+      {view === 'menu' && savedGame ? (
+        <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center border border-brand/50">
+          <h1 className="text-4xl font-black text-white mb-6 flex items-center justify-center gap-3">
+            <span className="text-[#ec4899]">PataParty!</span>
+          </h1>
+          <h2 className="text-xl font-bold text-white mb-2">Sei già in una partita!</h2>
+          <p className="text-[#b5bac1] text-sm mb-6">Vuoi rientrare nella partita con codice <strong className="text-white bg-[#1e1f22] px-2 py-0.5 rounded tracking-widest">{savedGame.code}</strong>?</p>
+          
+          <div className="space-y-3">
+            <button 
+              onClick={rejoinGame}
+              className="w-full bg-[#23a559] hover:bg-[#1a7f44] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg hover:-translate-y-0.5"
+            >
+              RIENTRA IN PARTITA
+            </button>
+            <button 
+              onClick={abandonSavedGame}
+              className="w-full bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-2 px-4 rounded transition-colors"
+            >
+              Abbandona Definitivamente
+            </button>
+          </div>
+        </div>
+      ) : view === 'menu' && !savedGame && (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-md w-full text-center">
           <h1 className="text-3xl font-black text-white mb-2 flex items-center justify-center gap-3">
             <span className="text-[#ec4899]">PataParty!</span>
@@ -196,7 +289,7 @@ export const PataPartyView = () => {
 
           <div className="space-y-6">
             {canCreate ? (
-              <div className="bg-[#1e1f22] p-4 rounded-lg">
+              <div className="bg-[#1e1f22] p-4 rounded-lg border border-transparent hover:border-yellow-500/30 transition-colors">
                 <h2 className="text-white font-bold mb-2 flex items-center justify-center gap-2">
                   <Crown size={18} className="text-yellow-500" /> Crea una nuova partita
                 </h2>
@@ -226,7 +319,7 @@ export const PataPartyView = () => {
               </div>
             </div>
 
-            <div className="bg-[#1e1f22] p-4 rounded-lg">
+            <div className="bg-[#1e1f22] p-4 rounded-lg border border-transparent hover:border-[#23a559]/30 transition-colors">
               <h2 className="text-white font-bold mb-2 flex items-center justify-center gap-2">
                 <Users size={18} className="text-[#23a559]" /> Unisciti a una partita
               </h2>
@@ -251,6 +344,7 @@ export const PataPartyView = () => {
         </div>
       )}
 
+      {/* Lobby di Attesa */}
       {view === 'lobby' && (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
           <h2 className="text-2xl font-bold text-white mb-2">Sala d'Attesa</h2>
@@ -264,11 +358,12 @@ export const PataPartyView = () => {
               Giocatori ({players.length})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
+              {/* Il GameMaster non è un pedone giocante, ma lo mostriamo in lobby per far capire chi è l'host */}
               {isHost && (
-                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2">
+                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
                   <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
                   <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
-                    {profile?.first_name || 'Tu'} (Game Master)
+                    {profile?.first_name || 'Tu'} <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>
                   </span>
                   <Crown size={14} className="text-yellow-500 ml-auto" />
                 </div>
@@ -289,7 +384,7 @@ export const PataPartyView = () => {
 
           <div className="flex gap-3">
             <button 
-              onClick={leaveGame}
+              onClick={abandonSavedGame}
               className="flex-1 bg-[#4e5058] hover:bg-[#6d6f78] text-white font-medium py-2 px-4 rounded transition-colors"
             >
               Abbandona
@@ -310,25 +405,33 @@ export const PataPartyView = () => {
       {/* FULLSCREEN PER LA PARTITA ATTIVA */}
       {view === 'playing' && (
         <div className="fixed inset-0 z-[99999] bg-[#111214] w-full h-full flex flex-col animate-in fade-in duration-300">
-          <div className="flex items-center justify-between bg-[#2b2d31] p-4 border-b border-[#1e1f22] shrink-0">
+          <div className="flex items-center justify-between bg-[#2b2d31] p-4 border-b border-[#1e1f22] shrink-0 shadow-md">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span className="text-[#ec4899]">PataParty!</span>
+                <span className="text-[#ec4899] drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">PataParty!</span>
                 <span className="bg-[#1e1f22] px-2 py-0.5 rounded text-sm text-[#949ba4] tracking-widest">{gameCode}</span>
               </h2>
             </div>
-            <button 
-              onClick={leaveGame}
-              className="bg-[#da373c] hover:bg-[#a12828] text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
-            >
-              Esci Dalla Partita
-            </button>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setView('menu')} // Minimizza il tabellone tornando al menu "Rientra"
+                className="flex items-center gap-2 bg-[#4e5058] hover:bg-[#6d6f78] text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
+              >
+                <Minimize2 size={16} /> Riduci a Icona
+              </button>
+              <button 
+                onClick={abandonSavedGame}
+                className="flex items-center gap-2 bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
+              >
+                <LogOut size={16} /> Abbandona
+              </button>
+            </div>
           </div>
 
-          <div className="flex gap-4 flex-1 overflow-hidden p-6 bg-[#313338]">
-            {/* Tabellone */}
+          <div className="flex gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338]">
+            {/* Tabellone Centrale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-6 overflow-y-auto custom-scrollbar relative shadow-inner">
-              <div className="flex flex-wrap gap-2 justify-center max-w-5xl mx-auto">
+              <div className="flex flex-wrap gap-3 justify-center max-w-5xl mx-auto">
                 {Array.from({length: BOARD_SIZE}).map((_, i) => {
                   const isStart = i === 0;
                   const isEnd = i === BOARD_SIZE - 1;
@@ -337,9 +440,9 @@ export const PataPartyView = () => {
                   return (
                     <div 
                       key={i} 
-                      className={`w-24 h-24 rounded-xl relative flex flex-col items-center justify-center transition-all ${
-                        isStart ? 'bg-[#23a559]/20 border-2 border-[#23a559]' : 
-                        isEnd ? 'bg-yellow-500/20 border-2 border-yellow-500' : 
+                      className={`w-20 h-20 md:w-24 md:h-24 rounded-xl relative flex flex-col items-center justify-center transition-all ${
+                        isStart ? 'bg-[#23a559]/20 border-2 border-[#23a559] shadow-[0_0_15px_rgba(35,165,89,0.3)]' : 
+                        isEnd ? 'bg-yellow-500/20 border-2 border-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.3)]' : 
                         'bg-[#1e1f22] border border-[#3f4147]'
                       }`}
                     >
@@ -363,8 +466,8 @@ export const PataPartyView = () => {
               </div>
             </div>
 
-            {/* Controlli Game Master */}
-            {isHost && (
+            {/* Colonna Destra (Controlli GM o Classifica) */}
+            {isHost ? (
               <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                   <Crown size={18} className="text-yellow-500" /> Controlli GM
@@ -410,11 +513,8 @@ export const PataPartyView = () => {
                   )}
                 </div>
               </div>
-            )}
-            
-            {/* Visualizzazione classifica per i Giocatori Normali */}
-            {!isHost && (
-               <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 shadow-inner">
+            ) : (
+              <div className="w-80 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 shadow-inner">
                  <h3 className="text-white font-bold mb-4">Classifica</h3>
                  <div className="space-y-2">
                    {[...players].sort((a, b) => b.position - a.position).map((p, i) => (
