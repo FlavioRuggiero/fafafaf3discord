@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -17,7 +17,7 @@ interface Player {
   avatar_decoration: string | null;
   x: number;
   y: number;
-  lastRoll?: number | string | number[] | null;
+  lastRoll?: number | string | number[] | string[] | null;
   specialDice?: string[];
   money?: number;
 }
@@ -28,6 +28,14 @@ interface ChatMessage {
   senderName: string;
   text: string;
   timestamp: number;
+}
+
+interface Poll {
+  id: string;
+  question: string;
+  options: string[];
+  votes: Record<string, number>;
+  isOpen: boolean;
 }
 
 interface GameState {
@@ -46,17 +54,18 @@ interface GameState {
   } | null;
   chatMessages?: ChatMessage[];
   isCommercial?: boolean;
+  poll?: Poll | null;
 }
 
 interface DiceState {
   playerId: string;
-  result: number | string | number[];
+  result: number | string | number[] | string[];
   rolling: boolean;
   diceType?: string;
 }
 
-const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: number | string | number[], rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[] }) => {
-  const [displayValue, setDisplayValue] = useState<number | string | number[]>(value);
+const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: number | string | number[] | string[], rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[] }) => {
+  const [displayValue, setDisplayValue] = useState<number | string | number[] | string[]>(value);
   
   useEffect(() => {
     if (rolling) {
@@ -68,6 +77,16 @@ const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: numbe
         else if (diceType === 'negativo') setDisplayValue(-(Math.floor(Math.random() * 6) + 1));
         else if (diceType === 'scambio' && players && players.length > 0) setDisplayValue(players[Math.floor(Math.random() * players.length)].id);
         else if (diceType === 'doppio') setDisplayValue([Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1]);
+        else if (diceType === 'scintilla') setDisplayValue(Math.floor(Math.random() * 5) + 6);
+        else if (diceType === 'triplo') setDisplayValue([Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1]);
+        else if (diceType === 'alfabetico') {
+          const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+          setDisplayValue([
+            letters[Math.floor(Math.random() * 26)],
+            letters[Math.floor(Math.random() * 26)],
+            letters[Math.floor(Math.random() * 26)]
+          ]);
+        }
         else setDisplayValue(Math.floor(Math.random() * 6) + 1);
       }, 100);
       return () => clearInterval(interval);
@@ -146,6 +165,7 @@ export const PataPartyView = () => {
   const [joinCode, setJoinCode] = useState('');
   const [isCommercialMode, setIsCommercialMode] = useState(false);
   const [isCommercial, setIsCommercial] = useState(false);
+  const [gmTab, setGmTab] = useState<'players' | 'tools'>('players');
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
@@ -157,10 +177,11 @@ export const PataPartyView = () => {
   const [isIframeActive, setIsIframeActive] = useState<boolean>(false);
   const [iframeInput, setIframeInput] = useState<string>('');
 
-  // Annunci e Classifica
+  // Annunci, Classifica, Sondaggi
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [announcementInput, setAnnouncementInput] = useState<string>('');
   const [leaderboard, setLeaderboard] = useState<GameState['leaderboard']>(null);
+  const [pollData, setPollData] = useState<Poll | null>(null);
 
   // Stati Chat
   const [showChat, setShowChat] = useState(false);
@@ -176,6 +197,10 @@ export const PataPartyView = () => {
   const [lbPlayerSelect, setLbPlayerSelect] = useState('');
   const [moneyAmounts, setMoneyAmounts] = useState<Record<string, string>>({});
 
+  // Stati Builder Sondaggio
+  const [pollQuestionInput, setPollQuestionInput] = useState('');
+  const [pollOptionsInput, setPollOptionsInput] = useState<string[]>(['', '']);
+
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
@@ -189,7 +214,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null });
 
   useEffect(() => {
     if (user) {
@@ -204,14 +229,12 @@ export const PataPartyView = () => {
     }
   }, [user]);
 
-  // Auto-scroll chat
   useEffect(() => {
     if (showChat && chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [chatMessages, showChat]);
 
-  // Gestione reset pallino notifiche chat
   useEffect(() => {
     if (showChat) setUnreadChat(false);
   }, [showChat]);
@@ -239,6 +262,7 @@ export const PataPartyView = () => {
     setLeaderboard(stateRef.current.leaderboard || null);
     setChatMessages(stateRef.current.chatMessages || []);
     setIsCommercial(stateRef.current.isCommercial || false);
+    setPollData(stateRef.current.poll || null);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -249,7 +273,7 @@ export const PataPartyView = () => {
     channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
 
-  const handleDiceRoll = (playerId: string, result: number | string | number[], diceType?: string) => {
+  const handleDiceRoll = (playerId: string, result: number | string | number[] | string[], diceType?: string) => {
     playSound('/openingsound.mp3');
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
@@ -312,6 +336,13 @@ export const PataPartyView = () => {
       setChatMessages(stateRef.current.chatMessages);
       if (!showChat) setUnreadChat(true);
     });
+    channel.on('broadcast', { event: 'vote_poll' }, (payload) => {
+      const { playerId, optionIndex } = payload.payload;
+      if (stateRef.current.poll && stateRef.current.poll.isOpen) {
+        stateRef.current.poll.votes[playerId] = optionIndex;
+        syncState();
+      }
+    });
     channel.subscribe();
     channelRef.current = channel;
   };
@@ -331,6 +362,7 @@ export const PataPartyView = () => {
       setLeaderboard(state.leaderboard || null);
       setChatMessages(state.chatMessages || []);
       setIsCommercial(state.isCommercial || false);
+      setPollData(state.poll || null);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -377,10 +409,12 @@ export const PataPartyView = () => {
     setIsIframeActive(false);
     setAnnouncement(null);
     setLeaderboard(null);
+    setPollData(null);
     setChatMessages([]);
     setUnreadChat(false);
     setShowChat(false);
     setIsCommercial(isCommercialMode);
+    setGmTab('players');
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
@@ -397,7 +431,8 @@ export const PataPartyView = () => {
       announcement: null, 
       leaderboard: null, 
       chatMessages: [],
-      isCommercial: isCommercialMode 
+      isCommercial: isCommercialMode,
+      poll: null
     };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
@@ -442,10 +477,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -457,6 +492,7 @@ export const PataPartyView = () => {
       setLeaderboard(stateRef.current.leaderboard || null);
       setChatMessages(stateRef.current.chatMessages || []);
       setIsCommercial(stateRef.current.isCommercial || false);
+      setPollData(stateRef.current.poll || null);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -483,6 +519,7 @@ export const PataPartyView = () => {
     setIsIframeActive(false);
     setAnnouncement(null);
     setLeaderboard(null);
+    setPollData(null);
     setChatMessages([]);
     setShowChat(false);
     setIsCommercialMode(false);
@@ -524,7 +561,6 @@ export const PataPartyView = () => {
     syncState();
     setAnnouncementInput('');
 
-    // Rimuove l'annuncio dopo 6 secondi automaticamente
     setTimeout(() => {
       if (stateRef.current.announcement) {
         stateRef.current.announcement = null;
@@ -557,6 +593,59 @@ export const PataPartyView = () => {
     showSuccess("Classifica nascosta.");
   };
 
+  // Funzioni Sondaggi
+  const addPollOption = () => {
+    if (pollOptionsInput.length < 4) {
+      setPollOptionsInput([...pollOptionsInput, '']);
+    }
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollOptionsInput.length > 2) {
+      setPollOptionsInput(pollOptionsInput.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePollOption = (index: number, val: string) => {
+    const newOptions = [...pollOptionsInput];
+    newOptions[index] = val;
+    setPollOptionsInput(newOptions);
+  };
+
+  const startPoll = () => {
+    if (!isHost) return;
+    if (!pollQuestionInput.trim()) return showError("Inserisci una domanda per il sondaggio.");
+    if (pollOptionsInput.some(o => !o.trim())) return showError("Tutte le opzioni devono avere un testo.");
+    
+    stateRef.current.poll = {
+      id: `poll-${Date.now()}`,
+      question: pollQuestionInput.trim(),
+      options: pollOptionsInput.map(o => o.trim()),
+      votes: {},
+      isOpen: true
+    };
+    syncState();
+    showSuccess("Sondaggio avviato!");
+  };
+
+  const closePoll = () => {
+    if (!isHost || !stateRef.current.poll) return;
+    stateRef.current.poll.isOpen = false;
+    syncState();
+    showSuccess("Sondaggio terminato!");
+  };
+
+  const hidePoll = () => {
+    if (!isHost) return;
+    stateRef.current.poll = null;
+    syncState();
+  };
+
+  const handleVotePoll = (optionIndex: number) => {
+    if (!user || !pollData || !pollData.isOpen) return;
+    channelRef.current?.send({ type: 'broadcast', event: 'vote_poll', payload: { playerId: user.id, optionIndex } });
+  };
+
   const setTurn = (playerId: string) => {
     if (!isHost) return;
     stateRef.current.activePlayerId = playerId;
@@ -577,14 +666,14 @@ export const PataPartyView = () => {
       const currentDice = stateRef.current.players[pIndex].specialDice || [];
       stateRef.current.players[pIndex].specialDice = [...currentDice, type];
       syncState();
-      showSuccess(`Dado ${type} assegnato!`);
+      showSuccess(`Dado assegnato!`);
     }
   };
 
   const rollDice = (diceType?: string) => {
     if (activePlayerId !== user?.id || diceState?.rolling) return;
     
-    let result: number | string | number[] = 0;
+    let result: number | string | number[] | string[] = 0;
     if (diceType === 'ebete') {
       result = [1, 1, 6][Math.floor(Math.random() * 3)];
     } else if (diceType === 'vigilante') {
@@ -600,6 +689,17 @@ export const PataPartyView = () => {
       result = currentPlayers[Math.floor(Math.random() * currentPlayers.length)].id;
     } else if (diceType === 'doppio') {
       result = [Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1];
+    } else if (diceType === 'scintilla') {
+      result = Math.floor(Math.random() * 5) + 6; // Da 6 a 10
+    } else if (diceType === 'triplo') {
+      result = [Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1];
+    } else if (diceType === 'alfabetico') {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      result = [
+        letters[Math.floor(Math.random() * 26)],
+        letters[Math.floor(Math.random() * 26)],
+        letters[Math.floor(Math.random() * 26)]
+      ];
     } else {
       result = Math.floor(Math.random() * 6) + 1;
     }
@@ -673,7 +773,11 @@ export const PataPartyView = () => {
     let rollContent: React.ReactNode = p.lastRoll;
     
     if (Array.isArray(p.lastRoll)) {
-      rollContent = `${p.lastRoll[0]} + ${p.lastRoll[1]}`;
+      if (typeof p.lastRoll[0] === 'string') {
+        rollContent = p.lastRoll.join('');
+      } else {
+        rollContent = p.lastRoll.join(' + ');
+      }
     } else if (typeof p.lastRoll === 'string') {
       const rolledPlayer = players.find(pl => pl.id === p.lastRoll);
       if (rolledPlayer) {
@@ -1026,6 +1130,8 @@ export const PataPartyView = () => {
                                 {diceState.rolling ? 'Sta tirando...' : 
                                  diceState.diceType === 'scambio' ? `${p.name} scambia con ${players.find(pl => pl.id === diceState.result)?.name || 'Qualcuno'}!` :
                                  diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
+                                 diceState.diceType === 'triplo' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]}, ${diceState.result[1]} e ${diceState.result[2]}!` :
+                                 diceState.diceType === 'alfabetico' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result.join(', ')}!` :
                                  `${p.name} ha fatto ${diceState.result}!`}
                               </div>
                               <div className="relative">
@@ -1190,7 +1296,7 @@ export const PataPartyView = () => {
                     <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
                   </div>
                   
-                  <div className="flex gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl">
+                  <div className="flex flex-wrap justify-center gap-2 bg-black/40 p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-xl max-w-sm md:max-w-md">
                     {/* Dado Normale */}
                     <div className="group/dice relative">
                       <button
@@ -1215,11 +1321,20 @@ export const PataPartyView = () => {
                                       d === 'carismatico' ? 'bg-[#f59e0b] border-[#d97706]' :
                                       d === 'doppio' ? 'bg-[#eab308] border-[#ca8a04]' :
                                       d === 'negativo' ? 'bg-[#6b7280] border-[#4b5563]' :
-                                      'bg-[#10b981] border-[#059669]';
+                                      d === 'scintilla' ? 'bg-[#ec4899] border-[#db2777]' :
+                                      d === 'triplo' ? 'bg-[#14b8a6] border-[#0d9488]' :
+                                      d === 'alfabetico' ? 'bg-[#8b5cf6] border-[#7c3aed]' :
+                                      'bg-[#10b981] border-[#059669]'; // Scambio
                       
-                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : d === 'doppio' ? 'Dado Doppio' : d === 'negativo' ? 'Dado Negativo' : 'Dado di Scambio';
-                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : d === 'doppio' ? 'Tira due dadi da 1 a 4' : d === 'negativo' ? 'Può uscire da -1 a -6' : 'Può uscire un giocatore a caso';
-                      const shortLabel = d === 'scambio' ? 'S' : d === 'doppio' ? 'D' : d === 'negativo' ? 'N' : d.charAt(0).toUpperCase();
+                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : d === 'doppio' ? 'Dado Doppio' : d === 'negativo' ? 'Dado Negativo' : d === 'scintilla' ? 'Dado Scintilla' : d === 'triplo' ? 'Dado Triplo' : d === 'alfabetico' ? 'Dado Alfabetico' : 'Dado di Scambio';
+                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : d === 'doppio' ? 'Tira due dadi da 1 a 4' : d === 'negativo' ? 'Può uscire da -1 a -6' : d === 'scintilla' ? 'Può uscire da 6 a 10' : d === 'triplo' ? 'Tira tre dadi da 1 a 3' : d === 'alfabetico' ? 'Escono 3 lettere a caso' : 'Può uscire un giocatore a caso';
+                      
+                      let shortLabel = d.substring(0,2).toUpperCase();
+                      if (d === 'scambio') shortLabel = 'SC';
+                      if (d === 'scintilla') shortLabel = 'ST';
+                      if (d === 'triplo') shortLabel = 'TR';
+                      if (d === 'alfabetico') shortLabel = 'AL';
+                      if (d === 'doppio') shortLabel = 'DP';
 
                       return (
                         <div key={i} className="group/dice relative">
@@ -1247,277 +1362,384 @@ export const PataPartyView = () => {
             </div>
 
             {/* Sidebar Giocatori e Impostazioni GM (Destra) */}
-            <div className={`w-full ${isIframeActive ? 'md:w-44' : 'md:w-72'} transition-all duration-300 bg-[#2b2d31] rounded-lg p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner relative z-10`}>
+            <div className={`w-full ${isIframeActive ? 'md:w-44' : 'md:w-72'} transition-all duration-300 bg-[#2b2d31] rounded-lg flex flex-col shrink-0 shadow-inner relative z-10 overflow-hidden`}>
               
               {isHost && (
-                <>
-                  {!isIframeActive && (
-                    <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                <div className="flex bg-[#1e1f22] p-1 rounded-t-lg shrink-0 border-b border-[#1f2023]">
+                  <button 
+                    onClick={() => setGmTab('players')} 
+                    className={`flex-1 text-xs py-2 rounded-md font-bold transition-colors ${gmTab === 'players' ? 'bg-[#35373c] text-white shadow-sm' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
+                  >
+                    Giocatori
+                  </button>
+                  <button 
+                    onClick={() => setGmTab('tools')} 
+                    className={`flex-1 text-xs py-2 rounded-md font-bold transition-colors ${gmTab === 'tools' ? 'bg-[#35373c] text-white shadow-sm' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}
+                  >
+                    Strumenti
+                  </button>
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-4 relative">
+                
+                {/* ACTIVE POLL DISPLAY (Visibile a tutti in cima alla lista giocatori) */}
+                {pollData && (
+                  <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-brand/50 shadow-md">
+                    <h4 className="text-white font-bold text-sm mb-3 break-words text-center flex items-center justify-center gap-2">
+                      <BarChart2 size={16} className="text-brand" /> {pollData.question}
+                    </h4>
+                    <div className="space-y-2">
+                      {pollData.options.map((opt, i) => {
+                        const votes = Object.values(pollData.votes).filter(v => v === i).length;
+                        const totalVotes = Object.keys(pollData.votes).length || 1;
+                        const pct = Math.round((votes / totalVotes) * 100);
+                        const hasVotedThis = pollData.votes[user?.id || ''] === i;
+                        
+                        return (
+                          <div key={i} className="relative overflow-hidden rounded bg-[#2b2d31] border border-[#3f4147]">
+                            <button
+                              onClick={() => handleVotePoll(i)}
+                              disabled={!pollData.isOpen}
+                              className={`w-full text-left relative z-10 px-3 py-2 text-xs font-medium transition-colors ${hasVotedThis ? 'text-white' : 'text-[#dbdee1] hover:text-white'} ${!pollData.isOpen ? 'cursor-default' : 'hover:bg-white/5'}`}
+                            >
+                              <div 
+                                className={`absolute left-0 top-0 bottom-0 z-[-1] transition-all duration-500 ${hasVotedThis ? 'bg-brand/40' : 'bg-brand/20'}`} 
+                                style={{ width: `${pollData.votes[user?.id || ''] !== undefined || !pollData.isOpen ? pct : 0}%` }}
+                              />
+                              <div className="flex justify-between items-center relative z-10">
+                                <span className="truncate pr-2">{opt}</span>
+                                {(pollData.votes[user?.id || ''] !== undefined || !pollData.isOpen) && (
+                                  <span className="font-bold">{votes} ({pct}%)</span>
+                                )}
+                              </div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {isHost && (
+                      <div className="mt-3 flex gap-2">
+                        {pollData.isOpen ? (
+                          <button onClick={closePoll} className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white text-[10px] font-bold py-1.5 rounded transition-colors">Termina Sondaggio</button>
+                        ) : (
+                          <button onClick={hidePoll} className="flex-1 bg-[#4e5058] hover:bg-[#6d6f78] text-white text-[10px] font-bold py-1.5 rounded transition-colors">Nascondi</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB GIOCATORI */}
+                {(!isHost || gmTab === 'players') && (
+                  <>
+                    <h3 className="text-white font-bold mb-3 flex items-center gap-2 truncate text-sm">
+                      <Users size={16} className="text-[#dbdee1] flex-shrink-0" /> <span className="truncate">Giocatori ({players.length})</span>
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      {players.map(p => {
+                        const isTurn = activePlayerId === p.id;
+                        
+                        return (
+                          <React.Fragment key={p.id}>
+                            {isHost && !isIframeActive ? (
+                              <Popover.Root>
+                                <Popover.Trigger asChild>
+                                  <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147] hover:border-brand'} flex items-center gap-3 transition-colors cursor-pointer relative`}>
+                                    <PlayerListItem p={p} isTurn={isTurn} />
+                                  </div>
+                                </Popover.Trigger>
+                                <Popover.Portal>
+                                  <Popover.Content className="z-[99999] bg-[#111214] border border-[#1e1f22] p-1.5 rounded-md shadow-xl min-w-[200px]" side="left" align="start" sideOffset={10}>
+                                    <button 
+                                      onClick={() => setTurn(p.id)}
+                                      className="flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-[#5865F2] rounded w-full text-left transition-colors font-medium mb-1"
+                                    >
+                                      <Play size={14} /> Imposta Turno
+                                    </button>
+                                    
+                                    <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
+                                    <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Aggiungi Dado Monouso</div>
+                                    
+                                    <div className="max-h-48 overflow-y-auto custom-scrollbar pr-1 space-y-0.5">
+                                      <button onClick={() => addSpecialDice(p.id, 'ebete')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Ebete (1,1,6)
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'vigilante')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Vigilante (3,4,5)
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'frazionario')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#a855f7] hover:bg-[#a855f7] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Frazionario
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'doppio')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#eab308] hover:bg-[#eab308] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Doppio
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'triplo')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#14b8a6] hover:bg-[#14b8a6] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Triplo
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'scintilla')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#ec4899] hover:bg-[#ec4899] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Scintilla (6-10)
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'carismatico')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Carismatico
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'negativo')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#9ca3af] hover:bg-[#9ca3af] hover:text-[#111214] rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Negativo (-1 a -6)
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'alfabetico')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Alfabetico
+                                      </button>
+                                      <button onClick={() => addSpecialDice(p.id, 'scambio')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#10b981] hover:bg-[#10b981] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                        <Plus size={12} /> Scambio
+                                      </button>
+                                    </div>
+
+                                    {isCommercial && (
+                                      <>
+                                        <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
+                                        <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Gestione Soldi</div>
+                                        <div className="flex items-center gap-1.5 px-2 py-1">
+                                          <input
+                                            type="number"
+                                            value={moneyAmounts[p.id] || ''}
+                                            onChange={(e) => setMoneyAmounts({...moneyAmounts, [p.id]: e.target.value})}
+                                            placeholder="Importo..."
+                                            className="w-16 bg-[#1e1f22] text-white text-xs px-2 py-1.5 rounded border border-[#3f4147] focus:border-[#23a559] outline-none"
+                                          />
+                                          <button onClick={() => { handleUpdateMoney(p.id, parseInt(moneyAmounts[p.id] || '0')); setMoneyAmounts({...moneyAmounts, [p.id]: ''}); }} className="flex-1 p-1.5 bg-[#23a559] hover:bg-[#1a7c43] text-white rounded flex items-center justify-center transition-colors"><Plus size={14}/></button>
+                                          <button onClick={() => { handleUpdateMoney(p.id, -parseInt(moneyAmounts[p.id] || '0')); setMoneyAmounts({...moneyAmounts, [p.id]: ''}); }} className="flex-1 p-1.5 bg-[#f23f43] hover:bg-[#da373c] text-white rounded flex items-center justify-center transition-colors"><Minus size={14}/></button>
+                                        </div>
+                                      </>
+                                    )}
+
+                                  </Popover.Content>
+                                </Popover.Portal>
+                              </Popover.Root>
+                            ) : (
+                              <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147]'} flex items-center gap-3 transition-colors relative`}>
+                                <PlayerListItem p={p} isTurn={isTurn} />
+                              </div>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                      {players.length === 0 && (
+                        <div className="text-center text-[#949ba4] text-sm py-8 border border-dashed border-[#3f4147] rounded-lg">
+                          Tutti i giocatori hanno abbandonato
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* TAB STRUMENTI (Solo GM) */}
+                {isHost && gmTab === 'tools' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    {!isIframeActive && (
+                      <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                        <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                          <ImageIcon size={14} className="flex-shrink-0" /> Sfondo (URL)
+                        </h4>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="https://..."
+                            value={boardUrlInput}
+                            onChange={e => setBoardUrlInput(e.target.value)}
+                            className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                          />
+                          <button
+                            onClick={() => {
+                              const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
+                              stateRef.current.boardUrl = finalUrl;
+                              setBoardUrl(finalUrl);
+                              syncState();
+                              showSuccess("Tabellone aggiornato!");
+                              setBoardUrlInput('');
+                            }}
+                            className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0"
+                          >
+                            Applica
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                       <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
-                        <ImageIcon size={14} className="flex-shrink-0" /> Sfondo (URL)
+                        <Megaphone size={14} className="flex-shrink-0 text-yellow-500" /> Annuncio
                       </h4>
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="https://..."
-                          value={boardUrlInput}
-                          onChange={e => setBoardUrlInput(e.target.value)}
-                          className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                          placeholder="Messaggio a schermo..."
+                          value={announcementInput}
+                          onChange={e => setAnnouncementInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && sendAnnouncement()}
+                          className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
                         />
                         <button
-                          onClick={() => {
-                            const finalUrl = boardUrlInput.trim() || '/pataparty-board.png';
-                            stateRef.current.boardUrl = finalUrl;
-                            setBoardUrl(finalUrl);
-                            syncState();
-                            showSuccess("Tabellone aggiornato!");
-                            setBoardUrlInput('');
-                          }}
-                          className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0"
+                          onClick={sendAnnouncement}
+                          className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0 shadow-sm"
                         >
-                          Applica
+                          Invia
                         </button>
                       </div>
                     </div>
-                  )}
 
-                  <div className="mb-4 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
-                      <Megaphone size={14} className="flex-shrink-0 text-yellow-500" /> Annuncio
-                    </h4>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Messaggio a schermo..."
-                        value={announcementInput}
-                        onChange={e => setAnnouncementInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && sendAnnouncement()}
-                        className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
-                      />
-                      <button
-                        onClick={sendAnnouncement}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0 shadow-sm"
-                      >
-                        Invia
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Builder Classifica GM */}
-                  <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
-                      <Trophy size={14} className="flex-shrink-0 text-yellow-500" /> Classifica
-                    </h4>
-                    <div className="flex flex-col gap-2">
-                      <input
-                        type="text"
-                        placeholder="Titolo (es. Risultati Finali)"
-                        value={lbTitle}
-                        onChange={e => setLbTitle(e.target.value)}
-                        className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Descrizione (opzionale)"
-                        value={lbDesc}
-                        onChange={e => setLbDesc(e.target.value)}
-                        className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
-                      />
-                      
-                      <div className="flex gap-2 mt-1">
-                        <select 
-                          value={lbPlayerSelect} 
-                          onChange={e => setLbPlayerSelect(e.target.value)}
-                          className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none border border-[#3f4147]"
-                        >
-                          <option value="">Aggiungi giocatore...</option>
-                          {players.filter(p => !lbWinners.includes(p.id)).map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
+                    <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                        <BarChart2 size={14} className="flex-shrink-0 text-[#0ea5e9]" /> Sondaggio
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          placeholder="Domanda sondaggio..."
+                          value={pollQuestionInput}
+                          onChange={e => setPollQuestionInput(e.target.value)}
+                          className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
+                        />
+                        <div className="space-y-1.5 mt-1">
+                          {pollOptionsInput.map((opt, i) => (
+                            <div key={i} className="flex gap-1.5 items-center">
+                              <span className="text-[#949ba4] text-[10px] w-3">{i+1}.</span>
+                              <input
+                                type="text"
+                                placeholder={`Opzione ${i+1}`}
+                                value={opt}
+                                onChange={e => updatePollOption(i, e.target.value)}
+                                className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
+                              />
+                              {pollOptionsInput.length > 2 && (
+                                <button onClick={() => removePollOption(i)} className="text-[#f23f43] hover:text-white p-1 transition-colors">
+                                  <Minus size={14} />
+                                </button>
+                              )}
+                            </div>
                           ))}
-                        </select>
+                        </div>
+                        {pollOptionsInput.length < 4 && (
+                          <button onClick={addPollOption} className="text-[#0ea5e9] hover:text-white text-[10px] font-bold uppercase flex items-center gap-1 mt-1 transition-colors w-max">
+                            <Plus size={12} /> Aggiungi Opzione
+                          </button>
+                        )}
                         <button
-                          onClick={() => {
-                            if (lbPlayerSelect) {
-                              setLbWinners([...lbWinners, lbPlayerSelect]);
-                              setLbPlayerSelect('');
-                            }
-                          }}
-                          className="bg-[#2b2d31] hover:bg-[#35373c] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0 border border-[#3f4147]"
+                          onClick={startPoll}
+                          className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white text-xs font-bold px-3 py-2 mt-2 rounded transition-colors shadow-sm"
                         >
-                          +
+                          Avvia Sondaggio
                         </button>
                       </div>
+                    </div>
 
-                      {lbWinners.length > 0 && (
-                        <div className="mt-1 space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
-                          {lbWinners.map((id, idx) => {
-                            const p = players.find(x => x.id === id);
-                            return (
-                              <div key={id} className="flex justify-between items-center bg-[#2b2d31] px-2 py-1 rounded text-xs text-[#dbdee1] border border-[#3f4147]">
-                                <span className="truncate flex-1 font-bold"><span className="text-[#949ba4] mr-1">{idx + 1}°</span> {p?.name}</span>
-                                <button onClick={() => setLbWinners(lbWinners.filter(x => x !== id))} className="text-[#f23f43] hover:text-white ml-2"><X size={12}/></button>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 mt-2 pt-2 border-t border-[#3f4147]">
-                        {leaderboard ? (
-                          <button
-                            onClick={hideLeaderboardGlobal}
-                            className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                    <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                        <Trophy size={14} className="flex-shrink-0 text-yellow-500" /> Classifica Finale
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          placeholder="Titolo (es. Risultati Finali)"
+                          value={lbTitle}
+                          onChange={e => setLbTitle(e.target.value)}
+                          className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Descrizione (opzionale)"
+                          value={lbDesc}
+                          onChange={e => setLbDesc(e.target.value)}
+                          className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500 border border-[#3f4147]"
+                        />
+                        
+                        <div className="flex gap-2 mt-1">
+                          <select 
+                            value={lbPlayerSelect} 
+                            onChange={e => setLbPlayerSelect(e.target.value)}
+                            className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none border border-[#3f4147]"
                           >
-                            Nascondi
+                            <option value="">Aggiungi giocatore...</option>
+                            {players.filter(p => !lbWinners.includes(p.id)).map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => {
+                              if (lbPlayerSelect) {
+                                setLbWinners([...lbWinners, lbPlayerSelect]);
+                                setLbPlayerSelect('');
+                              }
+                            }}
+                            className="bg-[#2b2d31] hover:bg-[#35373c] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors flex-shrink-0 border border-[#3f4147]"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+
+                        {lbWinners.length > 0 && (
+                          <div className="mt-1 space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                            {lbWinners.map((id, idx) => {
+                              const p = players.find(x => x.id === id);
+                              return (
+                                <div key={id} className="flex justify-between items-center bg-[#2b2d31] px-2 py-1 rounded text-xs text-[#dbdee1] border border-[#3f4147]">
+                                  <span className="truncate flex-1 font-bold"><span className="text-[#949ba4] mr-1">{idx + 1}°</span> {p?.name}</span>
+                                  <button onClick={() => setLbWinners(lbWinners.filter(x => x !== id))} className="text-[#f23f43] hover:text-white ml-2"><X size={12}/></button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-[#3f4147]">
+                          {leaderboard ? (
+                            <button
+                              onClick={hideLeaderboardGlobal}
+                              className="flex-1 bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                            >
+                              Nascondi
+                            </button>
+                          ) : (
+                            <button
+                              onClick={showLeaderboardGlobal}
+                              className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                            >
+                              Mostra
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                        <Globe size={14} className="flex-shrink-0" /> Minigioco Iframe
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={iframeInput}
+                          onChange={e => setIframeInput(e.target.value)}
+                          className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
+                        />
+                        {isIframeActive ? (
+                          <button
+                            onClick={stopIframe}
+                            className="w-full bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                          >
+                            Interrompi
                           </button>
                         ) : (
                           <button
-                            onClick={showLeaderboardGlobal}
-                            className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
+                            onClick={startIframe}
+                            className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
                           >
-                            Mostra Classifica
+                            Avvia Minigioco
                           </button>
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="mb-6 bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                    <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
-                      <Globe size={14} className="flex-shrink-0" /> Minigioco
-                    </h4>
-                    <div className="flex flex-col gap-2">
-                      <input
-                        type="url"
-                        placeholder="https://..."
-                        value={iframeInput}
-                        onChange={e => setIframeInput(e.target.value)}
-                        className="w-full min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-brand border border-[#3f4147]"
-                      />
-                      {isIframeActive ? (
-                        <button
-                          onClick={stopIframe}
-                          className="w-full bg-[#f23f43] hover:bg-[#da373c] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
-                        >
-                          Interrompi
-                        </button>
-                      ) : (
-                        <button
-                          onClick={startIframe}
-                          className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm"
-                        >
-                          Avvia
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <h3 className="text-white font-bold mb-4 flex items-center gap-2 truncate">
-                <Users size={18} className="text-[#dbdee1] flex-shrink-0" /> <span className="truncate">Giocatori</span>
-              </h3>
-              
-              <div className="space-y-2">
-                {players.map(p => {
-                  const isTurn = activePlayerId === p.id;
-                  
-                  return (
-                    <React.Fragment key={p.id}>
-                      {isHost && !isIframeActive ? (
-                        <Popover.Root>
-                          <Popover.Trigger asChild>
-                            <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147] hover:border-brand'} flex items-center gap-3 transition-colors cursor-pointer relative`}>
-                              <PlayerListItem p={p} isTurn={isTurn} />
-                            </div>
-                          </Popover.Trigger>
-                          <Popover.Portal>
-                            <Popover.Content className="z-[99999] bg-[#111214] border border-[#1e1f22] p-1.5 rounded-md shadow-xl min-w-[200px]" side="left" align="start" sideOffset={10}>
-                              <button 
-                                onClick={() => setTurn(p.id)}
-                                className="flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-[#5865F2] rounded w-full text-left transition-colors font-medium mb-1"
-                              >
-                                <Play size={14} /> Imposta Turno
-                              </button>
-                              
-                              <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
-                              <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Aggiungi Dado Monouso</div>
-                              
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'ebete')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Ebete (1,1,6)
-                              </button>
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'vigilante')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Vigilante (3,4,5)
-                              </button>
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'frazionario')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#a855f7] hover:bg-[#a855f7] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Fraz. (1.5, 2.5, 3.5)
-                              </button>
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'doppio')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#eab308] hover:bg-[#eab308] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Doppio (1-4, 1-4)
-                              </button>
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'carismatico')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Carismatico
-                              </button>
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'negativo')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#9ca3af] hover:bg-[#9ca3af] hover:text-[#111214] rounded w-full text-left transition-colors font-medium mb-0.5"
-                              >
-                                <Plus size={14} /> Dado Negativo (-1 a -6)
-                              </button>
-                              <button 
-                                onClick={() => addSpecialDice(p.id, 'scambio')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#10b981] hover:bg-[#10b981] hover:text-white rounded w-full text-left transition-colors font-medium"
-                              >
-                                <Plus size={14} /> Dado di Scambio
-                              </button>
-
-                              {isCommercial && (
-                                <>
-                                  <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
-                                  <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Gestione Soldi</div>
-                                  <div className="flex items-center gap-1.5 px-2 py-1">
-                                    <input
-                                      type="number"
-                                      value={moneyAmounts[p.id] || ''}
-                                      onChange={(e) => setMoneyAmounts({...moneyAmounts, [p.id]: e.target.value})}
-                                      placeholder="Importo..."
-                                      className="w-16 bg-[#1e1f22] text-white text-xs px-2 py-1.5 rounded border border-[#3f4147] focus:border-[#23a559] outline-none"
-                                    />
-                                    <button onClick={() => { handleUpdateMoney(p.id, parseInt(moneyAmounts[p.id] || '0')); setMoneyAmounts({...moneyAmounts, [p.id]: ''}); }} className="flex-1 p-1.5 bg-[#23a559] hover:bg-[#1a7c43] text-white rounded flex items-center justify-center transition-colors"><Plus size={14}/></button>
-                                    <button onClick={() => { handleUpdateMoney(p.id, -parseInt(moneyAmounts[p.id] || '0')); setMoneyAmounts({...moneyAmounts, [p.id]: ''}); }} className="flex-1 p-1.5 bg-[#f23f43] hover:bg-[#da373c] text-white rounded flex items-center justify-center transition-colors"><Minus size={14}/></button>
-                                  </div>
-                                </>
-                              )}
-
-                            </Popover.Content>
-                          </Popover.Portal>
-                        </Popover.Root>
-                      ) : (
-                        <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147]'} flex items-center gap-3 transition-colors relative`}>
-                          <PlayerListItem p={p} isTurn={isTurn} />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-                {players.length === 0 && (
-                  <div className="text-center text-[#949ba4] text-sm py-8 border border-dashed border-[#3f4147] rounded-lg">
-                    Tutti i giocatori hanno abbandonato
                   </div>
                 )}
               </div>
