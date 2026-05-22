@@ -24,7 +24,7 @@ interface GameState {
   status: 'lobby' | 'playing';
   players: Player[];
   activePlayerId?: string | null;
-  boardUrl?: string; // Nuovo stato per l'URL del tabellone
+  boardUrl?: string;
 }
 
 interface DiceState {
@@ -104,7 +104,7 @@ export const PataPartyView = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [boardUrl, setBoardUrl] = useState<string>('/pataparty-board.png');
-  const [boardUrlInput, setBoardUrlInput] = useState<string>(''); // Per l'input del GM
+  const [boardUrlInput, setBoardUrlInput] = useState<string>('');
   
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
@@ -318,7 +318,7 @@ export const PataPartyView = () => {
     setActivePlayerId(null);
   };
 
-  const startGame = () => {
+  conststartGame = () => {
     if (!isHost) return;
     stateRef.current.status = 'playing';
     syncState();
@@ -653,53 +653,9 @@ export const PataPartyView = () => {
 
           <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
             
-            {/* PULSANTI DADI PER IL GIOCATORE ATTIVO */}
-            {activePlayerId === user?.id && !isHost && (
-              <div className="absolute bottom-6 right-6 z-[150] flex flex-col items-end gap-2 animate-in slide-in-from-bottom-5">
-                <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
-                  <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
-                  È il tuo turno!
-                  <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
-                </div>
-                
-                <div className="flex gap-2">
-                  {/* Dado Normale */}
-                  <button
-                    onClick={() => rollDice()}
-                    disabled={diceState?.rolling}
-                    className="w-14 h-14 bg-white hover:bg-gray-100 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 border-gray-300 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative group"
-                    title="Dado Normale (1-6)"
-                  >
-                    <Dices size={28} className="text-[#111214]" />
-                  </button>
-
-                  {/* Dadi Speciali */}
-                  {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => (
-                    <button
-                      key={i}
-                      onClick={() => rollDice(d)}
-                      disabled={diceState?.rolling}
-                      className={`w-14 h-14 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative group ${
-                        d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
-                        d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
-                        'bg-[#a855f7] border-[#9333ea]'
-                      }`}
-                      title={d === 'ebete' ? 'Dado Ebete (1, 1, 6)' : d === 'vigilante' ? 'Dado Vigilante (3, 4, 5)' : 'Dado Frazionario (1.5, 2.5, 3.5)'}
-                    >
-                      <Dices size={28} className="text-white" />
-                      <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
-                        {d.charAt(0)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Tabellone Centrale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
-              {/* Contenitore adattivo per l'immagine */}
               <div 
                 ref={boardRef}
                 className="relative inline-flex items-center justify-center max-w-full max-h-[85vh]"
@@ -709,9 +665,6 @@ export const PataPartyView = () => {
                   alt="Board" 
                   className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border-2 border-[#3f4147] bg-[#fcf6ce]" 
                   draggable={false} 
-                  onError={(e) => {
-                    e.currentTarget.src = '/pataparty-board.png'; 
-                  }}
                 />
                 
                 {/* Overlay per le pedine: occupa esattemente lo spazio dell'immagine visibile */}
@@ -749,6 +702,62 @@ export const PataPartyView = () => {
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10">
                   <Info size={16} className="text-yellow-500" />
                   Trascina le pedine dei giocatori per spostarle sul tabellone.
+                </div>
+              )}
+
+              {/* PULSANTI DADI PER IL GIOCATORE ATTIVO (Discreti in basso al centro) */}
+              {activePlayerId === user?.id && !isHost && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
+                  <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
+                    <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
+                    È il tuo turno!
+                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
+                  </div>
+                  
+                  <div className="flex gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-sm border border-white/10">
+                    {/* Dado Normale */}
+                    <div className="group/dice relative">
+                      <button
+                        onClick={() => rollDice()}
+                        disabled={diceState?.rolling}
+                        className="w-14 h-14 bg-white hover:bg-gray-100 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 border-gray-300 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                      >
+                        <Dices size={28} className="text-[#111214]" />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                        Dado Normale<br/>
+                        <span className="text-[#949ba4] font-normal">Può uscire da 1 a 6</span>
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                      </div>
+                    </div>
+
+                    {/* Dadi Speciali */}
+                    {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => (
+                      <div key={i} className="group/dice relative">
+                        <button
+                          onClick={() => rollDice(d)}
+                          disabled={diceState?.rolling}
+                          className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
+                            d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
+                            d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
+                            'bg-[#a855f7] border-[#9333ea]'
+                          }`}
+                        >
+                          <Dices size={28} className="text-white" />
+                          <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
+                            {d.charAt(0)}
+                          </span>
+                        </button>
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                          {d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : 'Dado Frazionario'}<br/>
+                          <span className="text-[#949ba4] font-normal">
+                            {d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : 'Può uscire 1.5, 2.5 o 3.5'}
+                          </span>
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
