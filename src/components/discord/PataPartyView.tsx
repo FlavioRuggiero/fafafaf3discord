@@ -16,7 +16,7 @@ interface Player {
   avatar_decoration: string | null;
   x: number;
   y: number;
-  lastRoll?: number | null;
+  lastRoll?: number | string | null;
   specialDice?: string[];
 }
 
@@ -29,13 +29,13 @@ interface GameState {
 
 interface DiceState {
   playerId: string;
-  result: number;
+  result: number | string;
   rolling: boolean;
   diceType?: string;
 }
 
-const Dice = ({ value, rolling, diceType, size = 'md' }: { value: number, rolling: boolean, diceType?: string, size?: 'md' | 'sm' }) => {
-  const [displayValue, setDisplayValue] = useState(value);
+const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: number | string, rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[] }) => {
+  const [displayValue, setDisplayValue] = useState<number | string>(value);
   
   useEffect(() => {
     if (rolling) {
@@ -43,13 +43,15 @@ const Dice = ({ value, rolling, diceType, size = 'md' }: { value: number, rollin
         if (diceType === 'ebete') setDisplayValue([1, 1, 6][Math.floor(Math.random() * 3)]);
         else if (diceType === 'vigilante') setDisplayValue([3, 4, 5][Math.floor(Math.random() * 3)]);
         else if (diceType === 'frazionario') setDisplayValue([1.5, 2.5, 3.5][Math.floor(Math.random() * 3)]);
+        else if (diceType === 'carismatico') setDisplayValue(['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)]);
+        else if (diceType === 'scambio' && players && players.length > 0) setDisplayValue(players[Math.floor(Math.random() * players.length)].id);
         else setDisplayValue(Math.floor(Math.random() * 6) + 1);
       }, 100);
       return () => clearInterval(interval);
     } else {
       setDisplayValue(value);
     }
-  }, [rolling, value, diceType]);
+  }, [rolling, value, diceType, players]);
 
   const dotPositions: Record<number, string[]> = {
     1: ['center'],
@@ -73,22 +75,28 @@ const Dice = ({ value, rolling, diceType, size = 'md' }: { value: number, rollin
     }
   };
 
-  const isInteger1to6 = Number.isInteger(displayValue) && displayValue >= 1 && displayValue <= 6;
+  const isInteger1to6 = typeof displayValue === 'number' && Number.isInteger(displayValue) && displayValue >= 1 && displayValue <= 6;
+  const isScambio = diceType === 'scambio';
+  const targetPlayer = isScambio ? players?.find(p => p.id === displayValue) : null;
   const isSm = size === 'sm';
   const containerClasses = isSm 
     ? 'w-14 h-14 bg-white rounded-xl border-2 border-gray-200 p-1.5' 
     : 'w-32 h-32 bg-white rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] border-4 border-gray-200 p-4';
 
   return (
-    <div className={`${containerClasses} flex items-center justify-center ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
+    <div className={`${containerClasses} flex items-center justify-center overflow-hidden ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
       {isInteger1to6 ? (
         <div className="w-full h-full grid grid-cols-3 grid-rows-3 gap-[2px]">
-          {dotPositions[displayValue]?.map((pos, i) => (
+          {dotPositions[displayValue as number]?.map((pos, i) => (
             <div key={i} className={`${isSm ? 'w-2.5 h-2.5' : 'w-6 h-6'} bg-[#111214] rounded-full place-self-center shadow-inner ${getDotClass(pos)}`} />
           ))}
         </div>
+      ) : isScambio && targetPlayer ? (
+        <div className="w-full h-full flex flex-col items-center justify-center p-1">
+          <Avatar src={targetPlayer.avatar} decoration={targetPlayer.avatar_decoration} className={`${isSm ? 'w-8 h-8' : 'w-20 h-20'} object-cover`} />
+        </div>
       ) : (
-        <span className={`${isSm ? 'text-2xl' : 'text-5xl'} font-black text-[#111214]`}>{displayValue}</span>
+        <span className={`${isSm ? 'text-2xl' : 'text-5xl'} font-black text-[#111214] text-center`}>{displayValue}</span>
       )}
     </div>
   );
@@ -160,7 +168,7 @@ export const PataPartyView = () => {
     channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
 
-  const handleDiceRoll = (playerId: string, result: number, diceType?: string) => {
+  const handleDiceRoll = (playerId: string, result: number | string, diceType?: string) => {
     setDiceState({ playerId, result, rolling: true, diceType });
     setTimeout(() => {
       setDiceState(prev => prev ? { ...prev, rolling: false } : null);
@@ -356,13 +364,18 @@ export const PataPartyView = () => {
   const rollDice = (diceType?: string) => {
     if (activePlayerId !== user?.id || diceState?.rolling) return;
     
-    let result = 0;
+    let result: number | string = 0;
     if (diceType === 'ebete') {
       result = [1, 1, 6][Math.floor(Math.random() * 3)];
     } else if (diceType === 'vigilante') {
       result = [3, 4, 5][Math.floor(Math.random() * 3)];
     } else if (diceType === 'frazionario') {
       result = [1.5, 2.5, 3.5][Math.floor(Math.random() * 3)];
+    } else if (diceType === 'carismatico') {
+      result = ['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)];
+    } else if (diceType === 'scambio') {
+      const currentPlayers = stateRef.current.players;
+      result = currentPlayers[Math.floor(Math.random() * currentPlayers.length)].id;
     } else {
       result = Math.floor(Math.random() * 6) + 1;
     }
@@ -407,20 +420,31 @@ export const PataPartyView = () => {
     }
   };
 
-  const PlayerListItem = ({ p, isTurn }: { p: Player, isTurn: boolean }) => (
-    <>
-      {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
-      <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
-      <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-        {p.name}
-      </span>
-      {p.lastRoll && (
-        <div className="ml-auto flex items-center justify-center w-7 h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3">
-          <span className="text-[#111214] font-black text-sm">{p.lastRoll}</span>
-        </div>
-      )}
-    </>
-  );
+  const PlayerListItem = ({ p, isTurn }: { p: Player, isTurn: boolean }) => {
+    let rollContent: React.ReactNode = p.lastRoll;
+    
+    if (typeof p.lastRoll === 'string') {
+      const rolledPlayer = players.find(pl => pl.id === p.lastRoll);
+      if (rolledPlayer) {
+        rollContent = <Avatar src={rolledPlayer.avatar} decoration={rolledPlayer.avatar_decoration} className="w-5 h-5 object-cover" />;
+      }
+    }
+
+    return (
+      <>
+        {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
+        <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
+        <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+          {p.name}
+        </span>
+        {p.lastRoll !== null && p.lastRoll !== undefined && (
+          <div className="ml-auto flex items-center justify-center w-7 h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3 overflow-hidden">
+            <span className="text-[#111214] font-black text-xs md:text-sm flex items-center justify-center w-full h-full">{rollContent}</span>
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
@@ -458,6 +482,29 @@ export const PataPartyView = () => {
           animation: dice-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
       `}</style>
+
+      {/* OVERLAY DADO 3D (visibile a tutti se c'è un tiro) */}
+      {diceState && (
+        <div className="fixed inset-0 z-[200000] flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="flex flex-col items-center">
+            <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} players={players} />
+            <div className="mt-8 text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]">
+              {diceState.rolling ? (
+                <span className="animate-pulse">Rotolando...</span>
+              ) : (
+                <span className="animate-bounce-once text-[#23a559] bg-[#111214]/80 px-6 py-2 rounded-full border border-[#23a559]/50 shadow-[0_0_20px_rgba(35,165,89,0.4)] flex items-center gap-2">
+                  {players.find(p => p.id === diceState.playerId)?.name || 'Qualcuno'} ha tirato 
+                  {diceState.diceType === 'scambio' ? (
+                    <span className="font-bold text-white ml-1">{players.find(p => p.id === diceState.result)?.name || 'Qualcuno'}</span>
+                  ) : (
+                    <span className="font-bold text-white ml-1">{diceState.result}</span>
+                  )}!
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Menu Principale */}
       {view === 'menu' && savedGame ? (
@@ -657,7 +704,7 @@ export const PataPartyView = () => {
                   }}
                 />
                 
-                {/* Overlay per le pedine: rimosso overflow-hidden per evitare il taglio del balloon */}
+                {/* Overlay per le pedine */}
                 <div className="absolute inset-0 pointer-events-none rounded-xl">
                   {players.map(p => {
                     const isTurn = activePlayerId === p.id;
@@ -678,10 +725,10 @@ export const PataPartyView = () => {
                         {isRolling && diceState && (
                           <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[100] drop-shadow-xl animate-in slide-in-from-bottom-2 fade-in duration-300">
                             <div className="bg-[#111214]/90 backdrop-blur-sm border border-[#1e1f22] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-1 shadow-md whitespace-nowrap">
-                              {diceState.rolling ? 'Sta tirando...' : `${p.name} ha fatto ${diceState.result}!`}
+                              {diceState.rolling ? 'Sta tirando...' : `${p.name} ha tirato!`}
                             </div>
                             <div className="relative">
-                              <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" />
+                              <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
                               <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
                             </div>
                           </div>
@@ -737,31 +784,36 @@ export const PataPartyView = () => {
                     </div>
 
                     {/* Dadi Speciali */}
-                    {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => (
-                      <div key={i} className="group/dice relative">
-                        <button
-                          onClick={() => rollDice(d)}
-                          disabled={diceState?.rolling}
-                          className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
-                            d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
-                            d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
-                            'bg-[#a855f7] border-[#9333ea]'
-                          }`}
-                        >
-                          <Dices size={28} className="text-white" />
-                          <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
-                            {d.charAt(0)}
-                          </span>
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                          {d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : 'Dado Frazionario'}<br/>
-                          <span className="text-[#949ba4] font-normal">
-                            {d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : 'Può uscire 1.5, 2.5 o 3.5'}
-                          </span>
-                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                    {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => {
+                      const bgClass = d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
+                                      d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
+                                      d === 'frazionario' ? 'bg-[#a855f7] border-[#9333ea]' :
+                                      d === 'carismatico' ? 'bg-[#f59e0b] border-[#d97706]' :
+                                      'bg-[#10b981] border-[#059669]';
+                      
+                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : 'Dado di Scambio';
+                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : 'Può uscire un giocatore a caso';
+                      
+                      return (
+                        <div key={i} className="group/dice relative">
+                          <button
+                            onClick={() => rollDice(d)}
+                            disabled={diceState?.rolling}
+                            className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${bgClass}`}
+                          >
+                            <Dices size={28} className="text-white" />
+                            <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] uppercase shadow-lg">
+                              {d === 'scambio' ? 'S' : d.charAt(0)}
+                            </span>
+                          </button>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                            {label}<br/>
+                            <span className="text-[#949ba4] font-normal">{desc}</span>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -843,9 +895,21 @@ export const PataPartyView = () => {
                               </button>
                               <button 
                                 onClick={() => addSpecialDice(p.id, 'frazionario')}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#a855f7] hover:bg-[#a855f7] hover:text-white rounded w-full text-left transition-colors font-medium"
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#a855f7] hover:bg-[#a855f7] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
                               >
                                 <Plus size={14} /> Dado Fraz. (1.5, 2.5, 3.5)
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'carismatico')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white rounded w-full text-left transition-colors font-medium mb-0.5"
+                              >
+                                <Plus size={14} /> Dado Carismatico
+                              </button>
+                              <button 
+                                onClick={() => addSpecialDice(p.id, 'scambio')}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#10b981] hover:bg-[#10b981] hover:text-white rounded w-full text-left transition-colors font-medium"
+                              >
+                                <Plus size={14} /> Dado di Scambio
                               </button>
                             </Popover.Content>
                           </Popover.Portal>
