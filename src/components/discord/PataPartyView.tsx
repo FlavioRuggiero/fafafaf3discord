@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2 } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -19,6 +19,7 @@ interface Player {
   y: number;
   lastRoll?: number | string | number[] | string[] | null;
   specialDice?: string[];
+  defaultDiceId?: string | null;
   money?: number;
 }
 
@@ -38,6 +39,13 @@ interface Poll {
   isOpen: boolean;
 }
 
+interface CustomDiceDef {
+  id: string;
+  name: string;
+  description: string;
+  faces: string[];
+}
+
 interface GameState {
   status: 'lobby' | 'playing';
   players: Player[];
@@ -55,6 +63,7 @@ interface GameState {
   chatMessages?: ChatMessage[];
   isCommercial?: boolean;
   poll?: Poll | null;
+  customDice?: CustomDiceDef[];
 }
 
 interface DiceState {
@@ -64,7 +73,20 @@ interface DiceState {
   diceType?: string;
 }
 
-const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: number | string | number[] | string[], rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[] }) => {
+const BUILTIN_DICE = [
+  { id: 'ebete', label: 'Ebete (1,1,6)', color: 'text-[#f23f43]', bgClass: 'bg-[#f23f43] border-[#da373c]' },
+  { id: 'vigilante', label: 'Vigilante (3,4,5)', color: 'text-[#3b82f6]', bgClass: 'bg-[#3b82f6] border-[#2563eb]' },
+  { id: 'frazionario', label: 'Frazionario', color: 'text-[#a855f7]', bgClass: 'bg-[#a855f7] border-[#9333ea]' },
+  { id: 'doppio', label: 'Doppio', color: 'text-[#eab308]', bgClass: 'bg-[#eab308] border-[#ca8a04]' },
+  { id: 'triplo', label: 'Triplo', color: 'text-[#14b8a6]', bgClass: 'bg-[#14b8a6] border-[#0d9488]' },
+  { id: 'scintilla', label: 'Scintilla (6-10)', color: 'text-[#ec4899]', bgClass: 'bg-[#ec4899] border-[#db2777]' },
+  { id: 'carismatico', label: 'Carismatico', color: 'text-[#f59e0b]', bgClass: 'bg-[#f59e0b] border-[#d97706]' },
+  { id: 'negativo', label: 'Negativo (-1 a -6)', color: 'text-[#9ca3af]', bgClass: 'bg-[#6b7280] border-[#4b5563]' },
+  { id: 'alfabetico', label: 'Alfabetico', color: 'text-[#8b5cf6]', bgClass: 'bg-[#8b5cf6] border-[#7c3aed]' },
+  { id: 'scambio', label: 'Scambio', color: 'text-[#10b981]', bgClass: 'bg-[#10b981] border-[#059669]' },
+];
+
+const Dice = ({ value, rolling, diceType, size = 'md', players, customDiceDef }: { value: number | string | number[] | string[], rolling: boolean, diceType?: string, size?: 'md' | 'sm', players?: Player[], customDiceDef?: CustomDiceDef[] }) => {
   const [displayValue, setDisplayValue] = useState<number | string | number[] | string[]>(value);
   
   useEffect(() => {
@@ -87,13 +109,21 @@ const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: numbe
             letters[Math.floor(Math.random() * 26)]
           ]);
         }
+        else if (diceType?.startsWith('custom_') && customDiceDef) {
+          const custom = customDiceDef.find(d => d.id === diceType);
+          if (custom && custom.faces.length > 0) {
+            setDisplayValue(custom.faces[Math.floor(Math.random() * custom.faces.length)]);
+          } else {
+            setDisplayValue(Math.floor(Math.random() * 6) + 1);
+          }
+        }
         else setDisplayValue(Math.floor(Math.random() * 6) + 1);
       }, 100);
       return () => clearInterval(interval);
     } else {
       setDisplayValue(value);
     }
-  }, [rolling, value, diceType, players]);
+  }, [rolling, value, diceType, players, customDiceDef]);
 
   const dotPositions: Record<number, string[]> = {
     1: ['center'],
@@ -126,7 +156,7 @@ const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: numbe
   const vals = Array.isArray(displayValue) ? displayValue : [displayValue];
 
   return (
-    <div className={`flex gap-1.5 ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
+    <div className={`flex gap-1.5 flex-wrap justify-center ${rolling ? 'animate-dice-spin' : 'animate-dice-pop'}`}>
       {vals.map((v, idx) => {
         const isInteger1to6 = typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 6;
         const targetPlayer = isScambio ? players?.find(p => p.id === v) : null;
@@ -144,7 +174,7 @@ const Dice = ({ value, rolling, diceType, size = 'md', players }: { value: numbe
                 <Avatar src={targetPlayer.avatar} decoration={targetPlayer.avatar_decoration} className={`${isSm ? 'w-7 h-7' : 'w-16 h-16'} object-cover`} />
               </div>
             ) : (
-              <span className={`${isSm ? 'text-xl' : 'text-4xl'} font-black text-[#111214] text-center`}>{v}</span>
+              <span className={`${isSm ? 'text-xl' : 'text-3xl'} font-black text-[#111214] text-center overflow-hidden text-ellipsis whitespace-nowrap px-1`}>{v}</span>
             )}
           </div>
         );
@@ -177,11 +207,12 @@ export const PataPartyView = () => {
   const [isIframeActive, setIsIframeActive] = useState<boolean>(false);
   const [iframeInput, setIframeInput] = useState<string>('');
 
-  // Annunci, Classifica, Sondaggi
+  // Annunci, Classifica, Sondaggi, Dadi Custom
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [announcementInput, setAnnouncementInput] = useState<string>('');
   const [leaderboard, setLeaderboard] = useState<GameState['leaderboard']>(null);
   const [pollData, setPollData] = useState<Poll | null>(null);
+  const [customDice, setCustomDice] = useState<CustomDiceDef[]>([]);
 
   // Stati Chat
   const [showChat, setShowChat] = useState(false);
@@ -201,6 +232,11 @@ export const PataPartyView = () => {
   const [pollQuestionInput, setPollQuestionInput] = useState('');
   const [pollOptionsInput, setPollOptionsInput] = useState<string[]>(['', '']);
 
+  // Stati Builder Dado Custom
+  const [customDiceName, setCustomDiceName] = useState('');
+  const [customDiceDesc, setCustomDiceDesc] = useState('');
+  const [customDiceFaces, setCustomDiceFaces] = useState('');
+
   const [diceState, setDiceState] = useState<DiceState | null>(null);
   const [savedGame, setSavedGame] = useState<{code: string, isHost: boolean} | null>(null);
 
@@ -214,7 +250,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null });
+  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] });
 
   useEffect(() => {
     if (user) {
@@ -263,6 +299,7 @@ export const PataPartyView = () => {
     setChatMessages(stateRef.current.chatMessages || []);
     setIsCommercial(stateRef.current.isCommercial || false);
     setPollData(stateRef.current.poll || null);
+    setCustomDice(stateRef.current.customDice || []);
     
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
@@ -294,6 +331,81 @@ export const PataPartyView = () => {
     }
   };
 
+  const setDefaultDice = (playerId: string, diceId: string | null) => {
+    if (!isHost) return;
+    const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
+    if (pIndex !== -1) {
+      stateRef.current.players[pIndex].defaultDiceId = diceId;
+      syncState();
+      showSuccess("Dado predefinito aggiornato.");
+    }
+  };
+
+  const getDiceInfo = (type: string | null | undefined) => {
+    if (!type || type === 'standard') return { label: 'Dado Normale', desc: 'Può uscire da 1 a 6', shortLabel: '', bgClass: 'bg-white border-gray-300 text-[#111214]' };
+    
+    const builtin = BUILTIN_DICE.find(d => d.id === type);
+    if (builtin) {
+      const desc = type === 'ebete' ? 'Può uscire 1, 1 o 6' : type === 'vigilante' ? 'Può uscire 3, 4 o 5' : type === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : type === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : type === 'doppio' ? 'Tira due dadi da 1 a 4' : type === 'negativo' ? 'Può uscire da -1 a -6' : type === 'scintilla' ? 'Può uscire da 6 a 10' : type === 'triplo' ? 'Tira tre dadi da 1 a 3' : type === 'alfabetico' ? 'Escono 3 lettere a caso' : 'Può uscire un giocatore a caso';
+      let shortLabel = type.substring(0,2).toUpperCase();
+      if (type === 'scambio') shortLabel = 'SC';
+      if (type === 'scintilla') shortLabel = 'ST';
+      if (type === 'triplo') shortLabel = 'TR';
+      if (type === 'alfabetico') shortLabel = 'AL';
+      if (type === 'doppio') shortLabel = 'DP';
+      return { label: builtin.label, desc, shortLabel, bgClass: builtin.bgClass + ' text-white' };
+    }
+
+    if (type.startsWith('custom_')) {
+      const custom = stateRef.current.customDice?.find(d => d.id === type);
+      if (custom) return { label: custom.name, desc: custom.description, shortLabel: custom.name.substring(0,2).toUpperCase(), bgClass: 'bg-[#0ea5e9] border-[#0284c7] text-white' };
+    }
+
+    return { label: 'Dado Sconosciuto', desc: '?', shortLabel: '?', bgClass: 'bg-gray-500 border-gray-600 text-white' };
+  };
+
+  const getDiceResult = (type: string) => {
+    if (type === 'ebete') return [1, 1, 6][Math.floor(Math.random() * 3)];
+    if (type === 'vigilante') return [3, 4, 5][Math.floor(Math.random() * 3)];
+    if (type === 'frazionario') return [1.5, 2.5, 3.5][Math.floor(Math.random() * 3)];
+    if (type === 'carismatico') return ['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)];
+    if (type === 'negativo') return -(Math.floor(Math.random() * 6) + 1);
+    if (type === 'scambio') return stateRef.current.players[Math.floor(Math.random() * stateRef.current.players.length)].id;
+    if (type === 'doppio') return [Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1];
+    if (type === 'scintilla') return Math.floor(Math.random() * 5) + 6;
+    if (type === 'triplo') return [Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1];
+    if (type === 'alfabetico') {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      return [
+        letters[Math.floor(Math.random() * 26)],
+        letters[Math.floor(Math.random() * 26)],
+        letters[Math.floor(Math.random() * 26)]
+      ];
+    }
+    if (type.startsWith('custom_')) {
+      const custom = stateRef.current.customDice?.find(d => d.id === type);
+      if (custom && custom.faces.length > 0) return custom.faces[Math.floor(Math.random() * custom.faces.length)];
+    }
+    return Math.floor(Math.random() * 6) + 1;
+  };
+
+  const rollDice = (diceType?: string, isConsumable: boolean = false) => {
+    const me = players.find(p => p.id === user?.id);
+    const actualType = diceType || me?.defaultDiceId || 'standard';
+    
+    if (activePlayerId !== user?.id || diceState?.rolling) return;
+    
+    const result = getDiceResult(actualType);
+
+    handleDiceRoll(user.id, result, actualType);
+    channelRef.current?.send({ 
+      type: 'broadcast', 
+      event: 'dice_roll', 
+      payload: { playerId: user.id, result, diceType: actualType, isConsumable } 
+    });
+    setActivePlayerId(null);
+  };
+
   const setupHostChannel = (code: string) => {
     const channel = supabase.channel(`pataparty_${code}`);
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
@@ -305,6 +417,7 @@ export const PataPartyView = () => {
           y: 50, 
           lastRoll: null, 
           specialDice: [],
+          defaultDiceId: null,
           money: stateRef.current.isCommercial ? 0 : undefined 
         });
         syncState();
@@ -314,13 +427,13 @@ export const PataPartyView = () => {
       }
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
-      const { playerId, result, diceType } = payload.payload;
+      const { playerId, result, diceType, isConsumable } = payload.payload;
       handleDiceRoll(playerId, result, diceType);
       
       const pIndex = stateRef.current.players.findIndex(p => p.id === playerId);
       if (pIndex !== -1) {
         stateRef.current.players[pIndex].lastRoll = result;
-        if (diceType) {
+        if (isConsumable && diceType) {
           const diceArr = stateRef.current.players[pIndex].specialDice || [];
           const dIndex = diceArr.indexOf(diceType);
           if (dIndex !== -1) diceArr.splice(dIndex, 1);
@@ -363,6 +476,7 @@ export const PataPartyView = () => {
       setChatMessages(state.chatMessages || []);
       setIsCommercial(state.isCommercial || false);
       setPollData(state.poll || null);
+      setCustomDice(state.customDice || []);
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -414,6 +528,7 @@ export const PataPartyView = () => {
     setUnreadChat(false);
     setShowChat(false);
     setIsCommercial(isCommercialMode);
+    setCustomDice([]);
     setGmTab('players');
     
     const activeObj = { code, isHost: true };
@@ -432,7 +547,8 @@ export const PataPartyView = () => {
       leaderboard: null, 
       chatMessages: [],
       isCommercial: isCommercialMode,
-      poll: null
+      poll: null,
+      customDice: []
     };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
@@ -477,10 +593,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null };
+          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null };
+        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
       }
       setPlayers(stateRef.current.players);
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -493,6 +609,7 @@ export const PataPartyView = () => {
       setChatMessages(stateRef.current.chatMessages || []);
       setIsCommercial(stateRef.current.isCommercial || false);
       setPollData(stateRef.current.poll || null);
+      setCustomDice(stateRef.current.customDice || []);
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -524,6 +641,7 @@ export const PataPartyView = () => {
     setShowChat(false);
     setIsCommercialMode(false);
     setIsCommercial(false);
+    setCustomDice([]);
   };
 
   const startGame = () => {
@@ -670,43 +788,42 @@ export const PataPartyView = () => {
     }
   };
 
-  const rollDice = (diceType?: string) => {
-    if (activePlayerId !== user?.id || diceState?.rolling) return;
-    
-    let result: number | string | number[] | string[] = 0;
-    if (diceType === 'ebete') {
-      result = [1, 1, 6][Math.floor(Math.random() * 3)];
-    } else if (diceType === 'vigilante') {
-      result = [3, 4, 5][Math.floor(Math.random() * 3)];
-    } else if (diceType === 'frazionario') {
-      result = [1.5, 2.5, 3.5][Math.floor(Math.random() * 3)];
-    } else if (diceType === 'carismatico') {
-      result = ['😂', '😅', '😎', '😑', '🤑', '🥵', '😱'][Math.floor(Math.random() * 7)];
-    } else if (diceType === 'negativo') {
-      result = -(Math.floor(Math.random() * 6) + 1);
-    } else if (diceType === 'scambio') {
-      const currentPlayers = stateRef.current.players;
-      result = currentPlayers[Math.floor(Math.random() * currentPlayers.length)].id;
-    } else if (diceType === 'doppio') {
-      result = [Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1];
-    } else if (diceType === 'scintilla') {
-      result = Math.floor(Math.random() * 5) + 6; // Da 6 a 10
-    } else if (diceType === 'triplo') {
-      result = [Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * 3) + 1];
-    } else if (diceType === 'alfabetico') {
-      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      result = [
-        letters[Math.floor(Math.random() * 26)],
-        letters[Math.floor(Math.random() * 26)],
-        letters[Math.floor(Math.random() * 26)]
-      ];
-    } else {
-      result = Math.floor(Math.random() * 6) + 1;
-    }
+  const createCustomDice = () => {
+    if (!isHost) return;
+    if (!customDiceName.trim()) return showError("Inserisci un nome.");
+    if (!customDiceFaces.trim()) return showError("Inserisci almeno una faccia.");
 
-    handleDiceRoll(user.id, result, diceType);
-    channelRef.current?.send({ type: 'broadcast', event: 'dice_roll', payload: { playerId: user.id, result, diceType } });
-    setActivePlayerId(null);
+    const faces = customDiceFaces.split(',').map(f => f.trim()).filter(Boolean);
+    if (faces.length === 0) return showError("Facce non valide.");
+
+    const newDice: CustomDiceDef = {
+      id: `custom_${Date.now()}`,
+      name: customDiceName.trim(),
+      description: customDiceDesc.trim() || 'Dado personalizzato',
+      faces
+    };
+
+    stateRef.current.customDice = [...(stateRef.current.customDice || []), newDice];
+    syncState();
+    setCustomDiceName('');
+    setCustomDiceDesc('');
+    setCustomDiceFaces('');
+    showSuccess("Dado personalizzato creato!");
+  };
+
+  const deleteCustomDice = (id: string) => {
+    if (!isHost) return;
+    stateRef.current.customDice = (stateRef.current.customDice || []).filter(d => d.id !== id);
+    
+    // Rimuovi questo dado dai default/speciali dei giocatori
+    stateRef.current.players = stateRef.current.players.map(p => ({
+      ...p,
+      defaultDiceId: p.defaultDiceId === id ? null : p.defaultDiceId,
+      specialDice: (p.specialDice || []).filter(sd => sd !== id)
+    }));
+    
+    syncState();
+    showSuccess("Dado eliminato.");
   };
 
   const handlePointerDown = (e: React.PointerEvent, playerId: string) => {
@@ -1132,10 +1249,11 @@ export const PataPartyView = () => {
                                  diceState.diceType === 'doppio' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]} e ${diceState.result[1]}!` :
                                  diceState.diceType === 'triplo' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result[0]}, ${diceState.result[1]} e ${diceState.result[2]}!` :
                                  diceState.diceType === 'alfabetico' && Array.isArray(diceState.result) ? `${p.name} ha tirato ${diceState.result.join(', ')}!` :
+                                 diceState.diceType?.startsWith('custom_') ? `${p.name} ha fatto ${diceState.result}!` :
                                  `${p.name} ha fatto ${diceState.result}!`}
                               </div>
                               <div className="relative">
-                                <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} />
+                                <Dice value={diceState.result} rolling={diceState.rolling} diceType={diceState.diceType} size="sm" players={players} customDiceDef={customDice} />
                                 <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b-2 border-r-2 border-gray-200 rotate-45 z-[-1]"></div>
                               </div>
                             </div>
@@ -1297,60 +1415,54 @@ export const PataPartyView = () => {
                   </div>
                   
                   <div className="flex flex-wrap justify-center gap-2 bg-black/40 p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-xl max-w-sm md:max-w-md">
-                    {/* Dado Normale */}
-                    <div className="group/dice relative">
-                      <button
-                        onClick={() => rollDice()}
-                        disabled={diceState?.rolling}
-                        className="w-14 h-14 bg-white hover:bg-gray-100 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 border-gray-300 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                      >
-                        <Dices size={28} className="text-[#111214]" />
-                      </button>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                        Dado Normale<br/>
-                        <span className="text-[#949ba4] font-normal">Può uscire da 1 a 6</span>
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
-                      </div>
-                    </div>
+                    {/* Dado Principale (Predefinito del giocatore o Standard) */}
+                    {(() => {
+                      const me = players.find(p => p.id === user?.id);
+                      const defaultInfo = getDiceInfo(me?.defaultDiceId);
+                      const isStandard = !me?.defaultDiceId || me?.defaultDiceId === 'standard';
+                      
+                      return (
+                        <div className="group/dice relative">
+                          <button
+                            onClick={() => rollDice()}
+                            disabled={diceState?.rolling}
+                            className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${defaultInfo.bgClass}`}
+                          >
+                            <Dices size={28} className={isStandard ? "text-[#111214]" : "text-white"} />
+                            {!isStandard && (
+                              <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] shadow-lg">
+                                {defaultInfo.shortLabel}
+                              </span>
+                            )}
+                          </button>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                            {defaultInfo.label}<br/>
+                            <span className="text-[#949ba4] font-normal">{defaultInfo.desc}</span>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
-                    {/* Dadi Speciali */}
+                    {/* Dadi Speciali Monouso */}
                     {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => {
-                      const bgClass = d === 'ebete' ? 'bg-[#f23f43] border-[#da373c]' : 
-                                      d === 'vigilante' ? 'bg-[#3b82f6] border-[#2563eb]' : 
-                                      d === 'frazionario' ? 'bg-[#a855f7] border-[#9333ea]' :
-                                      d === 'carismatico' ? 'bg-[#f59e0b] border-[#d97706]' :
-                                      d === 'doppio' ? 'bg-[#eab308] border-[#ca8a04]' :
-                                      d === 'negativo' ? 'bg-[#6b7280] border-[#4b5563]' :
-                                      d === 'scintilla' ? 'bg-[#ec4899] border-[#db2777]' :
-                                      d === 'triplo' ? 'bg-[#14b8a6] border-[#0d9488]' :
-                                      d === 'alfabetico' ? 'bg-[#8b5cf6] border-[#7c3aed]' :
-                                      'bg-[#10b981] border-[#059669]'; // Scambio
-                      
-                      const label = d === 'ebete' ? 'Dado Ebete' : d === 'vigilante' ? 'Dado Vigilante' : d === 'frazionario' ? 'Dado Frazionario' : d === 'carismatico' ? 'Dado Carismatico' : d === 'doppio' ? 'Dado Doppio' : d === 'negativo' ? 'Dado Negativo' : d === 'scintilla' ? 'Dado Scintilla' : d === 'triplo' ? 'Dado Triplo' : d === 'alfabetico' ? 'Dado Alfabetico' : 'Dado di Scambio';
-                      const desc = d === 'ebete' ? 'Può uscire 1, 1 o 6' : d === 'vigilante' ? 'Può uscire 3, 4 o 5' : d === 'frazionario' ? 'Può uscire 1.5, 2.5 o 3.5' : d === 'carismatico' ? 'Può uscire 😂😅😎😑🤑🥵😱' : d === 'doppio' ? 'Tira due dadi da 1 a 4' : d === 'negativo' ? 'Può uscire da -1 a -6' : d === 'scintilla' ? 'Può uscire da 6 a 10' : d === 'triplo' ? 'Tira tre dadi da 1 a 3' : d === 'alfabetico' ? 'Escono 3 lettere a caso' : 'Può uscire un giocatore a caso';
-                      
-                      let shortLabel = d.substring(0,2).toUpperCase();
-                      if (d === 'scambio') shortLabel = 'SC';
-                      if (d === 'scintilla') shortLabel = 'ST';
-                      if (d === 'triplo') shortLabel = 'TR';
-                      if (d === 'alfabetico') shortLabel = 'AL';
-                      if (d === 'doppio') shortLabel = 'DP';
+                      const info = getDiceInfo(d);
 
                       return (
                         <div key={i} className="group/dice relative">
                           <button
-                            onClick={() => rollDice(d)}
+                            onClick={() => rollDice(d, true)}
                             disabled={diceState?.rolling}
-                            className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${bgClass}`}
+                            className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${info.bgClass}`}
                           >
                             <Dices size={28} className="text-white" />
                             <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] shadow-lg">
-                              {shortLabel}
+                              {info.shortLabel}
                             </span>
                           </button>
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                            {label}<br/>
-                            <span className="text-[#949ba4] font-normal">{desc}</span>
+                            {info.label}<br/>
+                            <span className="text-[#949ba4] font-normal">{info.desc}</span>
                             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
                           </div>
                         </div>
@@ -1460,39 +1572,31 @@ export const PataPartyView = () => {
                                     </button>
                                     
                                     <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
+                                    <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Dado Predefinito</div>
+                                    <select 
+                                      value={p.defaultDiceId || 'standard'}
+                                      onChange={(e) => setDefaultDice(p.id, e.target.value)}
+                                      className="w-full bg-[#1e1f22] text-white text-xs px-2 py-1.5 rounded border border-[#3f4147] outline-none mb-2"
+                                    >
+                                      <option value="standard">Dado Normale (1-6)</option>
+                                      {BUILTIN_DICE.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                                      {customDice.map(cd => <option key={cd.id} value={cd.id}>{cd.name} (Custom)</option>)}
+                                    </select>
+
+                                    <div className="h-[1px] bg-[#3f4147] my-2 mx-1"></div>
                                     <div className="px-2 py-1 text-[10px] font-bold text-[#949ba4] uppercase mb-1">Aggiungi Dado Monouso</div>
                                     
                                     <div className="max-h-48 overflow-y-auto custom-scrollbar pr-1 space-y-0.5">
-                                      <button onClick={() => addSpecialDice(p.id, 'ebete')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#f23f43] hover:bg-[#f23f43] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Ebete (1,1,6)
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'vigilante')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Vigilante (3,4,5)
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'frazionario')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#a855f7] hover:bg-[#a855f7] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Frazionario
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'doppio')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#eab308] hover:bg-[#eab308] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Doppio
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'triplo')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#14b8a6] hover:bg-[#14b8a6] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Triplo
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'scintilla')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#ec4899] hover:bg-[#ec4899] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Scintilla (6-10)
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'carismatico')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Carismatico
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'negativo')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#9ca3af] hover:bg-[#9ca3af] hover:text-[#111214] rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Negativo (-1 a -6)
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'alfabetico')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Alfabetico
-                                      </button>
-                                      <button onClick={() => addSpecialDice(p.id, 'scambio')} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#10b981] hover:bg-[#10b981] hover:text-white rounded w-full text-left transition-colors font-medium">
-                                        <Plus size={12} /> Scambio
-                                      </button>
+                                      {BUILTIN_DICE.map(d => (
+                                        <button key={d.id} onClick={() => addSpecialDice(p.id, d.id)} className={`flex items-center gap-2 px-3 py-1.5 text-xs ${d.color} hover:bg-[${d.color.replace('text-[', '').replace(']', '')}] hover:text-white rounded w-full text-left transition-colors font-medium`}>
+                                          <Plus size={12} /> {d.label}
+                                        </button>
+                                      ))}
+                                      {customDice.map(cd => (
+                                        <button key={cd.id} onClick={() => addSpecialDice(p.id, cd.id)} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#0ea5e9] hover:bg-[#0ea5e9] hover:text-white rounded w-full text-left transition-colors font-medium">
+                                          <Plus size={12} /> {cd.name} (Custom)
+                                        </button>
+                                      ))}
                                     </div>
 
                                     {isCommercial && (
@@ -1565,6 +1669,47 @@ export const PataPartyView = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Dadi Personalizzati */}
+                    <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                      <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                        <Dice5 size={14} className="flex-shrink-0 text-[#0ea5e9]" /> Dadi Personalizzati
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          placeholder="Nome dado..."
+                          value={customDiceName}
+                          onChange={e => setCustomDiceName(e.target.value)}
+                          className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Facce (separate da virgola)"
+                          value={customDiceFaces}
+                          onChange={e => setCustomDiceFaces(e.target.value)}
+                          className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
+                          title="Es: 1, 2, 3, Riprova, 💥"
+                        />
+                        <button
+                          onClick={createCustomDice}
+                          className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
+                        >
+                          Crea Dado
+                        </button>
+
+                        {customDice.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {customDice.map(d => (
+                              <div key={d.id} className="flex justify-between items-center bg-[#2b2d31] px-2 py-1 rounded text-[10px] text-[#dbdee1] border border-[#3f4147]">
+                                <span className="truncate flex-1 font-bold">{d.name} ({d.faces.length} facce)</span>
+                                <button onClick={() => deleteCustomDice(d.id)} className="text-[#f23f43] hover:text-white ml-2"><Trash2 size={12}/></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
                     <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                       <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
