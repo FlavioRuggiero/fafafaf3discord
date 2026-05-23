@@ -1123,30 +1123,30 @@ export const PataPartyView = () => {
       {/* FULLSCREEN PER LA PARTITA ATTIVA */}
       {view === 'playing' && (
         <div className="fixed inset-0 z-[99999] bg-[#111214] w-full h-full flex flex-col animate-in fade-in duration-300">
-          <div className="flex items-center justify-between bg-[#2b2d31] p-4 border-b border-[#1e1f22] shrink-0 shadow-md relative z-[10]">
+          <div className={`flex items-center justify-between bg-[#2b2d31] border-b border-[#1e1f22] shrink-0 shadow-md relative z-[10] transition-all duration-300 ${isIframeActive ? 'p-2' : 'p-4'}`}>
             <div className="flex items-center gap-4">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <h2 className={`font-bold text-white flex items-center gap-2 transition-all ${isIframeActive ? 'text-base' : 'text-xl'}`}>
                 <span className="text-[#ec4899] drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">PataParty!</span>
-                <span className="bg-[#1e1f22] px-2 py-0.5 rounded text-sm text-[#949ba4] tracking-widest">{gameCode}</span>
+                <span className="bg-[#1e1f22] px-2 py-0.5 rounded text-xs text-[#949ba4] tracking-widest">{gameCode}</span>
               </h2>
             </div>
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setView('menu')} 
-                className="flex items-center gap-2 bg-[#4e5058] hover:bg-[#6d6f78] text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
+                className={`flex items-center gap-2 bg-[#4e5058] hover:bg-[#6d6f78] text-white font-medium rounded transition-all ${isIframeActive ? 'py-1 px-3 text-xs' : 'py-1.5 px-4 text-sm'}`}
               >
-                <Minimize2 size={16} /> Riduci a Icona
+                <Minimize2 size={isIframeActive ? 14 : 16} /> <span className={isIframeActive ? 'hidden sm:inline' : ''}>Riduci a Icona</span>
               </button>
               <button 
                 onClick={abandonSavedGame}
-                className="flex items-center gap-2 bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium py-1.5 px-4 rounded transition-colors text-sm"
+                className={`flex items-center gap-2 bg-transparent border border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-medium rounded transition-all ${isIframeActive ? 'py-1 px-3 text-xs' : 'py-1.5 px-4 text-sm'}`}
               >
-                <LogOut size={16} /> Abbandona
+                <LogOut size={isIframeActive ? 14 : 16} /> <span className={isIframeActive ? 'hidden sm:inline' : ''}>Abbandona</span>
               </button>
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden p-4 md:p-6 bg-[#313338] relative">
+          <div className={`flex flex-col md:flex-row gap-4 flex-1 overflow-hidden bg-[#313338] relative transition-all duration-300 ${isIframeActive ? 'p-2' : 'p-4 md:p-6'}`}>
             
             {/* Tabellone Centrale / Iframe Globale */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
