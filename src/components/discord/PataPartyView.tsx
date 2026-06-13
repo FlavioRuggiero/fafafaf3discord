@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle, Upload, CheckCircle2 } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle, Upload, CheckCircle2, Save } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -51,6 +51,14 @@ interface IndovinaCharacter {
   name: string;
   imageUrl: string;
   creatorId: string;
+}
+
+interface IndovinaPreset {
+  id: string;
+  name: string;
+  creator_id: string;
+  characters: IndovinaCharacter[];
+  created_at: string;
 }
 
 interface GameState {
@@ -246,6 +254,12 @@ export const PataPartyView = () => {
   const [indovinaTurn, setIndovinaTurn] = useState<string | null>(null);
   const [eliminatedChars, setEliminatedChars] = useState<string[]>([]);
 
+  // IndovinaQualchì Setup & Presets
+  const [setupTab, setSetupTab] = useState<'create' | 'presets'>('create');
+  const [indovinaPresets, setIndovinaPresets] = useState<IndovinaPreset[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
+  const [presetNameInput, setPresetNameInput] = useState<string>('');
+
   // IndovinaQualchì Form Upload
   const [indovinaCharName, setIndovinaCharName] = useState('');
   const [indovinaCharUrl, setIndovinaCharUrl] = useState('');
@@ -306,6 +320,18 @@ export const PataPartyView = () => {
   useEffect(() => {
     if (showChat) setUnreadChat(false);
   }, [showChat]);
+
+  // Fetch presets when in setup phase
+  useEffect(() => {
+    const fetchPresets = async () => {
+      const { data, error } = await supabase.from('indovina_presets').select('*').order('created_at', { ascending: false });
+      if (data) setIndovinaPresets(data);
+    };
+
+    if (isHost && activeGameMode === 'indovina' && indovinaPhase === 'setup') {
+      fetchPresets();
+    }
+  }, [indovinaPhase, isHost, activeGameMode]);
 
   const canCreate = user?.id === adminId || (user && moderatorIds.includes(user.id)) || profile?.role === 'moderator';
 
@@ -387,6 +413,51 @@ export const PataPartyView = () => {
     syncState();
   };
 
+  const saveBoardAsPreset = async () => {
+    if (!isHost || !presetNameInput.trim()) return;
+    if (indovinaCharacters.length === 0) return showError("Il tabellone è vuoto.");
+    
+    const { error } = await supabase.from('indovina_presets').insert({
+       name: presetNameInput.trim(),
+       creator_id: user?.id,
+       characters: indovinaCharacters
+    });
+
+    if (error) {
+       showError("Errore nel salvataggio del preset.");
+    } else {
+       showSuccess("Preset salvato con successo!");
+       setPresetNameInput('');
+    }
+  };
+
+  const startGameWithPreset = () => {
+    if (!isHost) return;
+    const preset = indovinaPresets.find(p => p.id === selectedPresetId);
+    if (!preset) {
+       showError("Seleziona un preset valido.");
+       return;
+    }
+    if (stateRef.current.players.length !== 2) {
+       showError("Servono esattamente 2 giocatori.");
+       return;
+    }
+
+    stateRef.current.indovinaCharacters = preset.characters;
+    
+    const p1Id = stateRef.current.players[0].id;
+    const p2Id = stateRef.current.players[1].id;
+    
+    stateRef.current.indovinaPhase = 'playing';
+    stateRef.current.indovinaSecretChars = {
+      [p1Id]: preset.characters[Math.floor(Math.random() * preset.characters.length)].id,
+      [p2Id]: preset.characters[Math.floor(Math.random() * preset.characters.length)].id
+    };
+    stateRef.current.indovinaTurn = p1Id;
+    
+    syncState();
+    showSuccess("Partita avviata con il preset!");
+  };
 
   const handleDiceRoll = (playerId: string, result: number | string | number[] | string[], diceType?: string) => {
     playSound('/openingsound.mp3');
@@ -822,9 +893,9 @@ export const PataPartyView = () => {
       return;
     }
     stateRef.current.indovinaPhase = 'draft';
+    // Il turno inizia con l'Host
     stateRef.current.indovinaTurn = stateRef.current.players[0].id;
     stateRef.current.indovinaCharacters = [];
-    stateRef.current.indovinaSettings = indovinaSettings;
     syncState();
   };
 
@@ -868,15 +939,11 @@ export const PataPartyView = () => {
       creatorId: user.id
     };
 
-    if (isHost) {
-      handleAddCharacterLogic(newChar);
-    } else {
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'indovina_add_char',
-        payload: { char: newChar }
-      });
-    }
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'indovina_add_char',
+      payload: { char: newChar }
+    });
 
     setIndovinaCharName('');
     setIndovinaCharUrl('');
@@ -886,11 +953,7 @@ export const PataPartyView = () => {
   };
 
   const passIndovinaTurn = () => {
-    if (isHost) {
-      handlePassTurnLogic();
-    } else {
-      channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
-    }
+    channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
   };
 
   const toggleIndovinaChar = (charId: string) => {
@@ -1361,30 +1424,20 @@ export const PataPartyView = () => {
               Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
-              {isHost && (
-                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
-                  <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
-                  <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
-                    {profile?.first_name || 'Tu'} <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>
-                  </span>
-                  <Crown size={14} className="text-yellow-500 ml-auto" />
-                </div>
-              )}
-              {players.map(p => (
-                <div key={p.id} className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-[#3f4147]">
-                  <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
-                  <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                    {p.name}
-                  </span>
-                </div>
-              ))}
+              {players.map(p => {
+                const isHostPlayer = p.id === stateRef.current.players[0]?.id;
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 bg-[#2b2d31] p-2 rounded border ${isHostPlayer ? 'border-yellow-500/50 shadow-sm' : 'border-[#3f4147]'}`}>
+                    <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
+                    <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                      {p.name} {isHostPlayer && <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>}
+                    </span>
+                    {isHostPlayer && <Crown size={14} className="text-yellow-500 ml-auto" />}
+                  </div>
+                );
+              })}
               {players.length === 0 && (
                 <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
-              )}
-              {activeGameMode === 'indovina' && players.length > 2 && (
-                <div className="text-[#f23f43] text-xs font-bold text-center mt-2">
-                  Troppi giocatori per questa modalità! Massimo 2.
-                </div>
               )}
             </div>
           </div>
@@ -1504,28 +1557,60 @@ export const PataPartyView = () => {
                     <div className="m-auto text-center max-w-md p-8 bg-[#2b2d31] rounded-2xl border border-[#3f4147] shadow-xl">
                       <HelpCircle size={64} className="text-[#a855f7] mx-auto mb-4" />
                       <h2 className="text-3xl font-black text-white mb-2">IndovinaQualchì</h2>
-                      <p className="text-[#b5bac1] mb-6">Ogni giocatore creerà dei personaggi personalizzati (Nome e Immagine). Al termine, il gioco assegnerà segretamente un personaggio a ciascuno.</p>
+                      <p className="text-[#b5bac1] mb-6">Scegli se creare un nuovo tabellone o usarne uno salvato nei preset.</p>
                       
                       {isHost ? (
                         <div className="space-y-4">
-                          <div>
-                            <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Personaggi da creare a testa</label>
-                            <input 
-                              type="number" 
-                              min="4" 
-                              max="16" 
-                              value={indovinaSettings.charsPerPlayer}
-                              onChange={e => setIndovinaSettings({ charsPerPlayer: Math.max(4, Math.min(16, parseInt(e.target.value) || 4)) })}
-                              className="w-full bg-[#1e1f22] text-white text-center rounded p-3 text-xl font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
-                            />
-                            <p className="text-[10px] text-[#949ba4] mt-2">Totale personaggi sul tabellone: {indovinaSettings.charsPerPlayer * 2}</p>
+                          <div className="flex bg-[#1e1f22] p-1 rounded-lg">
+                             <button onClick={() => setSetupTab('create')} className={`flex-1 py-1.5 text-sm font-bold rounded transition-colors ${setupTab === 'create' ? 'bg-[#35373c] text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}>Crea Tabellone</button>
+                             <button onClick={() => setSetupTab('presets')} className={`flex-1 py-1.5 text-sm font-bold rounded transition-colors ${setupTab === 'presets' ? 'bg-[#35373c] text-white' : 'text-[#949ba4] hover:text-[#dbdee1]'}`}>Usa Preset</button>
                           </div>
-                          <button 
-                            onClick={startIndovinaDraft}
-                            className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg"
-                          >
-                            Inizia Creazione
-                          </button>
+
+                          {setupTab === 'create' ? (
+                            <div className="space-y-4 animate-in fade-in">
+                              <div>
+                                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Personaggi da creare a testa</label>
+                                <input 
+                                  type="number" 
+                                  min="4" 
+                                  max="16" 
+                                  value={indovinaSettings.charsPerPlayer}
+                                  onChange={e => setIndovinaSettings({ charsPerPlayer: Math.max(4, Math.min(16, parseInt(e.target.value) || 4)) })}
+                                  className="w-full bg-[#1e1f22] text-white text-center rounded p-3 text-xl font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
+                                />
+                                <p className="text-[10px] text-[#949ba4] mt-2">Totale personaggi sul tabellone: {indovinaSettings.charsPerPlayer * 2}</p>
+                              </div>
+                              <button 
+                                onClick={startIndovinaDraft}
+                                className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg"
+                              >
+                                Inizia Creazione
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-4 animate-in fade-in">
+                              <div>
+                                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona un Preset</label>
+                                <select 
+                                  value={selectedPresetId} 
+                                  onChange={e => setSelectedPresetId(e.target.value)}
+                                  className="w-full bg-[#1e1f22] text-white rounded p-3 font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
+                                >
+                                  <option value="">Seleziona...</option>
+                                  {indovinaPresets.map(p => (
+                                     <option key={p.id} value={p.id}>{p.name} ({p.characters.length} personaggi)</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <button 
+                                onClick={startGameWithPreset}
+                                disabled={!selectedPresetId}
+                                className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg disabled:opacity-50"
+                              >
+                                Avvia Partita con Preset
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
@@ -2138,6 +2223,30 @@ export const PataPartyView = () => {
                 {/* TAB STRUMENTI (Solo GM) */}
                 {isHost && gmTab === 'tools' && (
                   <div className="space-y-4 animate-in fade-in duration-200">
+                    
+                    {activeGameMode === 'indovina' && indovinaPhase === 'playing' && (
+                      <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                        <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1">
+                          <BookOpen size={14} className="text-[#a855f7]" /> Salva Tabellone come Preset
+                        </h4>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nome Preset (es. Marvel)"
+                            value={presetNameInput}
+                            onChange={e => setPresetNameInput(e.target.value)}
+                            className="flex-1 min-w-0 bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded border border-[#3f4147] outline-none focus:border-[#a855f7]"
+                          />
+                          <button
+                            onClick={saveBoardAsPreset}
+                            className="bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
+                          >
+                            <Save size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {!isIframeActive && activeGameMode === 'board' && (
                       <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                         <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
