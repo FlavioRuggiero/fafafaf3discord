@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2 } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -48,6 +48,7 @@ interface CustomDiceDef {
 
 interface GameState {
   status: 'lobby' | 'playing';
+  gameMode: 'board' | 'indovina';
   players: Player[];
   activePlayerId?: string | null;
   boardUrl?: string;
@@ -195,6 +196,8 @@ export const PataPartyView = () => {
   const [joinCode, setJoinCode] = useState('');
   const [isCommercialMode, setIsCommercialMode] = useState(false);
   const [isCommercial, setIsCommercial] = useState(false);
+  const [selectedGameMode, setSelectedGameMode] = useState<'board' | 'indovina'>('board');
+  const [activeGameMode, setActiveGameMode] = useState<'board' | 'indovina'>('board');
   const [gmTab, setGmTab] = useState<'players' | 'tools'>('players');
   
   const [players, setPlayers] = useState<Player[]>([]);
@@ -250,7 +253,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] });
+  const stateRef = useRef<GameState>({ status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] });
 
   useEffect(() => {
     if (user) {
@@ -290,6 +293,7 @@ export const PataPartyView = () => {
 
   const syncState = () => {
     setPlayers([...stateRef.current.players]);
+    setActiveGameMode(stateRef.current.gameMode || 'board');
     setActivePlayerId(stateRef.current.activePlayerId || null);
     setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
     setIframeUrl(stateRef.current.iframeUrl || null);
@@ -466,6 +470,7 @@ export const PataPartyView = () => {
       const state = payload.payload as GameState;
       stateRef.current = state;
       setPlayers(state.players);
+      setActiveGameMode(state.gameMode || 'board');
       setActivePlayerId(state.activePlayerId || null);
       setBoardUrl(state.boardUrl || '/pataparty-board.png');
       setRulesText(state.rules || '');
@@ -517,6 +522,7 @@ export const PataPartyView = () => {
     setGameCode(code);
     setIsHost(true);
     setView('lobby');
+    setActiveGameMode(selectedGameMode);
     setBoardUrl('/pataparty-board.png');
     setRulesText('');
     setIframeUrl(null);
@@ -537,6 +543,7 @@ export const PataPartyView = () => {
 
     stateRef.current = { 
       status: 'lobby', 
+      gameMode: selectedGameMode,
       players: [], 
       activePlayerId: null, 
       boardUrl: '/pataparty-board.png', 
@@ -593,12 +600,13 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
+          stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
         }
       } else {
-        stateRef.current = { status: 'lobby', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
+        stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
       }
       setPlayers(stateRef.current.players);
+      setActiveGameMode(stateRef.current.gameMode || 'board');
       setActivePlayerId(stateRef.current.activePlayerId || null);
       setBoardUrl(stateRef.current.boardUrl || '/pataparty-board.png');
       setRulesText(stateRef.current.rules || '');
@@ -916,7 +924,7 @@ export const PataPartyView = () => {
             {p.money || 0}€
           </span>
         )}
-        {p.lastRoll !== null && p.lastRoll !== undefined && !isCurrentlyRolling && !isIframeActive && (
+        {p.lastRoll !== null && p.lastRoll !== undefined && !isCurrentlyRolling && !isIframeActive && activeGameMode === 'board' && (
           <div className="ml-auto flex items-center justify-center w-max px-1.5 min-w-[28px] h-7 bg-white rounded shadow-sm border border-gray-300 transform rotate-3 overflow-hidden ml-2">
             <span className="text-[#111214] font-black text-xs md:text-sm flex items-center justify-center w-full h-full whitespace-nowrap">{rollContent}</span>
           </div>
@@ -1006,8 +1014,23 @@ export const PataPartyView = () => {
                 <h2 className="text-white font-bold mb-2 flex items-center justify-center gap-2">
                   <Crown size={18} className="text-yellow-500" /> Crea una nuova partita
                 </h2>
-                <p className="text-xs text-[#949ba4] mb-3">Diventa il Game Master e controlla il tabellone.</p>
+                <p className="text-xs text-[#949ba4] mb-3">Diventa il Game Master e scegli la modalità di gioco.</p>
                 
+                <div className="flex gap-2 mb-4">
+                  <button 
+                    onClick={() => setSelectedGameMode('board')} 
+                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors border ${selectedGameMode === 'board' ? 'bg-brand/20 border-brand text-white' : 'bg-[#2b2d31] border-[#3f4147] text-[#949ba4] hover:text-[#dbdee1]'}`}
+                  >
+                    Gioco dell'Oca
+                  </button>
+                  <button 
+                    onClick={() => setSelectedGameMode('indovina')} 
+                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors border ${selectedGameMode === 'indovina' ? 'bg-brand/20 border-brand text-white' : 'bg-[#2b2d31] border-[#3f4147] text-[#949ba4] hover:text-[#dbdee1]'}`}
+                  >
+                    IndovinaQualchì
+                  </button>
+                </div>
+
                 <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm text-[#dbdee1] justify-center bg-[#2b2d31] py-2 rounded-lg border border-[#3f4147]">
                   <input type="checkbox" checked={isCommercialMode} onChange={e => setIsCommercialMode(e.target.checked)} className="accent-brand w-4 h-4" />
                   Modalità Commerciale (Soldi)
@@ -1067,6 +1090,7 @@ export const PataPartyView = () => {
       {view === 'lobby' && (
         <div className="bg-[#2b2d31] p-8 rounded-xl shadow-xl max-w-lg w-full text-center">
           <h2 className="text-2xl font-bold text-white mb-2">Sala d'Attesa</h2>
+          <p className="text-[#a855f7] font-bold mb-4 uppercase">{activeGameMode === 'indovina' ? 'IndovinaQualchì' : "Gioco dell'Oca"}</p>
           <div className="bg-[#1e1f22] py-4 px-6 rounded-lg inline-block mb-6 border border-[#3f4147]">
             <p className="text-xs text-[#949ba4] font-bold uppercase mb-1">Codice Partita</p>
             <p className="text-4xl font-black text-white tracking-[0.2em]">{gameCode}</p>
@@ -1208,6 +1232,12 @@ export const PataPartyView = () => {
                     allowFullScreen
                   />
                 </div>
+              ) : activeGameMode === 'indovina' ? (
+                <div className="w-full h-full flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+                  <HelpCircle size={80} className="text-[#a855f7] mb-6 opacity-50" />
+                  <h1 className="text-4xl font-black text-white mb-4">IndovinaQualchì</h1>
+                  <p className="text-[#b5bac1]">Modalità in fase di sviluppo...</p>
+                </div>
               ) : (
                 <div 
                   ref={boardRef}
@@ -1335,7 +1365,7 @@ export const PataPartyView = () => {
                   )}
                 </div>
 
-                {isHost && !isIframeActive && (
+                {isHost && !isIframeActive && activeGameMode === 'board' && (
                   <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg pointer-events-none z-10 mx-auto hidden md:flex">
                     <Info size={16} className="text-yellow-500" />
                     Trascina le pedine dei giocatori per spostarle sul tabellone.
@@ -1406,7 +1436,7 @@ export const PataPartyView = () => {
               </div>
 
               {/* PULSANTI DADI PER IL GIOCATORE ATTIVO */}
-              {activePlayerId === user?.id && !isHost && !isIframeActive && (
+              {activePlayerId === user?.id && !isHost && !isIframeActive && activeGameMode === 'board' && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
                   <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
                     <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
@@ -1555,7 +1585,7 @@ export const PataPartyView = () => {
                         
                         return (
                           <React.Fragment key={p.id}>
-                            {isHost && !isIframeActive ? (
+                            {isHost && !isIframeActive && activeGameMode === 'board' ? (
                               <Popover.Root>
                                 <Popover.Trigger asChild>
                                   <div className={`bg-[#1e1f22] p-2 rounded-lg border ${isTurn ? 'border-[#23a559] shadow-[0_0_10px_rgba(35,165,89,0.3)]' : 'border-[#3f4147] hover:border-brand'} flex items-center gap-3 transition-colors cursor-pointer relative`}>
@@ -1640,7 +1670,7 @@ export const PataPartyView = () => {
                 {/* TAB STRUMENTI (Solo GM) */}
                 {isHost && gmTab === 'tools' && (
                   <div className="space-y-4 animate-in fade-in duration-200">
-                    {!isIframeActive && (
+                    {!isIframeActive && activeGameMode === 'board' && (
                       <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                         <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
                           <ImageIcon size={14} className="flex-shrink-0" /> Sfondo (URL)
@@ -1671,45 +1701,47 @@ export const PataPartyView = () => {
                     )}
 
                     {/* Dadi Personalizzati */}
-                    <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
-                      <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
-                        <Dice5 size={14} className="flex-shrink-0 text-[#0ea5e9]" /> Dadi Personalizzati
-                      </h4>
-                      <div className="flex flex-col gap-2">
-                        <input
-                          type="text"
-                          placeholder="Nome dado..."
-                          value={customDiceName}
-                          onChange={e => setCustomDiceName(e.target.value)}
-                          className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Facce (separate da virgola)"
-                          value={customDiceFaces}
-                          onChange={e => setCustomDiceFaces(e.target.value)}
-                          className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
-                          title="Es: 1, 2, 3, Riprova, 💥"
-                        />
-                        <button
-                          onClick={createCustomDice}
-                          className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
-                        >
-                          Crea Dado
-                        </button>
+                    {activeGameMode === 'board' && (
+                      <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
+                        <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
+                          <Dice5 size={14} className="flex-shrink-0 text-[#0ea5e9]" /> Dadi Personalizzati
+                        </h4>
+                        <div className="flex flex-col gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nome dado..."
+                            value={customDiceName}
+                            onChange={e => setCustomDiceName(e.target.value)}
+                            className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Facce (separate da virgola)"
+                            value={customDiceFaces}
+                            onChange={e => setCustomDiceFaces(e.target.value)}
+                            className="w-full bg-[#2b2d31] text-white text-xs px-2 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-[#0ea5e9] border border-[#3f4147]"
+                            title="Es: 1, 2, 3, Riprova, 💥"
+                          />
+                          <button
+                            onClick={createCustomDice}
+                            className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm"
+                          >
+                            Crea Dado
+                          </button>
 
-                        {customDice.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {customDice.map(d => (
-                              <div key={d.id} className="flex justify-between items-center bg-[#2b2d31] px-2 py-1 rounded text-[10px] text-[#dbdee1] border border-[#3f4147]">
-                                <span className="truncate flex-1 font-bold">{d.name} ({d.faces.length} facce)</span>
-                                <button onClick={() => deleteCustomDice(d.id)} className="text-[#f23f43] hover:text-white ml-2"><Trash2 size={12}/></button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                          {customDice.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {customDice.map(d => (
+                                <div key={d.id} className="flex justify-between items-center bg-[#2b2d31] px-2 py-1 rounded text-[10px] text-[#dbdee1] border border-[#3f4147]">
+                                  <span className="truncate flex-1 font-bold">{d.name} ({d.faces.length} facce)</span>
+                                  <button onClick={() => deleteCustomDice(d.id)} className="text-[#f23f43] hover:text-white ml-2"><Trash2 size={12}/></button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="bg-[#1e1f22] p-3 rounded-lg border border-[#3f4147]">
                       <h4 className="text-xs font-bold text-[#b5bac1] uppercase mb-2 flex items-center gap-1 truncate">
