@@ -939,11 +939,15 @@ export const PataPartyView = () => {
       creatorId: user.id
     };
 
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'indovina_add_char',
-      payload: { char: newChar }
-    });
+    if (isHost) {
+      handleAddCharacterLogic(newChar);
+    } else {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'indovina_add_char',
+        payload: { char: newChar }
+      });
+    }
 
     setIndovinaCharName('');
     setIndovinaCharUrl('');
@@ -953,7 +957,11 @@ export const PataPartyView = () => {
   };
 
   const passIndovinaTurn = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
+    if (isHost) {
+      handlePassTurnLogic();
+    } else {
+      channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
+    }
   };
 
   const toggleIndovinaChar = (charId: string) => {
@@ -1424,20 +1432,30 @@ export const PataPartyView = () => {
               Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
-              {players.map(p => {
-                const isHostPlayer = p.id === stateRef.current.players[0]?.id;
-                return (
-                  <div key={p.id} className={`flex items-center gap-3 bg-[#2b2d31] p-2 rounded border ${isHostPlayer ? 'border-yellow-500/50 shadow-sm' : 'border-[#3f4147]'}`}>
-                    <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
-                    <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                      {p.name} {isHostPlayer && <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>}
-                    </span>
-                    {isHostPlayer && <Crown size={14} className="text-yellow-500 ml-auto" />}
-                  </div>
-                );
-              })}
+              {isHost && (
+                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
+                  <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
+                  <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
+                    {profile?.first_name || 'Tu'} <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>
+                  </span>
+                  <Crown size={14} className="text-yellow-500 ml-auto" />
+                </div>
+              )}
+              {players.map(p => (
+                <div key={p.id} className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-[#3f4147]">
+                  <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
+                  <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                    {p.name}
+                  </span>
+                </div>
+              ))}
               {players.length === 0 && (
                 <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
+              )}
+              {activeGameMode === 'indovina' && players.length > 2 && (
+                <div className="text-[#f23f43] text-xs font-bold text-center mt-2">
+                  Troppi giocatori per questa modalità! Massimo 2.
+                </div>
               )}
             </div>
           </div>
@@ -1575,7 +1593,14 @@ export const PataPartyView = () => {
                                   min="4" 
                                   max="16" 
                                   value={indovinaSettings.charsPerPlayer}
-                                  onChange={e => setIndovinaSettings({ charsPerPlayer: Math.max(4, Math.min(16, parseInt(e.target.value) || 4)) })}
+                                  onChange={e => {
+                                    const val = Math.max(4, Math.min(16, parseInt(e.target.value) || 4));
+                                    setIndovinaSettings({ charsPerPlayer: val });
+                                    if (isHost) {
+                                      stateRef.current.indovinaSettings = { charsPerPlayer: val };
+                                      syncState();
+                                    }
+                                  }}
                                   className="w-full bg-[#1e1f22] text-white text-center rounded p-3 text-xl font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
                                 />
                                 <p className="text-[10px] text-[#949ba4] mt-2">Totale personaggi sul tabellone: {indovinaSettings.charsPerPlayer * 2}</p>
