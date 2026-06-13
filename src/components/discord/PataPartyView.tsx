@@ -385,6 +385,26 @@ export const PataPartyView = () => {
     channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
 
+  // IndovinaQualchì Centralized Logic (Per far funzionare bene l'Host)
+  const handleAddCharacterLogic = (char: IndovinaCharacter) => {
+    if (!isHostRef.current) return;
+    stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
+    
+    const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
+    
+    if (stateRef.current.indovinaCharacters.length >= maxChars) {
+      stateRef.current.indovinaPhase = 'ready';
+      stateRef.current.indovinaTurn = null;
+    } else {
+      // Alterna il turno di creazione tra i 2 giocatori
+      const currTurn = stateRef.current.indovinaTurn;
+      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
+      stateRef.current.indovinaTurn = nextTurn;
+    }
+    
+    syncState();
+  };
+
   const startIndovinaMatch = async (presetName?: string) => {
     if (!isHost) return;
     
@@ -415,6 +435,14 @@ export const PataPartyView = () => {
       stateRef.current.indovinaTurn = p1Id;
       syncState();
     }
+  };
+
+  const handlePassTurnLogic = () => {
+    if (!isHostRef.current) return;
+    const currTurn = stateRef.current.indovinaTurn;
+    const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
+    stateRef.current.indovinaTurn = nextTurn;
+    syncState();
   };
 
   const startGameWithPreset = () => {
@@ -606,28 +634,11 @@ export const PataPartyView = () => {
 
     // Indovina Events (Host gestisce il broadcast di un giocatore)
     channel.on('broadcast', { event: 'indovina_add_char' }, (payload) => {
-      const char = payload.payload.char;
-      stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
-      
-      const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
-      
-      if (stateRef.current.indovinaCharacters.length >= maxChars) {
-        stateRef.current.indovinaPhase = 'ready';
-        stateRef.current.indovinaTurn = null;
-      } else {
-        const currTurn = stateRef.current.indovinaTurn;
-        const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-        stateRef.current.indovinaTurn = nextTurn;
-      }
-      
-      syncState();
+      handleAddCharacterLogic(payload.payload.char);
     });
 
     channel.on('broadcast', { event: 'indovina_pass_turn' }, () => {
-      const currTurn = stateRef.current.indovinaTurn;
-      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-      stateRef.current.indovinaTurn = nextTurn;
-      syncState();
+      handlePassTurnLogic();
     });
 
     channel.subscribe();
@@ -943,20 +954,7 @@ export const PataPartyView = () => {
     };
 
     if (isHostRef.current) {
-      stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), newChar];
-      
-      const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
-      
-      if (stateRef.current.indovinaCharacters.length >= maxChars) {
-        stateRef.current.indovinaPhase = 'ready';
-        stateRef.current.indovinaTurn = null;
-      } else {
-        const currTurn = stateRef.current.indovinaTurn;
-        const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-        stateRef.current.indovinaTurn = nextTurn;
-      }
-      
-      syncState();
+      handleAddCharacterLogic(newChar);
     } else {
       channelRef.current?.send({
         type: 'broadcast',
@@ -974,10 +972,7 @@ export const PataPartyView = () => {
 
   const passIndovinaTurn = () => {
     if (isHostRef.current) {
-      const currTurn = stateRef.current.indovinaTurn;
-      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-      stateRef.current.indovinaTurn = nextTurn;
-      syncState();
+      handlePassTurnLogic();
     } else {
       channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
     }
@@ -1600,10 +1595,10 @@ export const PataPartyView = () => {
                                 <input 
                                   type="number" 
                                   min="4" 
-                                  max="16" 
+                                  max="32" 
                                   value={indovinaSettings.charsPerPlayer}
                                   onChange={e => {
-                                    const val = Math.max(4, Math.min(16, parseInt(e.target.value) || 4));
+                                    const val = Math.max(4, Math.min(32, parseInt(e.target.value) || 4));
                                     setIndovinaSettings({ charsPerPlayer: val });
                                     if (isHost) {
                                       stateRef.current.indovinaSettings = { charsPerPlayer: val };
