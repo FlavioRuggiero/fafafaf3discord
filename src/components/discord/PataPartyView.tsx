@@ -282,7 +282,7 @@ export const PataPartyView = () => {
   const lastSyncRef = useRef<number>(0);
 
   const channelRef = useRef<any>(null);
-  const stateRef = useRef<GameState>({ status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] });
+  const stateRef = useRef<GameState>({ status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [], indovinaPhase: 'setup', indovinaSettings: { charsPerPlayer: 12 }, indovinaCharacters: [], indovinaSecretChars: {}, indovinaTurn: null });
 
   useEffect(() => {
     if (user) {
@@ -449,9 +449,17 @@ export const PataPartyView = () => {
   // Setup Host
   const setupHostChannel = (code: string) => {
     const channel = supabase.channel(`pataparty_${code}`);
+    
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
       const newPlayer = payload.payload;
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
+        
+        // Controllo Limite Giocatori per IndovinaQualchì
+        if (stateRef.current.gameMode === 'indovina' && stateRef.current.players.length >= 2) {
+          channel.send({ type: 'broadcast', event: 'error_msg', payload: { targetId: newPlayer.id, msg: 'Partita IndovinaQualchì piena! (Massimo 2 giocatori)' } });
+          return;
+        }
+
         stateRef.current.players.push({ 
           ...newPlayer, 
           x: 50, 
@@ -467,6 +475,7 @@ export const PataPartyView = () => {
         channel.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
       }
     });
+
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
       const { playerId, result, diceType, isConsumable } = payload.payload;
       handleDiceRoll(playerId, result, diceType);
@@ -484,12 +493,14 @@ export const PataPartyView = () => {
         syncState();
       }
     });
+
     channel.on('broadcast', { event: 'chat_message' }, (payload) => {
       const msg = payload.payload;
       stateRef.current.chatMessages = [...(stateRef.current.chatMessages || []), msg];
       setChatMessages(stateRef.current.chatMessages);
       if (!showChat) setUnreadChat(true);
     });
+
     channel.on('broadcast', { event: 'vote_poll' }, (payload) => {
       const { playerId, optionIndex } = payload.payload;
       if (stateRef.current.poll && stateRef.current.poll.isOpen) {
@@ -518,7 +529,7 @@ export const PataPartyView = () => {
         };
         stateRef.current.indovinaTurn = p1Id;
       } else {
-        // Passa il turno di draft
+        // Alterna il turno di creazione tra i 2 giocatori
         const currTurn = stateRef.current.indovinaTurn;
         const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
         stateRef.current.indovinaTurn = nextTurn;
@@ -541,6 +552,7 @@ export const PataPartyView = () => {
   // Setup Player
   const setupPlayerChannel = (code: string) => {
     const channel = supabase.channel(`pataparty_${code}`);
+    
     channel.on('broadcast', { event: 'state_update' }, (payload) => {
       const state = payload.payload as GameState;
       stateRef.current = state;
@@ -566,16 +578,26 @@ export const PataPartyView = () => {
 
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
+
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
       const { playerId, result, diceType } = payload.payload;
       handleDiceRoll(playerId, result, diceType);
     });
+
     channel.on('broadcast', { event: 'chat_message' }, (payload) => {
       const msg = payload.payload;
       stateRef.current.chatMessages = [...(stateRef.current.chatMessages || []), msg];
       setChatMessages(stateRef.current.chatMessages);
       if (!showChat) setUnreadChat(true);
     });
+
+    channel.on('broadcast', { event: 'error_msg' }, (payload) => {
+      if (payload.payload.targetId === user?.id) {
+        showError(payload.payload.msg);
+        abandonSavedGame();
+      }
+    });
+
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED' && user) {
         channel.send({
@@ -624,10 +646,23 @@ export const PataPartyView = () => {
     setSavedGame(activeObj);
     localStorage.setItem(`pataparty_active_game_${user!.id}`, JSON.stringify(activeObj));
 
+    const hostPlayer: Player = {
+      id: user!.id,
+      name: profile?.first_name || 'Tu',
+      avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user!.id}`,
+      avatar_decoration: profile?.avatar_decoration || null,
+      x: 50,
+      y: 50,
+      lastRoll: null,
+      specialDice: [],
+      defaultDiceId: null,
+      money: isCommercialMode ? 0 : undefined
+    };
+
     stateRef.current = { 
       status: 'lobby', 
       gameMode: selectedGameMode,
-      players: [], 
+      players: [hostPlayer], 
       activePlayerId: null, 
       boardUrl: '/pataparty-board.png', 
       rules: '', 
@@ -646,7 +681,7 @@ export const PataPartyView = () => {
       indovinaTurn: null
     };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
-    setPlayers([]);
+    setPlayers([hostPlayer]);
     setActivePlayerId(null);
 
     setupHostChannel(code);
@@ -694,6 +729,18 @@ export const PataPartyView = () => {
       } else {
         stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [], indovinaPhase: 'setup', indovinaSettings: {charsPerPlayer: 12}, indovinaCharacters: [], indovinaSecretChars: {}, indovinaTurn: null };
       }
+      
+      // Assicurati che l'host sia nei players se c'è stato un problema di salvataggio
+      if (!stateRef.current.players.some(p => p.id === user.id)) {
+        stateRef.current.players.push({
+          id: user.id,
+          name: profile?.first_name || 'Tu',
+          avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+          avatar_decoration: profile?.avatar_decoration || null,
+          x: 50, y: 50, specialDice: [], defaultDiceId: null, money: stateRef.current.isCommercial ? 0 : undefined
+        });
+      }
+
       setPlayers(stateRef.current.players);
       setActiveGameMode(stateRef.current.gameMode || 'board');
       setActivePlayerId(stateRef.current.activePlayerId || null);
@@ -759,7 +806,12 @@ export const PataPartyView = () => {
   // Indovina Game Handlers
   const startIndovinaDraft = () => {
     if (!isHost) return;
+    if (stateRef.current.players.length !== 2) {
+      showError("Servono esattamente 2 giocatori per avviare IndovinaQualchì.");
+      return;
+    }
     stateRef.current.indovinaPhase = 'draft';
+    // Il turno inizia con l'Host
     stateRef.current.indovinaTurn = stateRef.current.players[0].id;
     stateRef.current.indovinaCharacters = [];
     syncState();
@@ -1101,10 +1153,11 @@ export const PataPartyView = () => {
         {isTurn && <div className="absolute -left-[1px] top-2 bottom-2 w-1.5 bg-[#23a559] rounded-r-md"></div>}
         <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8 flex-shrink-0" />
         <span className={`text-sm font-medium truncate flex-1 ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-          {p.name}
+          {p.name} {p.id === stateRef.current.players[0]?.id && <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>}
         </span>
+        {p.id === stateRef.current.players[0]?.id && <Crown size={14} className="text-yellow-500 ml-auto" />}
         {isCommercial && (
-          <span className="text-[#23a559] font-bold text-xs bg-[#23a559]/10 border border-[#23a559]/20 px-1.5 py-0.5 rounded whitespace-nowrap">
+          <span className="text-[#23a559] font-bold text-xs bg-[#23a559]/10 border border-[#23a559]/20 px-1.5 py-0.5 rounded whitespace-nowrap ml-2">
             {p.money || 0}€
           </span>
         )}
@@ -1289,30 +1342,20 @@ export const PataPartyView = () => {
               Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
-              {isHost && (
-                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
-                  <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
-                  <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
-                    {profile?.first_name || 'Tu'} <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>
-                  </span>
-                  <Crown size={14} className="text-yellow-500 ml-auto" />
-                </div>
-              )}
-              {players.map(p => (
-                <div key={p.id} className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-[#3f4147]">
-                  <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
-                  <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                    {p.name}
-                  </span>
-                </div>
-              ))}
+              {players.map(p => {
+                const isHostPlayer = p.id === stateRef.current.players[0]?.id;
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 bg-[#2b2d31] p-2 rounded border ${isHostPlayer ? 'border-yellow-500/50 shadow-sm' : 'border-[#3f4147]'}`}>
+                    <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
+                    <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                      {p.name} {isHostPlayer && <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>}
+                    </span>
+                    {isHostPlayer && <Crown size={14} className="text-yellow-500 ml-auto" />}
+                  </div>
+                );
+              })}
               {players.length === 0 && (
                 <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
-              )}
-              {activeGameMode === 'indovina' && players.length > 2 && (
-                <div className="text-[#f23f43] text-xs font-bold text-center mt-2">
-                  Troppi giocatori per questa modalità! Massimo 2.
-                </div>
               )}
             </div>
           </div>
@@ -1897,72 +1940,6 @@ export const PataPartyView = () => {
 
               </div>
 
-              {/* PULSANTI DADI PER IL GIOCATORE ATTIVO */}
-              {activePlayerId === user?.id && !isHost && !isIframeActive && activeGameMode === 'board' && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5">
-                  <div className="bg-[#2b2d31]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#1e1f22] text-xs font-bold text-white shadow-lg mb-1 relative flex items-center gap-2">
-                    <div className="w-2 h-2 bg-[#23a559] rounded-full animate-pulse"></div>
-                    È il tuo turno!
-                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#2b2d31] border-b border-r border-[#1e1f22] rotate-45"></div>
-                  </div>
-                  
-                  <div className="flex flex-wrap justify-center gap-2 bg-black/40 p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-xl max-w-sm md:max-w-md">
-                    {/* Dado Principale (Predefinito del giocatore o Standard) */}
-                    {(() => {
-                      const me = players.find(p => p.id === user?.id);
-                      const defaultInfo = getDiceInfo(me?.defaultDiceId);
-                      const isStandard = !me?.defaultDiceId || me?.defaultDiceId === 'standard';
-                      
-                      return (
-                        <div className="group/dice relative">
-                          <button
-                            onClick={() => rollDice()}
-                            disabled={diceState?.rolling}
-                            className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${defaultInfo.bgClass}`}
-                          >
-                            <Dices size={28} className={isStandard ? "text-[#111214]" : "text-white"} />
-                            {!isStandard && (
-                              <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] shadow-lg">
-                                {defaultInfo.shortLabel}
-                              </span>
-                            )}
-                          </button>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                            {defaultInfo.label}<br/>
-                            <span className="text-[#949ba4] font-normal">{defaultInfo.desc}</span>
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Dadi Speciali Monouso */}
-                    {players.find(p => p.id === user?.id)?.specialDice?.map((d, i) => {
-                      const info = getDiceInfo(d);
-
-                      return (
-                        <div key={i} className="group/dice relative">
-                          <button
-                            onClick={() => rollDice(d, true)}
-                            disabled={diceState?.rolling}
-                            className={`w-14 h-14 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-2 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${info.bgClass}`}
-                          >
-                            <Dices size={28} className="text-white" />
-                            <span className="absolute -top-2 -right-2 text-[10px] font-black bg-[#111214] text-white px-1.5 py-0.5 rounded-full border border-[#3f4147] shadow-lg">
-                              {info.shortLabel}
-                            </span>
-                          </button>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black text-white text-[10px] font-bold rounded opacity-0 group-hover/dice:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
-                            {info.label}<br/>
-                            <span className="text-[#949ba4] font-normal">{info.desc}</span>
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45"></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Sidebar Giocatori e Impostazioni GM (Destra) */}
