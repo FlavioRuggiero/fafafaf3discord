@@ -244,7 +244,7 @@ export const PataPartyView = () => {
   const [indovinaCharacters, setIndovinaCharacters] = useState<IndovinaCharacter[]>([]);
   const [indovinaSecretChars, setIndovinaSecretChars] = useState<Record<string, string>>({});
   const [indovinaTurn, setIndovinaTurn] = useState<string | null>(null);
-  const [eliminatedChars, setEliminatedChars] = useState<string[]>([]); // Local state
+  const [eliminatedChars, setEliminatedChars] = useState<string[]>([]);
 
   // IndovinaQualchì Form Upload
   const [indovinaCharName, setIndovinaCharName] = useState('');
@@ -349,6 +349,44 @@ export const PataPartyView = () => {
     }
     channelRef.current?.send({ type: 'broadcast', event: 'state_update', payload: stateRef.current });
   };
+
+  // IndovinaQualchì Centralized Logic (Per far funzionare bene l'Host)
+  const handleAddCharacterLogic = (char: IndovinaCharacter) => {
+    if (!isHost) return;
+    stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
+    
+    const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
+    
+    if (stateRef.current.indovinaCharacters.length >= maxChars) {
+      // Avvia partita, assegna segreti
+      const allChars = stateRef.current.indovinaCharacters;
+      const p1Id = stateRef.current.players[0].id;
+      const p2Id = stateRef.current.players[1].id;
+      
+      stateRef.current.indovinaPhase = 'playing';
+      stateRef.current.indovinaSecretChars = {
+        [p1Id]: allChars[Math.floor(Math.random() * allChars.length)].id,
+        [p2Id]: allChars[Math.floor(Math.random() * allChars.length)].id
+      };
+      stateRef.current.indovinaTurn = p1Id;
+    } else {
+      // Alterna il turno di creazione tra i 2 giocatori
+      const currTurn = stateRef.current.indovinaTurn;
+      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
+      stateRef.current.indovinaTurn = nextTurn;
+    }
+    
+    syncState();
+  };
+
+  const handlePassTurnLogic = () => {
+    if (!isHost) return;
+    const currTurn = stateRef.current.indovinaTurn;
+    const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
+    stateRef.current.indovinaTurn = nextTurn;
+    syncState();
+  };
+
 
   const handleDiceRoll = (playerId: string, result: number | string | number[] | string[], diceType?: string) => {
     playSound('/openingsound.mp3');
@@ -509,40 +547,13 @@ export const PataPartyView = () => {
       }
     });
 
-    // Indovina Events
+    // Indovina Events (Host gestisce il broadcast di un giocatore)
     channel.on('broadcast', { event: 'indovina_add_char' }, (payload) => {
-      const { char } = payload.payload;
-      stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
-      
-      const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
-      
-      if (stateRef.current.indovinaCharacters.length >= maxChars) {
-        // Avvia partita, assegna segreti
-        const allChars = stateRef.current.indovinaCharacters;
-        const p1Id = stateRef.current.players[0].id;
-        const p2Id = stateRef.current.players[1].id;
-        
-        stateRef.current.indovinaPhase = 'playing';
-        stateRef.current.indovinaSecretChars = {
-          [p1Id]: allChars[Math.floor(Math.random() * allChars.length)].id,
-          [p2Id]: allChars[Math.floor(Math.random() * allChars.length)].id
-        };
-        stateRef.current.indovinaTurn = p1Id;
-      } else {
-        // Alterna il turno di creazione tra i 2 giocatori
-        const currTurn = stateRef.current.indovinaTurn;
-        const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-        stateRef.current.indovinaTurn = nextTurn;
-      }
-      
-      syncState();
+      handleAddCharacterLogic(payload.payload.char);
     });
 
     channel.on('broadcast', { event: 'indovina_pass_turn' }, () => {
-      const currTurn = stateRef.current.indovinaTurn;
-      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-      stateRef.current.indovinaTurn = nextTurn;
-      syncState();
+      handlePassTurnLogic();
     });
 
     channel.subscribe();
@@ -811,9 +822,9 @@ export const PataPartyView = () => {
       return;
     }
     stateRef.current.indovinaPhase = 'draft';
-    // Il turno inizia con l'Host
     stateRef.current.indovinaTurn = stateRef.current.players[0].id;
     stateRef.current.indovinaCharacters = [];
+    stateRef.current.indovinaSettings = indovinaSettings;
     syncState();
   };
 
@@ -857,11 +868,15 @@ export const PataPartyView = () => {
       creatorId: user.id
     };
 
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'indovina_add_char',
-      payload: { char: newChar }
-    });
+    if (isHost) {
+      handleAddCharacterLogic(newChar);
+    } else {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'indovina_add_char',
+        payload: { char: newChar }
+      });
+    }
 
     setIndovinaCharName('');
     setIndovinaCharUrl('');
@@ -871,7 +886,11 @@ export const PataPartyView = () => {
   };
 
   const passIndovinaTurn = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
+    if (isHost) {
+      handlePassTurnLogic();
+    } else {
+      channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
+    }
   };
 
   const toggleIndovinaChar = (charId: string) => {
@@ -1342,20 +1361,30 @@ export const PataPartyView = () => {
               Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
-              {players.map(p => {
-                const isHostPlayer = p.id === stateRef.current.players[0]?.id;
-                return (
-                  <div key={p.id} className={`flex items-center gap-3 bg-[#2b2d31] p-2 rounded border ${isHostPlayer ? 'border-yellow-500/50 shadow-sm' : 'border-[#3f4147]'}`}>
-                    <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
-                    <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                      {p.name} {isHostPlayer && <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>}
-                    </span>
-                    {isHostPlayer && <Crown size={14} className="text-yellow-500 ml-auto" />}
-                  </div>
-                );
-              })}
+              {isHost && (
+                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
+                  <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
+                  <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
+                    {profile?.first_name || 'Tu'} <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>
+                  </span>
+                  <Crown size={14} className="text-yellow-500 ml-auto" />
+                </div>
+              )}
+              {players.map(p => (
+                <div key={p.id} className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-[#3f4147]">
+                  <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
+                  <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                    {p.name}
+                  </span>
+                </div>
+              ))}
               {players.length === 0 && (
                 <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
+              )}
+              {activeGameMode === 'indovina' && players.length > 2 && (
+                <div className="text-[#f23f43] text-xs font-bold text-center mt-2">
+                  Troppi giocatori per questa modalità! Massimo 2.
+                </div>
               )}
             </div>
           </div>
