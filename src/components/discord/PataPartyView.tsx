@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle, Upload, CheckCircle2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -46,6 +46,13 @@ interface CustomDiceDef {
   faces: string[];
 }
 
+interface IndovinaCharacter {
+  id: string;
+  name: string;
+  imageUrl: string;
+  creatorId: string;
+}
+
 interface GameState {
   status: 'lobby' | 'playing';
   gameMode: 'board' | 'indovina';
@@ -65,6 +72,13 @@ interface GameState {
   isCommercial?: boolean;
   poll?: Poll | null;
   customDice?: CustomDiceDef[];
+
+  // IndovinaQualchì State
+  indovinaPhase?: 'setup' | 'draft' | 'playing' | 'gameover';
+  indovinaSettings?: { charsPerPlayer: number };
+  indovinaCharacters?: IndovinaCharacter[];
+  indovinaSecretChars?: Record<string, string>;
+  indovinaTurn?: string | null;
 }
 
 interface DiceState {
@@ -224,6 +238,21 @@ export const PataPartyView = () => {
   const [unreadChat, setUnreadChat] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
+  // IndovinaQualchì State
+  const [indovinaPhase, setIndovinaPhase] = useState<'setup' | 'draft' | 'playing' | 'gameover'>('setup');
+  const [indovinaSettings, setIndovinaSettings] = useState({ charsPerPlayer: 12 });
+  const [indovinaCharacters, setIndovinaCharacters] = useState<IndovinaCharacter[]>([]);
+  const [indovinaSecretChars, setIndovinaSecretChars] = useState<Record<string, string>>({});
+  const [indovinaTurn, setIndovinaTurn] = useState<string | null>(null);
+  const [eliminatedChars, setEliminatedChars] = useState<string[]>([]); // Local state
+
+  // IndovinaQualchì Form Upload
+  const [indovinaCharName, setIndovinaCharName] = useState('');
+  const [indovinaCharUrl, setIndovinaCharUrl] = useState('');
+  const [indovinaCharFile, setIndovinaCharFile] = useState<File | null>(null);
+  const [isUploadingChar, setIsUploadingChar] = useState(false);
+  const indovinaFileInputRef = useRef<HTMLInputElement>(null);
+
   // Stati Builder Classifica e Soldi
   const [lbTitle, setLbTitle] = useState('Risultati Finali');
   const [lbDesc, setLbDesc] = useState('Ecco i vincitori di questo minigioco!');
@@ -305,6 +334,13 @@ export const PataPartyView = () => {
     setPollData(stateRef.current.poll || null);
     setCustomDice(stateRef.current.customDice || []);
     
+    // Indovina State
+    setIndovinaPhase(stateRef.current.indovinaPhase || 'setup');
+    setIndovinaSettings(stateRef.current.indovinaSettings || { charsPerPlayer: 12 });
+    setIndovinaCharacters(stateRef.current.indovinaCharacters || []);
+    setIndovinaSecretChars(stateRef.current.indovinaSecretChars || {});
+    setIndovinaTurn(stateRef.current.indovinaTurn || null);
+
     if (isHost || (savedGame && savedGame.isHost)) {
       const codeToSave = gameCode || savedGame?.code;
       if (codeToSave) {
@@ -410,6 +446,7 @@ export const PataPartyView = () => {
     setActivePlayerId(null);
   };
 
+  // Setup Host
   const setupHostChannel = (code: string) => {
     const channel = supabase.channel(`pataparty_${code}`);
     channel.on('broadcast', { event: 'join_request' }, (payload) => {
@@ -460,10 +497,48 @@ export const PataPartyView = () => {
         syncState();
       }
     });
+
+    // Indovina Events
+    channel.on('broadcast', { event: 'indovina_add_char' }, (payload) => {
+      const { char } = payload.payload;
+      stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
+      
+      const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
+      
+      if (stateRef.current.indovinaCharacters.length >= maxChars) {
+        // Avvia partita, assegna segreti
+        const allChars = stateRef.current.indovinaCharacters;
+        const p1Id = stateRef.current.players[0].id;
+        const p2Id = stateRef.current.players[1].id;
+        
+        stateRef.current.indovinaPhase = 'playing';
+        stateRef.current.indovinaSecretChars = {
+          [p1Id]: allChars[Math.floor(Math.random() * allChars.length)].id,
+          [p2Id]: allChars[Math.floor(Math.random() * allChars.length)].id
+        };
+        stateRef.current.indovinaTurn = p1Id;
+      } else {
+        // Passa il turno di draft
+        const currTurn = stateRef.current.indovinaTurn;
+        const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
+        stateRef.current.indovinaTurn = nextTurn;
+      }
+      
+      syncState();
+    });
+
+    channel.on('broadcast', { event: 'indovina_pass_turn' }, () => {
+      const currTurn = stateRef.current.indovinaTurn;
+      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
+      stateRef.current.indovinaTurn = nextTurn;
+      syncState();
+    });
+
     channel.subscribe();
     channelRef.current = channel;
   };
 
+  // Setup Player
   const setupPlayerChannel = (code: string) => {
     const channel = supabase.channel(`pataparty_${code}`);
     channel.on('broadcast', { event: 'state_update' }, (payload) => {
@@ -482,6 +557,13 @@ export const PataPartyView = () => {
       setIsCommercial(state.isCommercial || false);
       setPollData(state.poll || null);
       setCustomDice(state.customDice || []);
+      
+      setIndovinaPhase(state.indovinaPhase || 'setup');
+      setIndovinaSettings(state.indovinaSettings || { charsPerPlayer: 12 });
+      setIndovinaCharacters(state.indovinaCharacters || []);
+      setIndovinaSecretChars(state.indovinaSecretChars || {});
+      setIndovinaTurn(state.indovinaTurn || null);
+
       if (state.status === 'playing' && view !== 'playing') setView('playing');
     });
     channel.on('broadcast', { event: 'dice_roll' }, (payload) => {
@@ -536,6 +618,7 @@ export const PataPartyView = () => {
     setIsCommercial(isCommercialMode);
     setCustomDice([]);
     setGmTab('players');
+    setEliminatedChars([]);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
@@ -555,7 +638,12 @@ export const PataPartyView = () => {
       chatMessages: [],
       isCommercial: isCommercialMode,
       poll: null,
-      customDice: []
+      customDice: [],
+      indovinaPhase: 'setup',
+      indovinaSettings: { charsPerPlayer: 12 },
+      indovinaCharacters: [],
+      indovinaSecretChars: {},
+      indovinaTurn: null
     };
     localStorage.setItem(`pataparty_state_${code}`, JSON.stringify(stateRef.current));
     setPlayers([]);
@@ -578,6 +666,7 @@ export const PataPartyView = () => {
     setChatMessages([]);
     setUnreadChat(false);
     setShowChat(false);
+    setEliminatedChars([]);
 
     const activeObj = { code: joinCode, isHost: false };
     setSavedGame(activeObj);
@@ -600,10 +689,10 @@ export const PataPartyView = () => {
         try {
           stateRef.current = JSON.parse(storedState);
         } catch(e) {
-          stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
+          stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [], indovinaPhase: 'setup', indovinaSettings: {charsPerPlayer: 12}, indovinaCharacters: [], indovinaSecretChars: {}, indovinaTurn: null };
         }
       } else {
-        stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [] };
+        stateRef.current = { status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [], indovinaPhase: 'setup', indovinaSettings: {charsPerPlayer: 12}, indovinaCharacters: [], indovinaSecretChars: {}, indovinaTurn: null };
       }
       setPlayers(stateRef.current.players);
       setActiveGameMode(stateRef.current.gameMode || 'board');
@@ -618,6 +707,13 @@ export const PataPartyView = () => {
       setIsCommercial(stateRef.current.isCommercial || false);
       setPollData(stateRef.current.poll || null);
       setCustomDice(stateRef.current.customDice || []);
+      
+      setIndovinaPhase(stateRef.current.indovinaPhase || 'setup');
+      setIndovinaSettings(stateRef.current.indovinaSettings || { charsPerPlayer: 12 });
+      setIndovinaCharacters(stateRef.current.indovinaCharacters || []);
+      setIndovinaSecretChars(stateRef.current.indovinaSecretChars || {});
+      setIndovinaTurn(stateRef.current.indovinaTurn || null);
+
       setView(stateRef.current.status === 'playing' ? 'playing' : 'lobby');
       setupHostChannel(savedGame.code);
     } else {
@@ -650,6 +746,7 @@ export const PataPartyView = () => {
     setIsCommercialMode(false);
     setIsCommercial(false);
     setCustomDice([]);
+    setEliminatedChars([]);
   };
 
   const startGame = () => {
@@ -658,6 +755,93 @@ export const PataPartyView = () => {
     syncState();
     setView('playing');
   };
+
+  // Indovina Game Handlers
+  const startIndovinaDraft = () => {
+    if (!isHost) return;
+    stateRef.current.indovinaPhase = 'draft';
+    stateRef.current.indovinaTurn = stateRef.current.players[0].id;
+    stateRef.current.indovinaCharacters = [];
+    syncState();
+  };
+
+  const handleIndovinaFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setIndovinaCharFile(e.target.files[0]);
+    }
+  };
+
+  const submitIndovinaChar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !indovinaCharName.trim()) return;
+    if (!indovinaCharFile && !indovinaCharUrl.trim()) {
+      showError("Seleziona un'immagine o inserisci un URL.");
+      return;
+    }
+
+    setIsUploadingChar(true);
+    let finalUrl = indovinaCharUrl.trim();
+
+    if (indovinaCharFile) {
+      const fileExt = indovinaCharFile.name.split('.').pop();
+      const fileName = `indovina_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `minigame_icons/${fileName}`; // Usiamo lo stesso bucket
+      
+      const { error } = await supabase.storage.from('icons').upload(filePath, indovinaCharFile);
+      if (!error) {
+        const { data } = supabase.storage.from('icons').getPublicUrl(filePath);
+        finalUrl = data.publicUrl;
+      } else {
+        showError("Errore nel caricamento dell'immagine.");
+        setIsUploadingChar(false);
+        return;
+      }
+    }
+
+    const newChar: IndovinaCharacter = {
+      id: `char_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      name: indovinaCharName.trim(),
+      imageUrl: finalUrl,
+      creatorId: user.id
+    };
+
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'indovina_add_char',
+      payload: { char: newChar }
+    });
+
+    setIndovinaCharName('');
+    setIndovinaCharUrl('');
+    setIndovinaCharFile(null);
+    if (indovinaFileInputRef.current) indovinaFileInputRef.current.value = '';
+    setIsUploadingChar(false);
+  };
+
+  const passIndovinaTurn = () => {
+    channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
+  };
+
+  const toggleIndovinaChar = (charId: string) => {
+    setEliminatedChars(prev => 
+      prev.includes(charId) ? prev.filter(id => id !== charId) : [...prev, charId]
+    );
+  };
+
+  const endIndovinaGame = () => {
+    if (!isHost) return;
+    stateRef.current.indovinaPhase = 'gameover';
+    syncState();
+  };
+
+  const resetIndovina = () => {
+    if (!isHost) return;
+    stateRef.current.indovinaPhase = 'setup';
+    stateRef.current.indovinaCharacters = [];
+    stateRef.current.indovinaSecretChars = {};
+    syncState();
+  };
+
 
   const startIframe = () => {
     if (!isHost) return;
@@ -933,6 +1117,8 @@ export const PataPartyView = () => {
     );
   };
 
+  const canStartGame = activeGameMode === 'indovina' ? players.length === 2 : players.length >= 1;
+
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
       <style>{`
@@ -1031,10 +1217,12 @@ export const PataPartyView = () => {
                   </button>
                 </div>
 
-                <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm text-[#dbdee1] justify-center bg-[#2b2d31] py-2 rounded-lg border border-[#3f4147]">
-                  <input type="checkbox" checked={isCommercialMode} onChange={e => setIsCommercialMode(e.target.checked)} className="accent-brand w-4 h-4" />
-                  Modalità Commerciale (Soldi)
-                </label>
+                {selectedGameMode === 'board' && (
+                  <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm text-[#dbdee1] justify-center bg-[#2b2d31] py-2 rounded-lg border border-[#3f4147]">
+                    <input type="checkbox" checked={isCommercialMode} onChange={e => setIsCommercialMode(e.target.checked)} className="accent-brand w-4 h-4" />
+                    Modalità Commerciale (Soldi)
+                  </label>
+                )}
 
                 <button 
                   onClick={createGame}
@@ -1098,7 +1286,7 @@ export const PataPartyView = () => {
 
           <div className="text-left mb-6">
             <h3 className="text-[#dbdee1] font-bold mb-3 flex items-center justify-between">
-              Giocatori ({players.length})
+              Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
               {isHost && (
@@ -1121,6 +1309,11 @@ export const PataPartyView = () => {
               {players.length === 0 && (
                 <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
               )}
+              {activeGameMode === 'indovina' && players.length > 2 && (
+                <div className="text-[#f23f43] text-xs font-bold text-center mt-2">
+                  Troppi giocatori per questa modalità! Massimo 2.
+                </div>
+              )}
             </div>
           </div>
 
@@ -1134,7 +1327,7 @@ export const PataPartyView = () => {
             {isHost && (
               <button 
                 onClick={startGame}
-                disabled={players.length < 1}
+                disabled={!canStartGame}
                 className="flex-1 bg-[#23a559] hover:bg-[#1a7f44] text-white font-medium py-2 px-4 rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Play size={18} /> Inizia Partita
@@ -1172,7 +1365,7 @@ export const PataPartyView = () => {
 
           <div className={`flex flex-col md:flex-row gap-4 flex-1 overflow-hidden bg-[#313338] relative transition-all duration-300 ${isIframeActive ? 'p-2' : 'p-4 md:p-6'}`}>
             
-            {/* Tabellone Centrale / Iframe Globale */}
+            {/* Tabellone Centrale / Iframe Globale / IndovinaQualchì */}
             <div className="flex-1 bg-[#2b2d31] rounded-lg p-2 md:p-6 overflow-hidden relative shadow-inner flex items-center justify-center">
               
               {/* Overlay Classifica Finale */}
@@ -1233,10 +1426,279 @@ export const PataPartyView = () => {
                   />
                 </div>
               ) : activeGameMode === 'indovina' ? (
-                <div className="w-full h-full flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-                  <HelpCircle size={80} className="text-[#a855f7] mb-6 opacity-50" />
-                  <h1 className="text-4xl font-black text-white mb-4">IndovinaQualchì</h1>
-                  <p className="text-[#b5bac1]">Modalità in fase di sviluppo...</p>
+                <div className="w-full h-full flex flex-col animate-in fade-in zoom-in-95 duration-300 bg-[#1e1f22] rounded-xl overflow-hidden shadow-inner relative">
+                  {/* INDOVINA QUALCHÌ LOGIC */}
+                  {indovinaPhase === 'setup' && (
+                    <div className="m-auto text-center max-w-md p-8 bg-[#2b2d31] rounded-2xl border border-[#3f4147] shadow-xl">
+                      <HelpCircle size={64} className="text-[#a855f7] mx-auto mb-4" />
+                      <h2 className="text-3xl font-black text-white mb-2">IndovinaQualchì</h2>
+                      <p className="text-[#b5bac1] mb-6">Ogni giocatore creerà dei personaggi personalizzati (Nome e Immagine). Al termine, il gioco assegnerà segretamente un personaggio a ciascuno.</p>
+                      
+                      {isHost ? (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Personaggi da creare a testa</label>
+                            <input 
+                              type="number" 
+                              min="4" 
+                              max="16" 
+                              value={indovinaSettings.charsPerPlayer}
+                              onChange={e => setIndovinaSettings({ charsPerPlayer: Math.max(4, Math.min(16, parseInt(e.target.value) || 4)) })}
+                              className="w-full bg-[#1e1f22] text-white text-center rounded p-3 text-xl font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
+                            />
+                            <p className="text-[10px] text-[#949ba4] mt-2">Totale personaggi sul tabellone: {indovinaSettings.charsPerPlayer * 2}</p>
+                          </div>
+                          <button 
+                            onClick={startIndovinaDraft}
+                            className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg"
+                          >
+                            Inizia Creazione
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-[#1e1f22] p-4 rounded-lg border border-[#3f4147]">
+                          <p className="text-[#949ba4] italic text-sm">In attesa che il Game Master avvii la fase di creazione...</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {indovinaPhase === 'draft' && (
+                    <div className="flex flex-col h-full w-full p-4 md:p-6">
+                      <div className="flex justify-between items-center mb-6 bg-[#2b2d31] p-4 rounded-xl border border-[#3f4147]">
+                        <div>
+                          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Users size={20} className="text-[#a855f7]" /> Creazione Personaggi
+                          </h2>
+                          <p className="text-sm text-[#b5bac1]">
+                            Aggiunti: <span className="text-white font-bold">{indovinaCharacters.length}</span> su {indovinaSettings.charsPerPlayer * 2}
+                          </p>
+                        </div>
+                        <div className="bg-[#1e1f22] px-4 py-2 rounded-lg border border-[#a855f7]/30 shadow-sm flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-[#a855f7] animate-pulse"></div>
+                          <span className="text-sm font-medium text-white">
+                            Turno di: <strong className="text-[#a855f7]">{players.find(p => p.id === indovinaTurn)?.name || '...'}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
+                        {/* Form Creazione */}
+                        <div className={`w-full md:w-80 flex-shrink-0 flex flex-col gap-4 transition-opacity ${indovinaTurn === user?.id ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                          <div className="bg-[#2b2d31] p-5 rounded-xl border border-[#3f4147] flex-1 flex flex-col">
+                            <h3 className="text-white font-bold mb-4 uppercase text-sm">Aggiungi Personaggio</h3>
+                            
+                            <form onSubmit={submitIndovinaChar} className="flex flex-col h-full gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Nome Personaggio</label>
+                                <input 
+                                  type="text" 
+                                  required
+                                  value={indovinaCharName}
+                                  onChange={e => setIndovinaCharName(e.target.value)}
+                                  placeholder="Es. Mario Rossi"
+                                  className="w-full bg-[#1e1f22] text-white rounded p-2.5 outline-none border border-[#3f4147] focus:border-[#a855f7]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Immagine Personaggio</label>
+                                <div className="space-y-3">
+                                  <button 
+                                    type="button"
+                                    onClick={() => indovinaFileInputRef.current?.click()}
+                                    className="w-full border-2 border-dashed border-[#3f4147] hover:border-[#a855f7] rounded-lg p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#1e1f22]/50 h-32"
+                                  >
+                                    {indovinaCharFile ? (
+                                      <>
+                                        <CheckCircle2 size={24} className="text-[#23a559] mb-2" />
+                                        <span className="text-white text-xs font-medium truncate max-w-full px-2">{indovinaCharFile.name}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Upload size={24} className="text-[#949ba4] mb-2" />
+                                        <span className="text-[#dbdee1] text-xs font-medium">Carica un'immagine</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    ref={indovinaFileInputRef}
+                                    className="hidden"
+                                    onChange={handleIndovinaFileChange}
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-[1px] bg-[#3f4147] flex-1"></div>
+                                    <span className="text-[10px] text-[#949ba4] uppercase font-bold">Oppure</span>
+                                    <div className="h-[1px] bg-[#3f4147] flex-1"></div>
+                                  </div>
+                                  <input 
+                                    type="url" 
+                                    value={indovinaCharUrl}
+                                    onChange={e => setIndovinaCharUrl(e.target.value)}
+                                    placeholder="Incolla URL immagine..."
+                                    className="w-full bg-[#1e1f22] text-white text-xs rounded p-2.5 outline-none border border-[#3f4147] focus:border-[#a855f7]"
+                                  />
+                                </div>
+                              </div>
+
+                              <button 
+                                type="submit"
+                                disabled={!indovinaCharName.trim() || (!indovinaCharFile && !indovinaCharUrl.trim()) || isUploadingChar}
+                                className="mt-auto w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md disabled:opacity-50"
+                              >
+                                {isUploadingChar ? 'Caricamento...' : 'Aggiungi al Tabellone'}
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+
+                        {/* Griglia Preview */}
+                        <div className="flex-1 bg-[#2b2d31] p-5 rounded-xl border border-[#3f4147] overflow-y-auto custom-scrollbar">
+                          <h3 className="text-[#b5bac1] font-bold mb-4 uppercase text-sm">Tabellone in costruzione</h3>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {indovinaCharacters.map((char, i) => (
+                              <div key={i} className="aspect-[3/4] bg-[#1e1f22] rounded-lg border border-[#3f4147] overflow-hidden flex flex-col relative group animate-in zoom-in duration-300">
+                                <img src={char.imageUrl} className="flex-1 object-cover w-full bg-black/20" alt={char.name} />
+                                <div className="p-1.5 bg-[#1e1f22] border-t border-[#3f4147] text-center">
+                                  <span className="text-[10px] sm:text-xs font-bold text-white truncate block w-full">{char.name}</span>
+                                </div>
+                              </div>
+                            ))}
+                            {Array.from({ length: Math.max(0, (indovinaSettings.charsPerPlayer * 2) - indovinaCharacters.length) }).map((_, i) => (
+                              <div key={`empty-${i}`} className="aspect-[3/4] bg-[#1e1f22]/50 border-2 border-dashed border-[#3f4147] rounded-lg flex items-center justify-center">
+                                <HelpCircle size={24} className="text-[#3f4147]" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {indovinaPhase === 'playing' && (
+                    <div className="flex flex-col h-full w-full">
+                      {/* Top Bar - Secret Char */}
+                      <div className="bg-[#2b2d31] p-3 flex justify-between items-center border-b border-[#3f4147] shrink-0">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-[#1e1f22] border-2 border-[#23a559] rounded-lg p-1.5 flex items-center gap-3 shadow-md">
+                            <span className="text-xs font-bold text-[#949ba4] uppercase pl-2">Il tuo Personaggio:</span>
+                            {indovinaSecretChars[user?.id || ''] ? (() => {
+                              const myChar = indovinaCharacters.find(c => c.id === indovinaSecretChars[user?.id || '']);
+                              return myChar ? (
+                                <div className="flex items-center gap-2 bg-[#2b2d31] pr-3 rounded">
+                                  <img src={myChar.imageUrl} className="w-8 h-8 rounded-l object-cover border-r border-[#1e1f22]" />
+                                  <span className="text-white font-bold text-sm">{myChar.name}</span>
+                                </div>
+                              ) : null;
+                            })() : <span className="text-white font-bold">Nessuno (Spettatore)</span>}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors border ${indovinaTurn === user?.id ? 'bg-[#23a559]/20 border-[#23a559] text-[#23a559]' : 'bg-[#1e1f22] border-[#3f4147] text-[#949ba4]'}`}>
+                            {indovinaTurn === user?.id ? 'Tocca a TE fare domande!' : `Turno di: ${players.find(p => p.id === indovinaTurn)?.name || '...'}`}
+                          </div>
+                          {indovinaTurn === user?.id && (
+                            <button 
+                              onClick={passIndovinaTurn}
+                              className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold px-4 py-2 rounded-lg transition-colors shadow-md"
+                            >
+                              Passa Turno
+                            </button>
+                          )}
+                          {isHost && (
+                            <button onClick={endIndovinaGame} className="bg-[#f23f43] hover:bg-[#da373c] text-white font-bold px-4 py-2 rounded-lg transition-colors shadow-md ml-2">
+                              Termina
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Main Grid */}
+                      <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3 max-w-6xl mx-auto">
+                          {indovinaCharacters.map((char) => {
+                            const isEliminated = eliminatedChars.includes(char.id);
+                            return (
+                              <div 
+                                key={char.id} 
+                                onClick={() => toggleIndovinaChar(char.id)}
+                                className={`aspect-[3/4] rounded-lg border-2 cursor-pointer transition-all duration-300 relative overflow-hidden group ${
+                                  isEliminated 
+                                    ? 'border-[#f23f43] opacity-60 scale-95' 
+                                    : 'border-[#3f4147] hover:border-brand hover:-translate-y-1 hover:shadow-lg'
+                                }`}
+                              >
+                                <img 
+                                  src={char.imageUrl} 
+                                  className={`w-full h-full object-cover transition-all duration-300 ${isEliminated ? 'grayscale sepia-[0.3] blur-[1px]' : ''}`} 
+                                  alt={char.name} 
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-[#1e1f22]/90 backdrop-blur-sm border-t border-[#3f4147] text-center">
+                                  <span className={`text-[10px] sm:text-xs font-bold truncate block w-full ${isEliminated ? 'text-[#949ba4] line-through' : 'text-white'}`}>
+                                    {char.name}
+                                  </span>
+                                </div>
+                                {isEliminated && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+                                    <X size={48} className="text-[#f23f43] drop-shadow-[0_0_10px_rgba(242,63,67,0.8)]" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {indovinaPhase === 'gameover' && (
+                    <div className="m-auto text-center max-w-lg p-8 bg-[#2b2d31] rounded-2xl border border-[#3f4147] shadow-xl">
+                      <Trophy size={64} className="text-yellow-500 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+                      <h2 className="text-4xl font-black text-white mb-6">Partita Terminata!</h2>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-8">
+                        {players.map(p => {
+                          const charId = indovinaSecretChars[p.id];
+                          const char = indovinaCharacters.find(c => c.id === charId);
+                          return (
+                            <div key={p.id} className="bg-[#1e1f22] p-4 rounded-xl border border-[#3f4147] flex flex-col items-center">
+                              <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-12 h-12 mb-2" />
+                              <span className="text-white font-bold text-sm mb-3">{p.name} aveva:</span>
+                              {char ? (
+                                <div className="aspect-[3/4] w-24 rounded border-2 border-brand overflow-hidden relative">
+                                  <img src={char.imageUrl} className="w-full h-full object-cover" />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-[10px] font-bold py-1 text-center truncate px-1">
+                                    {char.name}
+                                  </div>
+                                </div>
+                              ) : <span className="text-[#949ba4] italic text-sm">Nessuno</span>}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {isHost && (
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={resetIndovina}
+                            className="flex-1 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg"
+                          >
+                            Gioca Ancora
+                          </button>
+                          <button 
+                            onClick={abandonSavedGame}
+                            className="flex-1 bg-transparent border-2 border-[#f23f43] text-[#f23f43] hover:bg-[#f23f43] hover:text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                          >
+                            Chiudi Minigioco
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                 </div>
               ) : (
                 <div 
