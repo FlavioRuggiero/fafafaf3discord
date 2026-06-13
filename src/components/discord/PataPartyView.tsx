@@ -390,16 +390,18 @@ export const PataPartyView = () => {
     if (!isHostRef.current) return;
     stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
     
-    const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
+    const playerCount = stateRef.current.players.length;
+    const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * playerCount;
     
     if (stateRef.current.indovinaCharacters.length >= maxChars) {
       stateRef.current.indovinaPhase = 'ready';
       stateRef.current.indovinaTurn = null;
     } else {
-      // Alterna il turno di creazione tra i 2 giocatori
+      // Alterna il turno di creazione tra i giocatori
       const currTurn = stateRef.current.indovinaTurn;
-      const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-      stateRef.current.indovinaTurn = nextTurn;
+      const currIndex = stateRef.current.players.findIndex(p => p.id === currTurn);
+      const nextIndex = (currIndex + 1) % playerCount;
+      stateRef.current.indovinaTurn = stateRef.current.players[nextIndex].id;
     }
     
     syncState();
@@ -423,16 +425,17 @@ export const PataPartyView = () => {
     }
     
     const allChars = stateRef.current.indovinaCharacters || [];
-    const p1Id = stateRef.current.players[0]?.id;
-    const p2Id = stateRef.current.players[1]?.id;
     
-    if (p1Id && p2Id && allChars.length > 0) {
+    if (stateRef.current.players.length >= 2 && allChars.length > 0) {
       stateRef.current.indovinaPhase = 'playing';
-      stateRef.current.indovinaSecretChars = {
-        [p1Id]: allChars[Math.floor(Math.random() * allChars.length)].id,
-        [p2Id]: allChars[Math.floor(Math.random() * allChars.length)].id
-      };
-      stateRef.current.indovinaTurn = p1Id;
+      
+      const secrets: Record<string, string> = {};
+      stateRef.current.players.forEach(p => {
+        secrets[p.id] = allChars[Math.floor(Math.random() * allChars.length)].id;
+      });
+      
+      stateRef.current.indovinaSecretChars = secrets;
+      stateRef.current.indovinaTurn = stateRef.current.players[0].id;
       syncState();
     }
   };
@@ -440,8 +443,9 @@ export const PataPartyView = () => {
   const handlePassTurnLogic = () => {
     if (!isHostRef.current) return;
     const currTurn = stateRef.current.indovinaTurn;
-    const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
-    stateRef.current.indovinaTurn = nextTurn;
+    const currIndex = stateRef.current.players.findIndex(p => p.id === currTurn);
+    const nextIndex = (currIndex + 1) % stateRef.current.players.length;
+    stateRef.current.indovinaTurn = stateRef.current.players[nextIndex].id;
     syncState();
   };
 
@@ -452,22 +456,22 @@ export const PataPartyView = () => {
        showError("Seleziona un preset valido.");
        return;
     }
-    if (stateRef.current.players.length !== 2) {
-       showError("Servono esattamente 2 giocatori.");
+    if (stateRef.current.players.length < 2 || stateRef.current.players.length > 4) {
+       showError("Servono da 2 a 4 giocatori.");
        return;
     }
 
     stateRef.current.indovinaCharacters = preset.characters;
     
-    const p1Id = stateRef.current.players[0].id;
-    const p2Id = stateRef.current.players[1].id;
-    
     stateRef.current.indovinaPhase = 'playing';
-    stateRef.current.indovinaSecretChars = {
-      [p1Id]: preset.characters[Math.floor(Math.random() * preset.characters.length)].id,
-      [p2Id]: preset.characters[Math.floor(Math.random() * preset.characters.length)].id
-    };
-    stateRef.current.indovinaTurn = p1Id;
+    
+    const secrets: Record<string, string> = {};
+    stateRef.current.players.forEach(p => {
+      secrets[p.id] = preset.characters[Math.floor(Math.random() * preset.characters.length)].id;
+    });
+    
+    stateRef.current.indovinaSecretChars = secrets;
+    stateRef.current.indovinaTurn = stateRef.current.players[0].id;
     
     syncState();
     showSuccess("Partita avviata con il preset!");
@@ -578,8 +582,8 @@ export const PataPartyView = () => {
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
         
         // Controllo Limite Giocatori per IndovinaQualchì
-        if (stateRef.current.gameMode === 'indovina' && stateRef.current.players.length >= 2) {
-          channel.send({ type: 'broadcast', event: 'error_msg', payload: { targetId: newPlayer.id, msg: 'Partita IndovinaQualchì piena! (Massimo 2 giocatori)' } });
+        if (stateRef.current.gameMode === 'indovina' && stateRef.current.players.length >= 4) {
+          channel.send({ type: 'broadcast', event: 'error_msg', payload: { targetId: newPlayer.id, msg: 'Partita IndovinaQualchì piena! (Massimo 4 giocatori)' } });
           return;
         }
 
@@ -902,8 +906,8 @@ export const PataPartyView = () => {
   // Indovina Game Handlers
   const startIndovinaDraft = () => {
     if (!isHost) return;
-    if (stateRef.current.players.length !== 2) {
-      showError("Servono esattamente 2 giocatori per avviare IndovinaQualchì.");
+    if (stateRef.current.players.length < 2 || stateRef.current.players.length > 4) {
+      showError("Servono da 2 a 4 giocatori per avviare IndovinaQualchì.");
       return;
     }
     stateRef.current.indovinaPhase = 'draft';
@@ -1274,7 +1278,7 @@ export const PataPartyView = () => {
     );
   };
 
-  const canStartGame = activeGameMode === 'indovina' ? players.length === 2 : players.length >= 1;
+  const canStartGame = activeGameMode === 'indovina' ? (players.length >= 2 && players.length <= 4) : players.length >= 1;
 
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
@@ -1443,7 +1447,7 @@ export const PataPartyView = () => {
 
           <div className="text-left mb-6">
             <h3 className="text-[#dbdee1] font-bold mb-3 flex items-center justify-between">
-              Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
+              Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 4' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
               {players.map(p => {
@@ -1607,7 +1611,7 @@ export const PataPartyView = () => {
                                   }}
                                   className="w-full bg-[#1e1f22] text-white text-center rounded p-3 text-xl font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
                                 />
-                                <p className="text-[10px] text-[#949ba4] mt-2">Totale personaggi sul tabellone: {indovinaSettings.charsPerPlayer * 2}</p>
+                                <p className="text-[10px] text-[#949ba4] mt-2">Totale personaggi sul tabellone: {indovinaSettings.charsPerPlayer * players.length}</p>
                               </div>
                               <button 
                                 onClick={startIndovinaDraft}
@@ -1657,7 +1661,7 @@ export const PataPartyView = () => {
                             <Users size={20} className="text-[#a855f7]" /> Creazione Personaggi
                           </h2>
                           <p className="text-sm text-[#b5bac1]">
-                            Aggiunti: <span className="text-white font-bold">{indovinaCharacters.length}</span> su {indovinaSettings.charsPerPlayer * 2}
+                            Aggiunti: <span className="text-white font-bold">{indovinaCharacters.length}</span> su {indovinaSettings.charsPerPlayer * players.length}
                           </p>
                         </div>
                         <div className="bg-[#1e1f22] px-4 py-2 rounded-lg border border-[#a855f7]/30 shadow-sm flex items-center gap-3">
@@ -1752,7 +1756,7 @@ export const PataPartyView = () => {
                                 </div>
                               </div>
                             ))}
-                            {Array.from({ length: Math.max(0, (indovinaSettings.charsPerPlayer * 2) - indovinaCharacters.length) }).map((_, i) => (
+                            {Array.from({ length: Math.max(0, (indovinaSettings.charsPerPlayer * players.length) - indovinaCharacters.length) }).map((_, i) => (
                               <div key={`empty-${i}`} className="aspect-[3/4] bg-[#1e1f22]/50 border-2 border-dashed border-[#3f4147] rounded-lg flex items-center justify-center">
                                 <HelpCircle size={24} className="text-[#3f4147]" />
                               </div>
@@ -1884,7 +1888,7 @@ export const PataPartyView = () => {
                       <Trophy size={64} className="text-yellow-500 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
                       <h2 className="text-4xl font-black text-white mb-6">Partita Terminata!</h2>
                       
-                      <div className="grid grid-cols-2 gap-4 mb-8">
+                      <div className={`grid gap-4 mb-8 ${players.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
                         {players.map(p => {
                           const charId = indovinaSecretChars[p.id];
                           const char = indovinaCharacters.find(c => c.id === charId);
