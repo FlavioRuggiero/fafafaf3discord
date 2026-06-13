@@ -294,17 +294,8 @@ export const PataPartyView = () => {
 
   const boardRef = useRef<HTMLDivElement>(null);
   const lastSyncRef = useRef<number>(0);
+
   const channelRef = useRef<any>(null);
-
-  // Refs per evitare stale closures
-  const isHostRef = useRef(isHost);
-  const savedGameRef = useRef(savedGame);
-  const gameCodeRef = useRef(gameCode);
-
-  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
-  useEffect(() => { savedGameRef.current = savedGame; }, [savedGame]);
-  useEffect(() => { gameCodeRef.current = gameCode; }, [gameCode]);
-
   const stateRef = useRef<GameState>({ status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [], indovinaPhase: 'setup', indovinaSettings: { charsPerPlayer: 12 }, indovinaCharacters: [], indovinaSecretChars: {}, indovinaTurn: null });
 
   useEffect(() => {
@@ -376,8 +367,8 @@ export const PataPartyView = () => {
     setIndovinaSecretChars(stateRef.current.indovinaSecretChars || {});
     setIndovinaTurn(stateRef.current.indovinaTurn || null);
 
-    if (isHostRef.current || (savedGameRef.current && savedGameRef.current.isHost)) {
-      const codeToSave = gameCodeRef.current || savedGameRef.current?.code;
+    if (isHost || (savedGame && savedGame.isHost)) {
+      const codeToSave = gameCode || savedGame?.code;
       if (codeToSave) {
         localStorage.setItem(`pataparty_state_${codeToSave}`, JSON.stringify(stateRef.current));
       }
@@ -387,7 +378,7 @@ export const PataPartyView = () => {
 
   // IndovinaQualchì Centralized Logic (Per far funzionare bene l'Host)
   const handleAddCharacterLogic = (char: IndovinaCharacter) => {
-    if (!isHostRef.current) return;
+    if (!isHost) return;
     stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
     
     const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
@@ -415,6 +406,7 @@ export const PataPartyView = () => {
          characters: stateRef.current.indovinaCharacters
       });
       if (error) {
+        console.error("Errore salvataggio preset:", error);
         showError("Errore nel salvataggio del preset.");
       } else {
         showSuccess("Preset salvato con successo!");
@@ -437,7 +429,7 @@ export const PataPartyView = () => {
   };
 
   const handlePassTurnLogic = () => {
-    if (!isHostRef.current) return;
+    if (!isHost) return;
     const currTurn = stateRef.current.indovinaTurn;
     const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
     stateRef.current.indovinaTurn = nextTurn;
@@ -952,7 +944,7 @@ export const PataPartyView = () => {
       creatorId: user.id
     };
 
-    if (isHostRef.current) {
+    if (isHost) {
       handleAddCharacterLogic(newChar);
     } else {
       channelRef.current?.send({
@@ -970,7 +962,7 @@ export const PataPartyView = () => {
   };
 
   const passIndovinaTurn = () => {
-    if (isHostRef.current) {
+    if (isHost) {
       handlePassTurnLogic();
     } else {
       channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
