@@ -294,8 +294,17 @@ export const PataPartyView = () => {
 
   const boardRef = useRef<HTMLDivElement>(null);
   const lastSyncRef = useRef<number>(0);
-
   const channelRef = useRef<any>(null);
+
+  // Refs per evitare stale closures
+  const isHostRef = useRef(isHost);
+  const savedGameRef = useRef(savedGame);
+  const gameCodeRef = useRef(gameCode);
+
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+  useEffect(() => { savedGameRef.current = savedGame; }, [savedGame]);
+  useEffect(() => { gameCodeRef.current = gameCode; }, [gameCode]);
+
   const stateRef = useRef<GameState>({ status: 'lobby', gameMode: 'board', players: [], activePlayerId: null, boardUrl: '/pataparty-board.png', rules: '', iframeUrl: null, isIframeActive: false, announcement: null, leaderboard: null, chatMessages: [], isCommercial: false, poll: null, customDice: [], indovinaPhase: 'setup', indovinaSettings: { charsPerPlayer: 12 }, indovinaCharacters: [], indovinaSecretChars: {}, indovinaTurn: null });
 
   useEffect(() => {
@@ -367,8 +376,8 @@ export const PataPartyView = () => {
     setIndovinaSecretChars(stateRef.current.indovinaSecretChars || {});
     setIndovinaTurn(stateRef.current.indovinaTurn || null);
 
-    if (isHost || (savedGame && savedGame.isHost)) {
-      const codeToSave = gameCode || savedGame?.code;
+    if (isHostRef.current || (savedGameRef.current && savedGameRef.current.isHost)) {
+      const codeToSave = gameCodeRef.current || savedGameRef.current?.code;
       if (codeToSave) {
         localStorage.setItem(`pataparty_state_${codeToSave}`, JSON.stringify(stateRef.current));
       }
@@ -378,7 +387,7 @@ export const PataPartyView = () => {
 
   // IndovinaQualchì Centralized Logic (Per far funzionare bene l'Host)
   const handleAddCharacterLogic = (char: IndovinaCharacter) => {
-    if (!isHost) return;
+    if (!isHostRef.current) return;
     stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
     
     const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * 2;
@@ -406,7 +415,7 @@ export const PataPartyView = () => {
   };
 
   const handlePassTurnLogic = () => {
-    if (!isHost) return;
+    if (!isHostRef.current) return;
     const currTurn = stateRef.current.indovinaTurn;
     const nextTurn = stateRef.current.players.find(p => p.id !== currTurn)?.id || currTurn;
     stateRef.current.indovinaTurn = nextTurn;
@@ -939,7 +948,7 @@ export const PataPartyView = () => {
       creatorId: user.id
     };
 
-    if (isHost) {
+    if (isHostRef.current) {
       handleAddCharacterLogic(newChar);
     } else {
       channelRef.current?.send({
@@ -957,7 +966,7 @@ export const PataPartyView = () => {
   };
 
   const passIndovinaTurn = () => {
-    if (isHost) {
+    if (isHostRef.current) {
       handlePassTurnLogic();
     } else {
       channelRef.current?.send({ type: 'broadcast', event: 'indovina_pass_turn', payload: {} });
@@ -1432,30 +1441,20 @@ export const PataPartyView = () => {
               Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 2' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
-              {isHost && (
-                <div className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-yellow-500/50 mb-2 shadow-sm">
-                  <Avatar src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} decoration={profile?.avatar_decoration} className="w-8 h-8" />
-                  <span className={`font-bold ${getThemeClass(profile?.avatar_decoration)}`} style={getThemeStyle(profile?.avatar_decoration)}>
-                    {profile?.first_name || 'Tu'} <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>
-                  </span>
-                  <Crown size={14} className="text-yellow-500 ml-auto" />
-                </div>
-              )}
-              {players.map(p => (
-                <div key={p.id} className="flex items-center gap-3 bg-[#2b2d31] p-2 rounded border border-[#3f4147]">
-                  <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
-                  <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
-                    {p.name}
-                  </span>
-                </div>
-              ))}
+              {players.map(p => {
+                const isHostPlayer = p.id === stateRef.current.players[0]?.id;
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 bg-[#2b2d31] p-2 rounded border ${isHostPlayer ? 'border-yellow-500/50 shadow-sm' : 'border-[#3f4147]'}`}>
+                    <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-8 h-8" />
+                    <span className={`font-medium ${getThemeClass(p.avatar_decoration)}`} style={getThemeStyle(p.avatar_decoration)}>
+                      {p.name} {isHostPlayer && <span className="text-xs text-yellow-500 ml-1 uppercase">(Game Master)</span>}
+                    </span>
+                    {isHostPlayer && <Crown size={14} className="text-yellow-500 ml-auto" />}
+                  </div>
+                );
+              })}
               {players.length === 0 && (
                 <div className="text-[#949ba4] text-sm text-center py-4">In attesa dei giocatori...</div>
-              )}
-              {activeGameMode === 'indovina' && players.length > 2 && (
-                <div className="text-[#f23f43] text-xs font-bold text-center mt-2">
-                  Troppi giocatori per questa modalità! Massimo 2.
-                </div>
               )}
             </div>
           </div>
