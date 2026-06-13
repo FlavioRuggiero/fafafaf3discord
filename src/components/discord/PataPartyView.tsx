@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { playSound } from "@/utils/sounds";
-import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle, Upload, CheckCircle2, Save } from "lucide-react";
+import { Crown, Users, Play, Minimize2, LogOut, Info, Dices, Plus, Minus, Image as ImageIcon, BookOpen, X, Globe, Megaphone, Trophy, MessageSquare, BarChart2, Dice5, Trash2, HelpCircle, Upload, CheckCircle2, Save, Edit2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { Avatar } from "./Avatar";
 import { useShop } from "@/contexts/ShopContext";
@@ -259,6 +259,8 @@ export const PataPartyView = () => {
   const [indovinaPresets, setIndovinaPresets] = useState<IndovinaPreset[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string>('');
   const [presetNameInput, setPresetNameInput] = useState<string>('');
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editingCharId, setEditingCharId] = useState<string | null>(null);
 
   // IndovinaQualchì Form Upload
   const [indovinaCharName, setIndovinaCharName] = useState('');
@@ -388,20 +390,32 @@ export const PataPartyView = () => {
   // IndovinaQualchì Centralized Logic (Per far funzionare bene l'Host)
   const handleAddCharacterLogic = (char: IndovinaCharacter) => {
     if (!isHostRef.current) return;
-    stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
     
-    const playerCount = stateRef.current.players.length;
-    const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * playerCount;
-    
-    if (stateRef.current.indovinaCharacters.length >= maxChars) {
-      stateRef.current.indovinaPhase = 'ready';
-      stateRef.current.indovinaTurn = null;
+    // Se stiamo modificando un personaggio, rimpiazzalo invece di aggiungerlo
+    if (editingCharId) {
+      stateRef.current.indovinaCharacters = stateRef.current.indovinaCharacters?.map(c => 
+        c.id === editingCharId ? char : c
+      ) || [];
+      setEditingCharId(null);
     } else {
-      // Alterna il turno di creazione tra i giocatori
-      const currTurn = stateRef.current.indovinaTurn;
-      const currIndex = stateRef.current.players.findIndex(p => p.id === currTurn);
-      const nextIndex = (currIndex + 1) % playerCount;
-      stateRef.current.indovinaTurn = stateRef.current.players[nextIndex].id;
+      stateRef.current.indovinaCharacters = [...(stateRef.current.indovinaCharacters || []), char];
+    }
+    
+    // Se stiamo modificando un preset intero, non forzare il passaggio automatico alla fase 'ready'
+    if (!editingPresetId) {
+      const playerCount = stateRef.current.players.length;
+      const maxChars = (stateRef.current.indovinaSettings?.charsPerPlayer || 12) * playerCount;
+      
+      if (stateRef.current.indovinaCharacters.length >= maxChars) {
+        stateRef.current.indovinaPhase = 'ready';
+        stateRef.current.indovinaTurn = null;
+      } else {
+        // Alterna il turno di creazione tra i giocatori se non in edit mode
+        const currTurn = stateRef.current.indovinaTurn;
+        const currIndex = stateRef.current.players.findIndex(p => p.id === currTurn);
+        const nextIndex = (currIndex + 1) % playerCount;
+        stateRef.current.indovinaTurn = stateRef.current.players[nextIndex].id;
+      }
     }
     
     syncState();
@@ -411,16 +425,33 @@ export const PataPartyView = () => {
     if (!isHost) return;
     
     if (presetName && presetName.trim()) {
-      const { error } = await supabase.from('indovina_presets').insert({
-         name: presetName.trim(),
-         creator_id: user?.id,
-         characters: stateRef.current.indovinaCharacters
-      });
-      if (error) {
-        console.error("Errore salvataggio preset:", error);
-        showError("Errore nel salvataggio del preset.");
+      if (editingPresetId) {
+        // Aggiorna preset esistente
+        const { error } = await supabase.from('indovina_presets').update({
+           name: presetName.trim(),
+           characters: stateRef.current.indovinaCharacters
+        }).eq('id', editingPresetId);
+        
+        if (error) {
+          console.error("Errore aggiornamento preset:", error);
+          showError("Errore nell'aggiornamento del preset.");
+        } else {
+          showSuccess("Preset aggiornato con successo!");
+        }
       } else {
-        showSuccess("Preset salvato con successo!");
+        // Crea nuovo preset
+        const { error } = await supabase.from('indovina_presets').insert({
+           name: presetName.trim(),
+           creator_id: user?.id,
+           characters: stateRef.current.indovinaCharacters
+        });
+        
+        if (error) {
+          console.error("Errore salvataggio preset:", error);
+          showError("Errore nel salvataggio del preset.");
+        } else {
+          showSuccess("Preset salvato con successo!");
+        }
       }
     }
     
@@ -475,6 +506,40 @@ export const PataPartyView = () => {
     
     syncState();
     showSuccess("Partita avviata con il preset!");
+  };
+
+  const editSelectedPreset = () => {
+    if (!isHost) return;
+    const preset = indovinaPresets.find(p => p.id === selectedPresetId);
+    if (!preset) {
+       showError("Seleziona un preset valido.");
+       return;
+    }
+    setEditingPresetId(preset.id);
+    setPresetNameInput(preset.name);
+    stateRef.current.indovinaCharacters = [...preset.characters];
+    stateRef.current.indovinaPhase = 'draft';
+    syncState();
+  };
+
+  const deleteIndovinaChar = (charId: string) => {
+    if (!isHost) return;
+    stateRef.current.indovinaCharacters = stateRef.current.indovinaCharacters?.filter(c => c.id !== charId) || [];
+    syncState();
+  };
+
+  const startEditIndovinaChar = (char: IndovinaCharacter) => {
+    if (!isHost) return;
+    setEditingCharId(char.id);
+    setIndovinaCharName(char.name);
+    setIndovinaCharUrl(char.imageUrl);
+  };
+
+  const cancelEditIndovinaChar = () => {
+    setEditingCharId(null);
+    setIndovinaCharName('');
+    setIndovinaCharUrl('');
+    setIndovinaCharFile(null);
   };
 
   const handleDiceRoll = (playerId: string, result: number | string | number[] | string[], diceType?: string) => {
@@ -741,6 +806,8 @@ export const PataPartyView = () => {
     setCustomDice([]);
     setGmTab('players');
     setEliminatedChars([]);
+    setEditingPresetId(null);
+    setEditingCharId(null);
     
     const activeObj = { code, isHost: true };
     setSavedGame(activeObj);
@@ -802,6 +869,8 @@ export const PataPartyView = () => {
     setUnreadChat(false);
     setShowChat(false);
     setEliminatedChars([]);
+    setEditingPresetId(null);
+    setEditingCharId(null);
 
     const activeObj = { code: joinCode, isHost: false };
     setSavedGame(activeObj);
@@ -894,6 +963,8 @@ export const PataPartyView = () => {
     setIsCommercial(false);
     setCustomDice([]);
     setEliminatedChars([]);
+    setEditingPresetId(null);
+    setEditingCharId(null);
   };
 
   const startGame = () => {
@@ -951,7 +1022,7 @@ export const PataPartyView = () => {
     }
 
     const newChar: IndovinaCharacter = {
-      id: `char_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      id: editingCharId || `char_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       name: indovinaCharName.trim(),
       imageUrl: finalUrl,
       creatorId: user.id
@@ -1624,16 +1695,28 @@ export const PataPartyView = () => {
                             <div className="space-y-4 animate-in fade-in">
                               <div>
                                 <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Seleziona un Preset</label>
-                                <select 
-                                  value={selectedPresetId} 
-                                  onChange={e => setSelectedPresetId(e.target.value)}
-                                  className="w-full bg-[#1e1f22] text-white rounded p-3 font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
-                                >
-                                  <option value="">Seleziona...</option>
-                                  {indovinaPresets.map(p => (
-                                     <option key={p.id} value={p.id}>{p.name} ({p.characters.length} personaggi)</option>
-                                  ))}
-                                </select>
+                                <div className="flex gap-2 mb-2">
+                                  <select 
+                                    value={selectedPresetId} 
+                                    onChange={e => setSelectedPresetId(e.target.value)}
+                                    className="flex-1 bg-[#1e1f22] text-white rounded p-3 font-bold border border-[#3f4147] outline-none focus:border-[#a855f7]"
+                                  >
+                                    <option value="">Seleziona...</option>
+                                    {indovinaPresets.map(p => (
+                                       <option key={p.id} value={p.id}>{p.name} ({p.characters.length} personaggi)</option>
+                                    ))}
+                                  </select>
+                                  {canCreate && (
+                                    <button 
+                                      onClick={editSelectedPreset} 
+                                      disabled={!selectedPresetId} 
+                                      className="bg-[#4e5058] hover:bg-[#6d6f78] text-white p-3 rounded transition-colors disabled:opacity-50"
+                                      title="Modifica Preset"
+                                    >
+                                      <Edit2 size={18} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <button 
                                 onClick={startGameWithPreset}
@@ -1658,25 +1741,54 @@ export const PataPartyView = () => {
                       <div className="flex justify-between items-center mb-6 bg-[#2b2d31] p-4 rounded-xl border border-[#3f4147]">
                         <div>
                           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <Users size={20} className="text-[#a855f7]" /> Creazione Personaggi
+                            <Users size={20} className="text-[#a855f7]" /> {editingPresetId ? 'Modifica Preset' : 'Creazione Personaggi'}
                           </h2>
                           <p className="text-sm text-[#b5bac1]">
-                            Aggiunti: <span className="text-white font-bold">{indovinaCharacters.length}</span> su {indovinaSettings.charsPerPlayer * players.length}
+                            {editingPresetId ? `Personaggi nel preset: ` : `Aggiunti: `}
+                            <span className="text-white font-bold">{indovinaCharacters.length}</span>
+                            {!editingPresetId && ` su ${indovinaSettings.charsPerPlayer * players.length}`}
                           </p>
                         </div>
-                        <div className="bg-[#1e1f22] px-4 py-2 rounded-lg border border-[#a855f7]/30 shadow-sm flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full bg-[#a855f7] animate-pulse"></div>
-                          <span className="text-sm font-medium text-white">
-                            Turno di: <strong className="text-[#a855f7]">{players.find(p => p.id === indovinaTurn)?.name || '...'}</strong>
-                          </span>
+                        <div className="flex items-center gap-3">
+                          {editingPresetId ? (
+                            <button
+                              onClick={() => {
+                                stateRef.current.indovinaPhase = 'ready';
+                                syncState();
+                              }}
+                              className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm"
+                            >
+                              Salva Modifiche e Vai Avanti
+                            </button>
+                          ) : (
+                            <>
+                              <div className="bg-[#1e1f22] px-4 py-2 rounded-lg border border-[#a855f7]/30 shadow-sm flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-[#a855f7] animate-pulse"></div>
+                                <span className="text-sm font-medium text-white">
+                                  Turno di: <strong className="text-[#a855f7]">{players.find(p => p.id === indovinaTurn)?.name || '...'}</strong>
+                                </span>
+                              </div>
+                              {isHost && (
+                                <button
+                                  onClick={() => {
+                                    stateRef.current.indovinaPhase = 'ready';
+                                    syncState();
+                                  }}
+                                  className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                                >
+                                  Forza Chiusura
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
 
                       <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-                        {/* Form Creazione */}
-                        <div className={`w-full md:w-80 flex-shrink-0 flex flex-col gap-4 transition-opacity ${indovinaTurn === user?.id ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                        {/* Form Creazione/Modifica */}
+                        <div className={`w-full md:w-80 flex-shrink-0 flex flex-col gap-4 transition-opacity ${(indovinaTurn === user?.id || editingPresetId) ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                           <div className="bg-[#2b2d31] p-5 rounded-xl border border-[#3f4147] flex-1 flex flex-col">
-                            <h3 className="text-white font-bold mb-4 uppercase text-sm">Aggiungi Personaggio</h3>
+                            <h3 className="text-white font-bold mb-4 uppercase text-sm">{editingCharId ? 'Modifica Personaggio' : 'Aggiungi Personaggio'}</h3>
                             
                             <form onSubmit={submitIndovinaChar} className="flex flex-col h-full gap-4">
                               <div>
@@ -1704,6 +1816,8 @@ export const PataPartyView = () => {
                                         <CheckCircle2 size={24} className="text-[#23a559] mb-2" />
                                         <span className="text-white text-xs font-medium truncate max-w-full px-2">{indovinaCharFile.name}</span>
                                       </>
+                                    ) : indovinaCharUrl && editingCharId ? (
+                                      <img src={indovinaCharUrl} className="w-full h-full object-contain opacity-50" />
                                     ) : (
                                       <>
                                         <Upload size={24} className="text-[#949ba4] mb-2" />
@@ -1733,13 +1847,24 @@ export const PataPartyView = () => {
                                 </div>
                               </div>
 
-                              <button 
-                                type="submit"
-                                disabled={!indovinaCharName.trim() || (!indovinaCharFile && !indovinaCharUrl.trim()) || isUploadingChar}
-                                className="mt-auto w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md disabled:opacity-50"
-                              >
-                                {isUploadingChar ? 'Caricamento...' : 'Aggiungi al Tabellone'}
-                              </button>
+                              <div className="mt-auto flex gap-2">
+                                {editingCharId && (
+                                  <button 
+                                    type="button"
+                                    onClick={cancelEditIndovinaChar}
+                                    className="w-1/3 bg-[#4e5058] hover:bg-[#6d6f78] text-white font-bold py-3 rounded-lg transition-colors"
+                                  >
+                                    Annulla
+                                  </button>
+                                )}
+                                <button 
+                                  type="submit"
+                                  disabled={!indovinaCharName.trim() || (!indovinaCharFile && !indovinaCharUrl.trim()) || isUploadingChar}
+                                  className={`${editingCharId ? 'w-2/3' : 'w-full'} bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md disabled:opacity-50`}
+                                >
+                                  {isUploadingChar ? 'Caricamento...' : (editingCharId ? 'Salva Modifiche' : 'Aggiungi al Tabellone')}
+                                </button>
+                              </div>
                             </form>
                           </div>
                         </div>
@@ -1749,14 +1874,20 @@ export const PataPartyView = () => {
                           <h3 className="text-[#b5bac1] font-bold mb-4 uppercase text-sm">Tabellone in costruzione</h3>
                           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
                             {indovinaCharacters.map((char, i) => (
-                              <div key={i} className="aspect-[3/4] bg-[#1e1f22] rounded-lg border border-[#3f4147] overflow-hidden flex flex-col relative group animate-in zoom-in duration-300">
+                              <div key={char.id} className="aspect-[3/4] bg-[#1e1f22] rounded-lg border border-[#3f4147] overflow-hidden flex flex-col relative group animate-in zoom-in duration-300">
                                 <img src={char.imageUrl} className="flex-1 object-cover w-full bg-black/20" alt={char.name} />
                                 <div className="p-1.5 bg-[#1e1f22] border-t border-[#3f4147] text-center">
                                   <span className="text-[10px] sm:text-xs font-bold text-white truncate block w-full">{char.name}</span>
                                 </div>
+                                {isHost && (
+                                  <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onClick={(e) => { e.stopPropagation(); startEditIndovinaChar(char); }} className="bg-[#1e1f22]/80 backdrop-blur-sm p-1.5 rounded hover:bg-brand text-white transition-colors"><Edit2 size={14}/></button>
+                                    <button onClick={(e) => { e.stopPropagation(); deleteIndovinaChar(char.id); }} className="bg-[#1e1f22]/80 backdrop-blur-sm p-1.5 rounded hover:bg-[#f23f43] text-white transition-colors"><Trash2 size={14}/></button>
+                                  </div>
+                                )}
                               </div>
                             ))}
-                            {Array.from({ length: Math.max(0, (indovinaSettings.charsPerPlayer * players.length) - indovinaCharacters.length) }).map((_, i) => (
+                            {!editingPresetId && Array.from({ length: Math.max(0, (indovinaSettings.charsPerPlayer * players.length) - indovinaCharacters.length) }).map((_, i) => (
                               <div key={`empty-${i}`} className="aspect-[3/4] bg-[#1e1f22]/50 border-2 border-dashed border-[#3f4147] rounded-lg flex items-center justify-center">
                                 <HelpCircle size={24} className="text-[#3f4147]" />
                               </div>
@@ -1771,7 +1902,7 @@ export const PataPartyView = () => {
                     <div className="m-auto text-center max-w-md p-8 bg-[#2b2d31] rounded-2xl border border-[#3f4147] shadow-xl">
                       <CheckCircle2 size={64} className="text-[#23a559] mx-auto mb-4" />
                       <h2 className="text-3xl font-black text-white mb-2">Tabellone Completato!</h2>
-                      <p className="text-[#b5bac1] mb-6">I personaggi sono pronti. {isHost ? "Vuoi salvare questo tabellone come preset per le prossime partite?" : "In attesa che il Game Master avvii la partita..."}</p>
+                      <p className="text-[#b5bac1] mb-6">I personaggi sono pronti. {isHost ? (editingPresetId ? "Salva le modifiche al preset prima di iniziare la partita." : "Vuoi salvare questo tabellone come preset per le prossime partite?") : "In attesa che il Game Master avvii la partita..."}</p>
                       
                       {isHost ? (
                         <div className="space-y-4">
