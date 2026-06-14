@@ -487,8 +487,8 @@ export const PataPartyView = () => {
        showError("Seleziona un preset valido.");
        return;
     }
-    if (stateRef.current.players.length < 2 || stateRef.current.players.length > 4) {
-       showError("Servono da 2 a 4 giocatori.");
+    if (stateRef.current.players.length < 2 || stateRef.current.players.length > 16) {
+       showError("Servono da 2 a 16 giocatori.");
        return;
     }
 
@@ -647,8 +647,8 @@ export const PataPartyView = () => {
       if (!stateRef.current.players.find(p => p.id === newPlayer.id)) {
         
         // Controllo Limite Giocatori per IndovinaQualchì
-        if (stateRef.current.gameMode === 'indovina' && stateRef.current.players.length >= 4) {
-          channel.send({ type: 'broadcast', event: 'error_msg', payload: { targetId: newPlayer.id, msg: 'Partita IndovinaQualchì piena! (Massimo 4 giocatori)' } });
+        if (stateRef.current.gameMode === 'indovina' && stateRef.current.players.length >= 16) {
+          channel.send({ type: 'broadcast', event: 'error_msg', payload: { targetId: newPlayer.id, msg: 'Partita IndovinaQualchì piena! (Massimo 16 giocatori)' } });
           return;
         }
 
@@ -977,8 +977,8 @@ export const PataPartyView = () => {
   // Indovina Game Handlers
   const startIndovinaDraft = () => {
     if (!isHost) return;
-    if (stateRef.current.players.length < 2 || stateRef.current.players.length > 4) {
-      showError("Servono da 2 a 4 giocatori per avviare IndovinaQualchì.");
+    if (stateRef.current.players.length < 2 || stateRef.current.players.length > 16) {
+      showError("Servono da 2 a 16 giocatori per avviare IndovinaQualchì.");
       return;
     }
     stateRef.current.indovinaPhase = 'draft';
@@ -1349,7 +1349,7 @@ export const PataPartyView = () => {
     );
   };
 
-  const canStartGame = activeGameMode === 'indovina' ? (players.length >= 2 && players.length <= 4) : players.length >= 1;
+  const canStartGame = activeGameMode === 'indovina' ? (players.length >= 2 && players.length <= 16) : players.length >= 1;
 
   return (
     <div className="flex-1 bg-[#313338] h-full flex flex-col items-center justify-center p-8 overflow-y-auto custom-scrollbar relative">
@@ -1518,7 +1518,7 @@ export const PataPartyView = () => {
 
           <div className="text-left mb-6">
             <h3 className="text-[#dbdee1] font-bold mb-3 flex items-center justify-between">
-              Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 4' : ''})
+              Giocatori ({players.length}{activeGameMode === 'indovina' ? ' / 16' : ''})
             </h3>
             <div className="bg-[#1e1f22] rounded-lg p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
               {players.map(p => {
@@ -2019,16 +2019,16 @@ export const PataPartyView = () => {
                       <Trophy size={64} className="text-yellow-500 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
                       <h2 className="text-4xl font-black text-white mb-6">Partita Terminata!</h2>
                       
-                      <div className={`grid gap-4 mb-8 ${players.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+                      <div className={`grid gap-4 mb-8 ${players.length > 2 ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8' : 'grid-cols-2'}`}>
                         {players.map(p => {
                           const charId = indovinaSecretChars[p.id];
                           const char = indovinaCharacters.find(c => c.id === charId);
                           return (
                             <div key={p.id} className="bg-[#1e1f22] p-4 rounded-xl border border-[#3f4147] flex flex-col items-center">
                               <Avatar src={p.avatar} decoration={p.avatar_decoration} className="w-12 h-12 mb-2" />
-                              <span className="text-white font-bold text-sm mb-3">{p.name} aveva:</span>
+                              <span className="text-white font-bold text-sm mb-3 text-center line-clamp-2">{p.name} aveva:</span>
                               {char ? (
-                                <div className="aspect-[3/4] w-24 rounded border-2 border-brand overflow-hidden relative">
+                                <div className="aspect-[3/4] w-full rounded border-2 border-brand overflow-hidden relative">
                                   <img src={char.imageUrl} className="w-full h-full object-cover" />
                                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-[10px] font-bold py-1 text-center truncate px-1">
                                     {char.name}
